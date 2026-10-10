@@ -7,6 +7,7 @@
 
 import { useNavigate, useParams } from 'react-router-dom'
 import { usePosting } from '../api/postings'
+import { SimilarPostings } from '../components/SimilarPostings'
 import { formatDate, workModeLabel } from '../utils/format'
 
 export default function PostingDetailPage() {
@@ -49,7 +50,7 @@ export default function PostingDetailPage() {
 
   // ── Detail view ───────────────────────────────────────────────────────────
   return (
-    <div className="max-w-3xl mx-auto px-4 py-8">
+    <div className="max-w-6xl mx-auto px-4 py-8 md:grid md:grid-cols-3 md:gap-8">
       {/* Back link */}
       <button
         onClick={() => navigate(-1)}
@@ -59,7 +60,7 @@ export default function PostingDetailPage() {
         ← Back to postings
       </button>
 
-      <article>
+      <article className="md:col-span-2">
         {/* Title + company */}
         <header className="mb-6">
           <h1 className="text-2xl font-bold text-gray-900">{posting.title}</h1>
@@ -122,6 +123,14 @@ export default function PostingDetailPage() {
           </div>
         )}
       </article>
+
+      {/* Similar postings sidebar */}
+      <aside className="mt-8 md:mt-0" aria-label="Similar postings">
+        <h2 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
+          Similar postings
+        </h2>
+        <SimilarPostings postingId={id!} />
+      </aside>
     </div>
   )
 }

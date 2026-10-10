@@ -19,6 +19,13 @@ dependencies = [
     "argon2-cffi>=23.1",     # argon2id password hashing (OWASP-recommended)
     "redis[asyncio]>=5.0",   # async Redis client for session storage
     "pandas>=2.2",           # CSV generation for tracker export endpoint
+    "rq>=1.16",              # background job queue (ingest workers)
+    "rq-scheduler>=0.13",    # scheduled 6-hour ingest runs
+    "openai>=1.30",          # text-embedding-3-small for semantic search
+    "pgvector>=0.3",         # pgvector SQLAlchemy integration
+    "python-multipart>=0.0.9", # FastAPI file upload support
+    "feedparser>=6.0",       # RSS/Atom feed parsing
+    "anthropic>=0.29",       # Claude Haiku skill extraction fallback
 ]
 
 [project.optional-dependencies]
@@ -29,6 +36,7 @@ dev = [
     "ruff>=0.4",
     "mypy>=1.10",
     "types-passlib",
+    "respx>=0.21",           # httpx request mocking for ingest tests
 ]
 
 [tool.setuptools.packages.find]

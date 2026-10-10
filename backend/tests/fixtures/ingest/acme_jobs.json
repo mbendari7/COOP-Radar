@@ -1,0 +1,57 @@
+[
+  {
+    "id": "acme-001",
+    "title": "Backend Software Developer Co-op",
+    "company": "Acme Corp",
+    "city": "Waterloo",
+    "term": "Summer 2027",
+    "deadline": "2027-03-01",
+    "work_mode": "hybrid",
+    "description": "Join our backend team building distributed systems with Python and Go.",
+    "skills": ["Python", "Go", "PostgreSQL", "Docker"]
+  },
+  {
+    "id": "acme-002",
+    "title": "Frontend React Developer Co-op",
+    "company": "Acme Corp",
+    "city": "Toronto",
+    "term": "Summer 2027",
+    "deadline": "2027-02-15",
+    "work_mode": "remote",
+    "description": "Build modern React applications with TypeScript and TanStack Query.",
+    "skills": ["React", "TypeScript", "CSS", "REST API"]
+  },
+  {
+    "id": "acme-003",
+    "title": "Embedded Firmware Engineer Co-op",
+    "company": "Acme Corp",
+    "city": "Kitchener",
+    "term": "Fall 2027",
+    "deadline": "2027-06-30",
+    "work_mode": "onsite",
+    "description": "Work on microcontroller firmware for IoT devices using C and RTOS.",
+    "skills": ["C", "Embedded Systems", "RTOS", "Git"]
+  },
+  {
+    "id": "acme-004",
+    "title": "Data Science Co-op",
+    "company": "Acme Corp",
+    "city": "Waterloo",
+    "term": "Winter 2027",
+    "deadline": "2026-11-01",
+    "work_mode": "hybrid",
+    "description": "Build ML pipelines with Python, pandas, and scikit-learn.",
+    "skills": ["Python", "Pandas", "Machine Learning", "SQL"]
+  },
+  {
+    "id": "acme-005",
+    "title": "DevOps Engineer Co-op",
+    "company": "Acme Corp",
+    "city": "Toronto",
+    "term": "Summer 2027",
+    "deadline": "2027-03-15",
+    "work_mode": "hybrid",
+    "description": "Manage CI/CD pipelines and Kubernetes clusters.",
+    "skills": ["Docker", "Kubernetes", "AWS", "Linux"]
+  }
+]

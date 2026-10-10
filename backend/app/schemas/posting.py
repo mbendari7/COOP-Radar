@@ -39,6 +39,7 @@ class PostingListItem(BaseModel):
     posted_at: datetime
     skills: list[str]
     source_url: str | None
+    closed_at: datetime | None = None
     # Populated for authenticated requests only; None means unauthenticated
     is_saved: bool | None = None
 
@@ -46,6 +47,7 @@ class PostingListItem(BaseModel):
 class PostingDetail(PostingListItem):
     """Full posting detail — includes description for the detail page."""
     description: str
+    low_confidence_fields: dict | None = None
 
 
 class Page(BaseModel, Generic[T]):
@@ -79,6 +81,60 @@ class FilterMeta(BaseModel):
 
 # ── Query params ──────────────────────────────────────────────────────────────
 
+class ManualPostingIn(BaseModel):
+    """Schema for manually submitted postings via POST /api/postings."""
+
+    title: str
+    company: str
+    city: str
+    term: str
+    deadline: date
+    province: str | None = None
+    work_mode: WorkMode | None = None
+    duration_months: int | None = None
+    description: str | None = None
+    skills: list[str] = []
+    source_url: str | None = None
+
+
+class RowError(BaseModel):
+    """A single per-row validation error from a CSV upload."""
+
+    row: int
+    column: str
+    message: str
+
+
+class CsvUploadResult(BaseModel):
+    """Response from POST /api/postings/upload."""
+
+    added: int
+    skipped_duplicates: int
+    errors: list[RowError] = []
+
+
+class SimilarPostingOut(BaseModel):
+    """One item in the similar postings response."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str
+    company: str
+    city: str
+    province: str
+    work_mode: WorkMode | None
+    term: str
+    deadline: date | None
+    similarity: float
+
+
+class SimilarPostingsResponse(BaseModel):
+    """Response from GET /api/postings/{id}/similar."""
+
+    items: list[SimilarPostingOut]
+
+
 class PostingListParams(BaseModel):
     """
     All query parameters accepted by GET /api/postings.
@@ -102,6 +158,8 @@ class PostingListParams(BaseModel):
     duration: list[Literal[4, 8, 12, 16]] | None = None
     skills: list[str] | None = None
     show_expired: bool = False
+    show_closed: bool = False
+    search_mode: Literal["keyword", "semantic"] = "keyword"
 
     # Whitelisted sort columns — anything else is a 422 before service is called
     sort: Literal["posted_at", "deadline", "company", "title"] = "posted_at"

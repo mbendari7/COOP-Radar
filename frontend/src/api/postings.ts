@@ -26,13 +26,34 @@ export interface PostingListItem {
   posted_at: string         // ISO datetime string
   skills: string[]
   source_url: string | null
+  closed_at: string | null
+  is_closed: boolean        // derived: closed_at !== null
   // Populated for authenticated requests; null/undefined for unauthenticated
   is_saved?: boolean | null
 }
 
 export interface PostingDetail extends PostingListItem {
   description: string
+  low_confidence_fields?: Record<string, number> | null
 }
+
+export interface SimilarPostingOut {
+  id: string
+  title: string
+  company: string
+  city: string
+  province: string
+  work_mode: WorkMode | null
+  term: string
+  deadline: string | null
+  similarity: number
+}
+
+export interface SimilarPostingsResponse {
+  items: SimilarPostingOut[]
+}
+
+export type SearchMode = 'keyword' | 'semantic'
 
 export interface PostingsPage {
   items: PostingListItem[]
@@ -61,6 +82,8 @@ export interface PostingListParams {
   duration?: number[]
   skills?: string[]
   show_expired?: boolean
+  show_closed?: boolean
+  search_mode?: SearchMode
   sort?: SortField
   order?: SortOrder
   page?: number
@@ -84,6 +107,8 @@ function buildQueryString(params: PostingListParams): string {
     params.skills.forEach((s) => sp.append('skills', s))
   }
   if (params.show_expired) sp.set('show_expired', 'true')
+  if (params.show_closed) sp.set('show_closed', 'true')
+  if (params.search_mode && params.search_mode !== 'keyword') sp.set('search_mode', params.search_mode)
   if (params.sort) sp.set('sort', params.sort)
   if (params.order) sp.set('order', params.order)
   if (params.page && params.page !== 1) sp.set('page', String(params.page))
@@ -104,6 +129,12 @@ async function fetchPosting(id: string): Promise<PostingDetail> {
   if (res.status === 404) throw new Error('Posting not found')
   if (!res.ok) throw new Error(`GET /api/postings/${id} failed: ${res.status}`)
   return res.json() as Promise<PostingDetail>
+}
+
+async function fetchSimilar(postingId: string): Promise<SimilarPostingsResponse> {
+  const res = await fetch(`${API_BASE}/api/postings/${postingId}/similar`)
+  if (!res.ok) throw new Error(`GET /api/postings/${postingId}/similar failed: ${res.status}`)
+  return res.json() as Promise<SimilarPostingsResponse>
 }
 
 async function fetchFilterMeta(): Promise<FilterMeta> {
@@ -132,6 +163,16 @@ export function usePosting(id: string | undefined) {
     queryKey: ['posting', id],
     queryFn: () => fetchPosting(id!),
     enabled: !!id,
+  })
+}
+
+/** Fetch up to 5 similar postings for a given posting ID. */
+export function useSimilarPostings(postingId: string | undefined) {
+  return useQuery({
+    queryKey: ['similar', postingId],
+    queryFn: () => fetchSimilar(postingId!),
+    enabled: !!postingId,
+    staleTime: 5 * 60 * 1000,
   })
 }
 

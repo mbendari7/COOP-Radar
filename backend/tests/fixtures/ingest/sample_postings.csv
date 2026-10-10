@@ -1,0 +1,6 @@
+title,company,city,term,deadline,work_mode,province,skills
+Backend Developer Co-op,TechStartup,Waterloo,Summer 2027,2027-03-01,hybrid,ON,"Python,FastAPI"
+Frontend Engineer Co-op,WebAgency,Toronto,Summer 2027,2027-02-28,remote,ON,"React,TypeScript"
+Data Scientist Co-op,DataLab,Vancouver,Fall 2027,2027-06-30,onsite,BC,"Python,Machine Learning,Pandas"
+DevOps Engineer Co-op,CloudCo,Ottawa,Winter 2027,2026-11-15,hybrid,ON,"Docker,Kubernetes,AWS"
+Embedded Systems Co-op,HardwareCo,Kitchener,Summer 2027,2027-03-15,onsite,ON,"C,Embedded Systems,RTOS"
