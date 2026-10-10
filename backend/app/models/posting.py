@@ -7,15 +7,17 @@ from sqlalchemy import (
     CheckConstraint,
     Date,
     Enum,
+    ForeignKey,
     Index,
     SmallInteger,
     String,
     Text,
     text,
 )
-from sqlalchemy.dialects.postgresql import TSVECTOR
+from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy import TIMESTAMP
 
 from app.db import Base
 
@@ -76,6 +78,18 @@ class Posting(Base):
     # Mapped as nullable so SQLAlchemy doesn't try to INSERT it.
     search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
 
+    # Feature 003 — ingestion source tracking
+    source_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("ingest_sources.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    source_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
+    closed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
+    low_confidence_fields: Mapped[dict] = mapped_column(
+        JSONB, nullable=False, server_default=text("'{}'::jsonb")
+    )
+
     __table_args__ = (
         CheckConstraint(
             "duration_months IN (4, 8, 12, 16)", name="ck_duration_months"
@@ -93,4 +107,13 @@ class Posting(Base):
         Index("idx_postings_term", "term"),
         Index("idx_postings_work_mode", "work_mode"),
         Index("idx_postings_duration", "duration_months"),
+        # Feature 003 indexes
+        Index("idx_postings_closed_at", "closed_at"),
+        Index(
+            "idx_postings_source_ref",
+            "source_id",
+            "source_ref",
+            unique=True,
+            postgresql_where=text("source_ref IS NOT NULL"),
+        ),
     )

@@ -16,16 +16,18 @@
 
 import { useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { useFilterMeta, usePostings, type SortField, type SortOrder, type WorkMode, type PageSize } from '../api/postings'
+import { useFilterMeta, usePostings, type SearchMode, type SortField, type SortOrder, type WorkMode, type PageSize } from '../api/postings'
 import FilterBar from '../components/FilterBar'
 import PostingsTable from '../components/PostingsTable'
 import SearchBox from '../components/SearchBox'
+import { SearchModeToggle } from '../components/SearchModeToggle'
 
 // URL param names — keep in one place so there's no typo drift
 const P = {
   q: 'q', city: 'city', province: 'province', term: 'term',
   work_mode: 'work_mode', duration: 'duration', skills: 'skills',
-  show_expired: 'show_expired', sort: 'sort', order: 'order',
+  show_expired: 'show_expired', search_mode: 'search_mode',
+  sort: 'sort', order: 'order',
   page: 'page', page_size: 'page_size',
 } as const
 
@@ -43,6 +45,7 @@ export default function PostingsListPage() {
   const duration     = sp.getAll(P.duration).map(Number).filter((d) => [4,8,12,16].includes(d))
   const skills       = sp.getAll(P.skills).filter(Boolean)
   const show_expired = sp.get(P.show_expired) === 'true'
+  const search_mode  = ((sp.get(P.search_mode) ?? 'keyword') as SearchMode)
   const sort         = (sp.get(P.sort) ?? 'posted_at') as SortField
   const order        = (sp.get(P.order) ?? 'desc') as SortOrder
   const page         = Math.max(1, Number(sp.get(P.page) ?? 1))
@@ -58,6 +61,7 @@ export default function PostingsListPage() {
     duration: duration.length ? duration : undefined,
     skills: skills.length ? skills : undefined,
     show_expired,
+    search_mode,
     sort,
     order,
     page,
@@ -115,10 +119,18 @@ export default function PostingsListPage() {
       </div>
 
       {/* Search */}
-      <SearchBox
-        value={q}
-        onSearch={(v) => update({ [P.q]: v || null })}
-      />
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex-1 min-w-0">
+          <SearchBox
+            value={q}
+            onSearch={(v) => update({ [P.q]: v || null })}
+          />
+        </div>
+        <SearchModeToggle
+          value={search_mode}
+          onChange={(mode) => update({ [P.search_mode]: mode === 'keyword' ? null : mode })}
+        />
+      </div>
 
       {/* Filters */}
       <FilterBar

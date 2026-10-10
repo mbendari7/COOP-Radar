@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>Shopify Engineering Careers</title>
+  <id>https://www.shopify.com/careers/feed</id>
+  <updated>2027-01-15T00:00:00Z</updated>
+  <entry>
+    <id>https://www.shopify.com/careers/dev-intern-1</id>
+    <title>Software Developer Intern - Summer 2027</title>
+    <author><name>Shopify Inc</name></author>
+    <link href="https://www.shopify.com/careers/dev-intern-1"/>
+    <published>2027-01-15T00:00:00Z</published>
+    <summary>Build scalable Ruby on Rails and React applications supporting millions of merchants worldwide. Remote-friendly position.</summary>
+  </entry>
+  <entry>
+    <id>https://www.shopify.com/careers/data-intern-1</id>
+    <title>Data Engineering Intern - Summer 2027</title>
+    <author><name>Shopify Inc</name></author>
+    <link href="https://www.shopify.com/careers/data-intern-1"/>
+    <published>2027-01-10T00:00:00Z</published>
+    <summary>Work with petabyte-scale data pipelines using Apache Spark, Kafka, and BigQuery. Ottawa or Toronto office preferred.</summary>
+  </entry>
+  <entry>
+    <id>https://www.shopify.com/careers/ml-intern-1</id>
+    <title>Machine Learning Engineer Intern - Fall 2027</title>
+    <author><name>Shopify Inc</name></author>
+    <link href="https://www.shopify.com/careers/ml-intern-1"/>
+    <published>2027-01-05T00:00:00Z</published>
+    <summary>Apply ML models to improve merchant recommendations and fraud detection. Python and PyTorch experience required.</summary>
+  </entry>
+</feed>

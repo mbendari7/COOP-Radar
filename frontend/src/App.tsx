@@ -17,6 +17,15 @@ import PostingsListPage from './pages/PostingsListPage'
 // Lazy-load heavy pages so the initial bundle stays small
 const SavedPostingsPage = lazy(() => import('./pages/SavedPostingsPage'))
 const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage'))
+const AdminSourcesPage = lazy(() =>
+  import('./pages/AdminSourcesPage').then((m) => ({ default: m.AdminSourcesPage }))
+)
+const CsvUploadPage = lazy(() =>
+  import('./components/CsvUploadForm').then((m) => ({ default: m.CsvUploadForm }))
+)
+const ManualPostingPage = lazy(() =>
+  import('./components/ManualPostingForm').then((m) => ({ default: m.ManualPostingForm }))
+)
 
 function Header() {
   const { data: me, isLoading } = useMe()
@@ -47,6 +56,20 @@ function Header() {
               >
                 Saved
               </Link>
+              <Link
+                to="/upload"
+                className="text-sm text-gray-600 hover:text-gray-900 font-medium"
+              >
+                Upload
+              </Link>
+              {me.is_admin && (
+                <Link
+                  to="/admin/sources"
+                  className="text-sm text-amber-700 hover:text-amber-900 font-medium"
+                >
+                  Admin
+                </Link>
+              )}
               <Link
                 to="/account"
                 className="text-sm text-gray-500 hover:text-gray-900"
@@ -99,6 +122,9 @@ export default function App() {
             <Route path="/postings/:id" element={<PostingDetailPage />} />
             <Route path="/saved" element={<SavedPostingsPage />} />
             <Route path="/account" element={<AccountSettingsPage />} />
+            <Route path="/upload" element={<div className="p-6 max-w-2xl mx-auto"><CsvUploadPage /></div>} />
+            <Route path="/submit" element={<div className="p-6 max-w-2xl mx-auto"><ManualPostingPage /></div>} />
+            <Route path="/admin/sources" element={<AdminSourcesPage />} />
           </Routes>
         </Suspense>
       </main>

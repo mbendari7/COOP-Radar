@@ -78,6 +78,21 @@ async def get_current_user(
     return user
 
 
+async def get_admin_user(
+    current_user=Depends(get_current_user),
+):
+    """
+    Require the authenticated user to have is_admin = True.
+    Raises HTTP 403 FORBIDDEN if the user is not an admin.
+    """
+    if not current_user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail={"detail": "Forbidden", "code": "FORBIDDEN"},
+        )
+    return current_user
+
+
 async def get_optional_user(
     request: Request,
     session: str | None = Cookie(default=None),

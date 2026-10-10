@@ -9,7 +9,7 @@ is an argon2id hash — the plaintext is never stored or logged.
 from datetime import datetime
 from uuid import UUID, uuid4
 
-from sqlalchemy import Text, text
+from sqlalchemy import BOOLEAN, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy import TIMESTAMP
@@ -29,6 +29,7 @@ class User(Base):
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False
     )
+    is_admin: Mapped[bool] = mapped_column(BOOLEAN, nullable=False, server_default=text("FALSE"))
 
     # Back-reference so we can access user.saved_postings if needed
     saved_postings: Mapped[list["SavedPosting"]] = relationship(  # noqa: F821

@@ -53,6 +53,28 @@ services:
       - "8000:8000"
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+  # RQ worker for ingest jobs and rq-scheduler for 6-hour scheduled runs.
+  worker:
+    image: coopradar-api
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-coopradar}:${POSTGRES_PASSWORD:-coopradar}@db:5432/${POSTGRES_DB:-coopradar}
+      REDIS_URL: redis://redis:6379/0
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      EMBED_MODEL: ${EMBED_MODEL:-text-embedding-3-small}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+    volumes:
+      - ./backend:/app
+    command: python -m app.worker
+
   # Vite dev server with HMR. VITE_API_URL tells the frontend where the API lives.
   web:
     build:
