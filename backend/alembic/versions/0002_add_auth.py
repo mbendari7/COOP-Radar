@@ -20,7 +20,7 @@ def upgrade() -> None:
     # Four valid states for tracking an application's progress.
     # NULL in saved_postings.status means "no status set" (different from any value).
     status_enum = postgresql.ENUM(
-        "applied", "interviewing", "offer", "rejected",
+        "saved", "applying", "applied", "interview", "offer", "rejected", "withdrawn",
         name="application_status_enum",
         create_type=True,
     )
@@ -74,7 +74,7 @@ def upgrade() -> None:
         sa.Column(
             "status",
             postgresql.ENUM(
-                "applied", "interviewing", "offer", "rejected",
+                "saved", "applying", "applied", "interview", "offer", "rejected", "withdrawn",
                 name="application_status_enum",
                 create_type=False,  # already created above
             ),

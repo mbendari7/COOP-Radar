@@ -17,20 +17,27 @@ from uuid import UUID, uuid4
 from sqlalchemy import TIMESTAMP, Enum, ForeignKey, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from app.models.application_event import ApplicationEvent
 
 from app.db import Base
 
 
 class ApplicationStatus(str, enum.Enum):
     """
-    The four valid application tracking states.
+    Seven stages of a co-op application lifecycle.
     str mixin lets FastAPI serialise these as plain strings automatically.
     NULL in the database means "no status set" — distinct from any value here.
     """
-    applied      = "applied"
-    interviewing = "interviewing"
-    offer        = "offer"
-    rejected     = "rejected"
+    saved      = "saved"
+    applying   = "applying"
+    applied    = "applied"
+    interview  = "interview"
+    offer      = "offer"
+    rejected   = "rejected"
+    withdrawn  = "withdrawn"
 
 
 class SavedPosting(Base):
@@ -52,9 +59,19 @@ class SavedPosting(Base):
     saved_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False
     )
+    # Updated whenever status changes — used for "last updated" sort on tracker table
+    last_status_at: Mapped[datetime | None] = mapped_column(
+        TIMESTAMP(timezone=True), nullable=True
+    )
 
     user: Mapped["User"] = relationship(back_populates="saved_postings")  # noqa: F821
     posting: Mapped["Posting"] = relationship()  # noqa: F821
+    events: Mapped[list["ApplicationEvent"]] = relationship(
+        back_populates="saved_posting",
+        order_by="ApplicationEvent.created_at.desc()",
+        cascade="all, delete-orphan",
+        lazy="selectin",
+    )
 
     __table_args__ = (
         UniqueConstraint("user_id", "posting_id", name="ux_saved_postings_user_posting"),

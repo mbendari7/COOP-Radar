@@ -25,6 +25,35 @@ from app.models.user import User
 _ph = PasswordHasher()  # singleton — thread-safe, cheap to keep
 _SESSION_TTL = 60 * 60 * 24 * 7  # 7 days
 
+# ── Login rate limiting ────────────────────────────────────────────────────────
+# 5 failed attempts per email within a 15-minute window triggers a 429.
+# Counter lives in Redis alongside sessions (same pool).
+_RATE_PREFIX = "login_attempts:"
+_MAX_ATTEMPTS = 5
+_RATE_WINDOW = 60 * 15  # 15 minutes in seconds
+
+
+async def _check_login_rate_limit(redis: aioredis.Redis, email: str) -> None:  # type: ignore[type-arg]
+    """Increment the attempt counter for this email; raise 429 if over limit."""
+    key = f"{_RATE_PREFIX}{email}"
+    count = await redis.incr(key)
+    if count == 1:
+        # First attempt in this window — set the TTL
+        await redis.expire(key, _RATE_WINDOW)
+    if count > _MAX_ATTEMPTS:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail={
+                "detail": "Too many login attempts. Try again in 15 minutes.",
+                "code": "RATE_LIMITED",
+            },
+        )
+
+
+async def _clear_login_rate_limit(redis: aioredis.Redis, email: str) -> None:  # type: ignore[type-arg]
+    """Remove the attempt counter after a successful login."""
+    await redis.delete(f"{_RATE_PREFIX}{email}")
+
 
 # ── Cookie helpers ────────────────────────────────────────────────────────────
 
@@ -115,8 +144,12 @@ async def login(
     Returns (user, session_token).
     Raises HTTP 401 with the same message whether the email is unknown or the
     password is wrong — preventing account enumeration (FR-014).
+    Raises HTTP 429 after 5 failed attempts within a 15-minute window.
     """
     normalised = email.lower().strip()
+
+    # Check rate limit before any DB work (prevents enumeration via timing too)
+    await _check_login_rate_limit(redis, normalised)
 
     _INVALID = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -136,6 +169,9 @@ async def login(
         _ph.verify(user.hashed_password, password)
     except VerifyMismatchError:
         raise _INVALID
+
+    # Successful login — clear the rate limit counter
+    await _clear_login_rate_limit(redis, normalised)
 
     # Re-hash if argon2 parameters have changed (argon2-cffi handles this automatically)
     if _ph.check_needs_rehash(user.hashed_password):
