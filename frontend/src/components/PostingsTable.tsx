@@ -18,6 +18,7 @@ import {
 } from '@tanstack/react-table'
 import { useNavigate } from 'react-router-dom'
 import type { PostingListItem, SortField, SortOrder } from '../api/postings'
+import BookmarkButton from './BookmarkButton'
 import PostingCard from './PostingCard'
 import { formatDate, workModeLabel } from '../utils/format'
 
@@ -82,6 +83,7 @@ interface Props {
   sort: SortField
   order: SortOrder
   onSortChange: (field: SortField, order: SortOrder) => void
+  showBookmarks?: boolean
 }
 
 export default function PostingsTable({
@@ -92,6 +94,7 @@ export default function PostingsTable({
   sort,
   order,
   onSortChange,
+  showBookmarks = false,
 }: Props) {
   const navigate = useNavigate()
 
@@ -160,6 +163,11 @@ export default function PostingsTable({
           <thead className="bg-gray-50 border-b border-gray-200">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
+                {showBookmarks && (
+                  <th scope="col" className="px-2 py-3 w-8">
+                    <span className="sr-only">Saved</span>
+                  </th>
+                )}
                 {headerGroup.headers.map((header) => {
                   const sortable = SORTABLE.has(header.id)
                   const isSorted = header.id === sort
@@ -226,6 +234,17 @@ export default function PostingsTable({
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
+                    {showBookmarks && (
+                      <td
+                        className="px-2 py-3"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <BookmarkButton
+                          postingId={row.original.id}
+                          isSaved={row.original.is_saved === true}
+                        />
+                      </td>
+                    )}
                   </tr>
                 ))
             }
