@@ -229,6 +229,16 @@ async def test_get_unknown_posting_returns_404(client: AsyncClient) -> None:
     assert response.json()["detail"]["code"] == "POSTING_NOT_FOUND"
 
 
+# --- is_saved field (Feature 002) ---------------------------------------------
+
+async def test_unauthenticated_list_has_no_is_saved(client: AsyncClient, db_session: AsyncSession) -> None:
+    """Unauthenticated GET /api/postings: is_saved should be null/absent."""
+    await add(db_session, make_posting(title="Anon Test"))
+    body = (await client.get("/api/postings")).json()
+    for item in body["items"]:
+        assert item.get("is_saved") is None
+
+
 # --- Filter meta ---------------------------------------------------------------
 
 async def test_filter_meta_returns_sorted_distinct_values(

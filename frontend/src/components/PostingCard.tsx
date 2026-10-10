@@ -6,13 +6,15 @@
 
 import { useNavigate } from 'react-router-dom'
 import type { PostingListItem } from '../api/postings'
+import BookmarkButton from './BookmarkButton'
 import { formatDate, workModeLabel } from '../utils/format'
 
 interface Props {
   posting: PostingListItem
+  showBookmark?: boolean
 }
 
-export default function PostingCard({ posting }: Props) {
+export default function PostingCard({ posting, showBookmark = false }: Props) {
   const navigate = useNavigate()
 
   return (
@@ -38,9 +40,17 @@ export default function PostingCard({ posting }: Props) {
           <p className="font-semibold text-gray-900 truncate">{posting.title}</p>
           <p className="text-sm text-gray-600 truncate">{posting.company}</p>
         </div>
-        <span className={`shrink-0 text-xs px-2 py-0.5 rounded-full font-medium ${workModeBadgeClass(posting.work_mode)}`}>
-          {workModeLabel(posting.work_mode)}
-        </span>
+        <div className="flex items-center gap-1 shrink-0">
+          <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${workModeBadgeClass(posting.work_mode)}`}>
+            {workModeLabel(posting.work_mode)}
+          </span>
+          {showBookmark && (
+            <BookmarkButton
+              postingId={posting.id}
+              isSaved={posting.is_saved === true}
+            />
+          )}
+        </div>
       </div>
 
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">

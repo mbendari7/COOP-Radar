@@ -26,7 +26,11 @@ _SORT_MAP = {
 }
 
 
-async def list_postings(params: PostingListParams, db: AsyncSession) -> PostingsPage:
+async def list_postings(
+    params: PostingListParams,
+    db: AsyncSession,
+    user_id: UUID | None = None,
+) -> PostingsPage:
     """
     Return a paginated, filtered, sorted page of postings.
 
@@ -54,8 +58,15 @@ async def list_postings(params: PostingListParams, db: AsyncSession) -> Postings
         )
 
     if params.city:
-        # Case-insensitive match via ILIKE — covers "toronto" vs "Toronto"
-        stmt = stmt.where(Posting.city.ilike(params.city))
+        # Remote postings always appear in city-filtered results (FR-004a).
+        # We include a posting if its city matches OR it's flagged as remote work.
+        from sqlalchemy import or_
+        stmt = stmt.where(
+            or_(
+                Posting.city.ilike(params.city),
+                Posting.work_mode == WorkMode.remote,
+            )
+        )
 
     if params.province:
         stmt = stmt.where(Posting.province.ilike(params.province))
@@ -97,7 +108,24 @@ async def list_postings(params: PostingListParams, db: AsyncSession) -> Postings
     stmt = stmt.offset(offset).limit(params.page_size)
 
     rows = (await db.execute(stmt)).scalars().all()
-    items = [PostingListItem.model_validate(row) for row in rows]
+
+    # Build a set of saved posting IDs for this user if authenticated
+    saved_ids: set[UUID] = set()
+    if user_id is not None and rows:
+        from app.models.saved_posting import SavedPosting
+        row_ids = [row.id for row in rows]
+        saved_stmt = select(SavedPosting.posting_id).where(
+            SavedPosting.user_id == user_id,
+            SavedPosting.posting_id.in_(row_ids),
+        )
+        saved_ids = set((await db.execute(saved_stmt)).scalars().all())
+
+    items = []
+    for row in rows:
+        item = PostingListItem.model_validate(row)
+        if user_id is not None:
+            item.is_saved = row.id in saved_ids
+        items.append(item)
 
     return PostingsPage(
         items=items,

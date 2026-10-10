@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_asyn
 from app.config import get_settings
 from app.db import Base, get_db
 from app.main import create_app
+from app.redis import get_redis
 
 
 # Use a separate test database to avoid stomping on dev data.
@@ -64,20 +65,47 @@ async def db_session(db_engine) -> AsyncGenerator[AsyncSession, None]:  # type: 
         await session.rollback()
 
 
+class _MockRedis:
+    """In-memory Redis stub for tests — avoids needing a real Redis instance."""
+
+    def __init__(self) -> None:
+        self._store: dict[str, dict[str, str]] = {}
+
+    async def hset(self, key: str, field: str, value: str) -> None:
+        self._store.setdefault(key, {})[field] = value
+
+    async def hget(self, key: str, field: str) -> str | None:
+        return self._store.get(key, {}).get(field)
+
+    async def expire(self, key: str, ttl: int) -> None:
+        pass
+
+    async def delete(self, key: str) -> None:
+        self._store.pop(key, None)
+
+    async def aclose(self) -> None:
+        pass
+
+
 @pytest_asyncio.fixture
 async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     """
     Async HTTP client wired to the FastAPI app.
-    Overrides the get_db dependency so every request in a test uses the
-    same rolled-back session — changes made in the test are visible to the
-    request but never committed to the real DB.
+    Overrides get_db and get_redis so tests are fully in-memory — no real
+    DB commits, no real Redis instance required.
     """
     app = create_app()
+    mock_redis = _MockRedis()
 
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
+    async def override_get_redis(request=None):  # type: ignore[override]
+        yield mock_redis
+
     app.dependency_overrides[get_db] = override_get_db
+    app.dependency_overrides[get_redis] = override_get_redis
+    app.state.redis = mock_redis
 
     async with AsyncClient(
         transport=ASGITransport(app=app),  # type: ignore[arg-type]
