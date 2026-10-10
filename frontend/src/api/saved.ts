@@ -1,5 +1,5 @@
 /**
- * TanStack Query hooks for saved postings.
+ * TanStack Query hooks for saved postings, events, and CSV export.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -9,13 +9,52 @@ const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type ApplicationStatus = 'applied' | 'interviewing' | 'offer' | 'rejected'
+export type ApplicationStatus =
+  | 'saved'
+  | 'applying'
+  | 'applied'
+  | 'interview'
+  | 'offer'
+  | 'rejected'
+  | 'withdrawn'
+
+export const STATUS_LABELS: Record<ApplicationStatus, string> = {
+  saved: 'Saved',
+  applying: 'Applying',
+  applied: 'Applied',
+  interview: 'Interview',
+  offer: 'Offer',
+  rejected: 'Rejected',
+  withdrawn: 'Withdrawn',
+}
+
+export const ALL_STATUSES: ApplicationStatus[] = [
+  'saved', 'applying', 'applied', 'interview', 'offer', 'rejected', 'withdrawn',
+]
+
+export interface ApplicationEventOut {
+  id: string
+  status: ApplicationStatus
+  notes: string | null
+  event_date: string | null
+  created_at: string
+}
 
 export interface SavedPostingOut {
   id: string
   saved_at: string
+  last_status_at: string | null
   status: ApplicationStatus | null
   posting: PostingListItem
+  events: ApplicationEventOut[]
+}
+
+export interface DeadlineItem {
+  saved_id: string
+  posting_id: string
+  title: string
+  company: string
+  deadline: string
 }
 
 export interface SavedPostingsPage {
@@ -24,6 +63,10 @@ export interface SavedPostingsPage {
   page: number
   page_size: number
   status_counts: Record<string, number>
+  total_applied: number
+  total_interview: number
+  total_offer: number
+  deadlines_this_week: DeadlineItem[]
 }
 
 export interface SavedListParams {
@@ -65,14 +108,35 @@ async function deleteSave(savedId: string): Promise<void> {
   if (!res.ok && res.status !== 404) throw new Error(`DELETE /api/saved/${savedId} failed: ${res.status}`)
 }
 
-async function patchStatus(savedId: string, status: ApplicationStatus | null): Promise<SavedPostingOut> {
+async function patchStatus(
+  savedId: string,
+  statusVal: ApplicationStatus | null,
+  notes?: string | null,
+  eventDate?: string | null,
+): Promise<SavedPostingOut> {
   const res = await fetch(`${API_BASE}/api/saved/${savedId}/status`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     credentials: 'include',
-    body: JSON.stringify({ status }),
+    body: JSON.stringify({ status: statusVal, notes: notes ?? null, event_date: eventDate ?? null }),
   })
   if (!res.ok) throw new Error(`PATCH /api/saved/${savedId}/status failed: ${res.status}`)
+  return res.json() as Promise<SavedPostingOut>
+}
+
+async function postEvent(
+  savedId: string,
+  status: ApplicationStatus,
+  notes: string | null,
+  eventDate: string | null,
+): Promise<SavedPostingOut> {
+  const res = await fetch(`${API_BASE}/api/saved/${savedId}/events`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    credentials: 'include',
+    body: JSON.stringify({ status, notes, event_date: eventDate }),
+  })
+  if (!res.ok) throw new Error(`POST /api/saved/${savedId}/events failed: ${res.status}`)
   return res.json() as Promise<SavedPostingOut>
 }
 
@@ -91,7 +155,6 @@ export function useSavePosting() {
   return useMutation({
     mutationFn: postSave,
     onSuccess: () => {
-      // Invalidate both lists so is_saved and the saved page stay in sync
       qc.invalidateQueries({ queryKey: ['saved'] })
       qc.invalidateQueries({ queryKey: ['postings'] })
     },
@@ -112,8 +175,40 @@ export function useUnsavePosting() {
 export function useUpdateStatus() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: ({ savedId, status }: { savedId: string; status: ApplicationStatus | null }) =>
-      patchStatus(savedId, status),
+    mutationFn: ({
+      savedId,
+      status: statusVal,
+      notes,
+      eventDate,
+    }: {
+      savedId: string
+      status: ApplicationStatus | null
+      notes?: string | null
+      eventDate?: string | null
+    }) => patchStatus(savedId, statusVal, notes, eventDate),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['saved'] }),
   })
+}
+
+export function useAddEvent() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      savedId,
+      status: statusVal,
+      notes,
+      eventDate,
+    }: {
+      savedId: string
+      status: ApplicationStatus
+      notes: string | null
+      eventDate: string | null
+    }) => postEvent(savedId, statusVal, notes, eventDate),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['saved'] }),
+  })
+}
+
+/** Trigger a CSV download — opens the export URL in a new tab. */
+export function downloadCsv(): void {
+  window.open(`${API_BASE}/api/saved/export/csv`, '_blank')
 }

@@ -123,7 +123,11 @@ async def test_update_status(saved_client: AsyncClient, posting: Posting):
         json={"status": "applied"},
     )
     assert patch_res.status_code == 200
-    assert patch_res.json()["status"] == "applied"
+    data = patch_res.json()
+    assert data["status"] == "applied"
+    # A status change event should be recorded
+    assert len(data["events"]) == 1
+    assert data["events"][0]["status"] == "applied"
 
 
 async def test_update_status_clear_to_null(saved_client: AsyncClient, posting: Posting):
@@ -138,12 +142,31 @@ async def test_update_status_clear_to_null(saved_client: AsyncClient, posting: P
 
 
 async def test_status_counts_in_list_response(saved_client: AsyncClient, posting: Posting):
-    """GET /api/saved includes status_counts summary."""
+    """GET /api/saved includes status_counts and stats summary."""
     save_res = await saved_client.post("/api/saved", json={"posting_id": str(posting.id)})
     saved_id = save_res.json()["id"]
     await saved_client.patch(f"/api/saved/{saved_id}/status", json={"status": "applied"})
 
     res = await saved_client.get("/api/saved")
-    counts = res.json()["status_counts"]
+    data = res.json()
+    counts = data["status_counts"]
     assert counts["applied"] == 1
     assert counts["none"] == 0
+    assert data["total_applied"] == 1
+    assert "deadlines_this_week" in data
+
+
+async def test_add_event_with_notes(saved_client: AsyncClient, posting: Posting):
+    """POST /api/saved/{id}/events records a status change with notes."""
+    save_res = await saved_client.post("/api/saved", json={"posting_id": str(posting.id)})
+    saved_id = save_res.json()["id"]
+
+    res = await saved_client.post(
+        f"/api/saved/{saved_id}/events",
+        json={"status": "interview", "notes": "Phone screen scheduled", "event_date": "2027-02-01"},
+    )
+    assert res.status_code == 201
+    data = res.json()
+    assert data["status"] == "interview"
+    assert data["events"][0]["notes"] == "Phone screen scheduled"
+    assert data["events"][0]["event_date"] == "2027-02-01"
