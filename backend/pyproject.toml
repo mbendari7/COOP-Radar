@@ -16,6 +16,8 @@ dependencies = [
     "alembic>=1.13",
     "httpx>=0.27",           # used in perf tests and future ingestion
     "greenlet>=3.0",         # required by SQLAlchemy async
+    "argon2-cffi>=23.1",     # argon2id password hashing (OWASP-recommended)
+    "redis[asyncio]>=5.0",   # async Redis client for session storage
 ]
 
 [project.optional-dependencies]

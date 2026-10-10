@@ -26,6 +26,8 @@ export interface PostingListItem {
   posted_at: string         // ISO datetime string
   skills: string[]
   source_url: string | null
+  // Populated for authenticated requests; null/undefined for unauthenticated
+  is_saved?: boolean | null
 }
 
 export interface PostingDetail extends PostingListItem {
