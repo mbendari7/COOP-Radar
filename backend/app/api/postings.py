@@ -3,6 +3,9 @@ Postings router — thin layer that delegates straight to the service.
 
 Route order matters: /meta/filters MUST come before /{id} so FastAPI doesn't
 try to interpret "meta" as a UUID and return a 422.
+
+For authenticated requests (cookie present), each posting item gets an
+is_saved: bool field injected.  Unauthenticated requests leave it as None.
 """
 
 from uuid import UUID
@@ -11,6 +14,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
+from app.deps import get_optional_user
 from app.schemas.posting import FilterMeta, PostingDetail, PostingListParams, PostingsPage
 from app.services.postings import get_filter_meta, get_posting, list_postings
 
@@ -28,9 +32,6 @@ async def postings_filter_meta(db: AsyncSession = Depends(get_db)) -> FilterMeta
 
 @router.get("", response_model=PostingsPage)
 async def get_postings(
-    # Query params come in as individual FastAPI Query() bindings because
-    # Pydantic models can't be used directly as query-param groups in FastAPI
-    # without Depends().  We collect them all here and pass to the schema.
     q: str | None = Query(default=None, max_length=200),
     city: str | None = Query(default=None),
     province: str | None = Query(default=None),
@@ -44,15 +45,14 @@ async def get_postings(
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25),
     db: AsyncSession = Depends(get_db),
+    current_user=Depends(get_optional_user),
 ) -> PostingsPage:
     """
     List postings with optional keyword search, filters, sort, and pagination.
-    Unknown sort/order/page_size values produce a 422 via PostingListParams validation.
+    Authenticated users also get is_saved on each item.
     """
     from app.models.posting import WorkMode
 
-    # Validate and coerce all params through the Pydantic schema.
-    # This is where invalid sort values, bad page_sizes, etc. are rejected.
     params = PostingListParams(
         q=q,
         city=city,
@@ -67,7 +67,7 @@ async def get_postings(
         page=page,
         page_size=page_size,  # type: ignore[arg-type]
     )
-    return await list_postings(params, db)
+    return await list_postings(params, db, user_id=current_user.id if current_user else None)
 
 
 @router.get("/{posting_id}", response_model=PostingDetail)

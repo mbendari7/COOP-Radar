@@ -39,6 +39,8 @@ class PostingListItem(BaseModel):
     posted_at: datetime
     skills: list[str]
     source_url: str | None
+    # Populated for authenticated requests only; None means unauthenticated
+    is_saved: bool | None = None
 
 
 class PostingDetail(PostingListItem):
