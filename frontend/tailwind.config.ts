@@ -1,0 +1,22 @@
+import type { Config } from 'tailwindcss'
+
+const config: Config = {
+  // Only generate CSS for classes actually used in source files
+  content: ['./index.html', './src/**/*.{ts,tsx}'],
+  theme: {
+    extend: {
+      // Keep brand colours in one place so they're easy to swap
+      colors: {
+        brand: {
+          50: '#eff6ff',
+          500: '#3b82f6',
+          600: '#2563eb',
+          700: '#1d4ed8',
+        },
+      },
+    },
+  },
+  plugins: [],
+}
+
+export default config

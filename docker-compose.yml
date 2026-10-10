@@ -1,0 +1,75 @@
+services:
+  # PostgreSQL 16 with the pgvector extension pre-installed.
+  # pgvector is unused in Feature 001 but must be present so Feature 003
+  # can add vector columns without a stack change.
+  db:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-coopradar}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-coopradar}
+      POSTGRES_DB: ${POSTGRES_DB:-coopradar}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-coopradar}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Redis for sessions (Feature 002) and the RQ job queue (Feature 003+).
+  # Not used in Feature 001 — it's here so the stack doesn't change later.
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # FastAPI backend. Uvicorn runs with --reload so code changes apply live.
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-coopradar}:${POSTGRES_PASSWORD:-coopradar}@db:5432/${POSTGRES_DB:-coopradar}
+      REDIS_URL: redis://redis:6379/0
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
+    volumes:
+      - ./backend:/app
+    ports:
+      - "8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  # Vite dev server with HMR. VITE_API_URL tells the frontend where the API lives.
+  web:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: dev
+    restart: unless-stopped
+    depends_on:
+      - api
+    environment:
+      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules   # keep container node_modules isolated from host
+    ports:
+      - "5173:5173"
+    command: npm run dev -- --host 0.0.0.0
+
+volumes:
+  db_data:

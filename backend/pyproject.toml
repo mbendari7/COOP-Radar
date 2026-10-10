@@ -1,0 +1,56 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.backends.legacy:build"
+
+[project]
+name = "coopradar-api"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.30",
+    "pydantic[email]>=2.7",
+    "pydantic-settings>=2.3",
+    "sqlalchemy[asyncio]>=2.0",
+    "asyncpg>=0.29",         # async PostgreSQL driver for SQLAlchemy
+    "alembic>=1.13",
+    "httpx>=0.27",           # used in perf tests and future ingestion
+    "greenlet>=3.0",         # required by SQLAlchemy async
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "ruff>=0.4",
+    "mypy>=1.10",
+    "types-passlib",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+
+# --- ruff ---
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "N"]
+ignore = ["B008"]   # FastAPI Depends() calls are fine as default args
+
+# --- mypy ---
+[tool.mypy]
+python_version = "3.12"
+strict = true
+plugins = ["pydantic.mypy"]
+exclude = ["alembic/"]      # generated migration files don't need strict typing
+
+# --- pytest ---
+[tool.pytest.ini_options]
+asyncio_mode = "auto"       # all async tests run automatically
+testpaths = ["tests"]
+markers = [
+    "perf: performance benchmarks (run separately with -m perf)",
+]
