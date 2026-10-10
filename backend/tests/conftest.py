@@ -70,6 +70,7 @@ class _MockRedis:
 
     def __init__(self) -> None:
         self._store: dict[str, dict[str, str]] = {}
+        self._counters: dict[str, int] = {}
 
     async def hset(self, key: str, field: str, value: str) -> None:
         self._store.setdefault(key, {})[field] = value
@@ -77,11 +78,16 @@ class _MockRedis:
     async def hget(self, key: str, field: str) -> str | None:
         return self._store.get(key, {}).get(field)
 
+    async def incr(self, key: str) -> int:
+        self._counters[key] = self._counters.get(key, 0) + 1
+        return self._counters[key]
+
     async def expire(self, key: str, ttl: int) -> None:
         pass
 
     async def delete(self, key: str) -> None:
         self._store.pop(key, None)
+        self._counters.pop(key, None)
 
     async def aclose(self) -> None:
         pass

@@ -20,6 +20,7 @@ class MockRedis:
     def __init__(self) -> None:
         self._store: dict[str, dict[str, str]] = {}
         self._ttls: dict[str, int] = {}
+        self._counters: dict[str, int] = {}
 
     async def hset(self, key: str, field: str, value: str) -> None:
         self._store.setdefault(key, {})[field] = value
@@ -27,11 +28,16 @@ class MockRedis:
     async def hget(self, key: str, field: str) -> str | None:
         return self._store.get(key, {}).get(field)
 
+    async def incr(self, key: str) -> int:
+        self._counters[key] = self._counters.get(key, 0) + 1
+        return self._counters[key]
+
     async def expire(self, key: str, ttl: int) -> None:
         self._ttls[key] = ttl
 
     async def delete(self, key: str) -> None:
         self._store.pop(key, None)
+        self._counters.pop(key, None)
 
     async def aclose(self) -> None:
         pass
@@ -185,3 +191,23 @@ async def test_logout_returns_204_and_clears_cookie(auth_client: AsyncClient):
     # Cookie should be cleared (max-age=0)
     cookie = res.headers.get("set-cookie", "")
     assert "Max-Age=0" in cookie or "max-age=0" in cookie.lower()
+
+
+async def test_login_rate_limited_after_five_failures(auth_client: AsyncClient):
+    """After 5 failed login attempts, the 6th returns 429 RATE_LIMITED."""
+    # Register so the email is valid — wrong password triggers the counter
+    await auth_client.post(
+        "/api/auth/register",
+        json={"email": "ratelimit@example.com", "password": "password1234"},
+    )
+    for _ in range(5):
+        await auth_client.post(
+            "/api/auth/login",
+            json={"email": "ratelimit@example.com", "password": "wrongpassword"},
+        )
+    res = await auth_client.post(
+        "/api/auth/login",
+        json={"email": "ratelimit@example.com", "password": "wrongpassword"},
+    )
+    assert res.status_code == 429
+    assert res.json()["code"] == "RATE_LIMITED"
