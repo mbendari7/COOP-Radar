@@ -116,18 +116,24 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Validate the compose file
+        env:
+          POSTGRES_PASSWORD: ci-password
+        run: docker compose -f docker-compose.prod.yml config --quiet
+
       - name: Build and start the production stack
         env:
           POSTGRES_PASSWORD: ci-password
         run: docker compose -f docker-compose.prod.yml up -d --build
 
       - name: Wait for the site to be healthy
+        env:
+          POSTGRES_PASSWORD: ci-password
         run: |
           for i in $(seq 1 60); do
             curl -fsS http://localhost:8080/api/health && exit 0
             sleep 3
           done
-          docker compose -f docker-compose.prod.yml logs app
           exit 1
 
       - name: Smoke test website, API, and demo account

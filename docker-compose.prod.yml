@@ -72,7 +72,9 @@ services:
     restart: unless-stopped
     depends_on:
       - app
-    command: caddy reverse-proxy --from ${DOMAIN:?Set DOMAIN to use the https profile} --to app:8000
+    # Compose reads every ${VAR} in this file even for profiles you don't start, so DOMAIN
+    # must not be "required" here. Without DOMAIN, Caddy serves https://localhost (self-signed).
+    command: caddy reverse-proxy --from ${DOMAIN:-localhost} --to app:8000
     ports:
       - "80:80"
       - "443:443"
