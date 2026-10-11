@@ -1,8 +1,9 @@
 from datetime import datetime
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 from uuid import UUID
 
 from sqlalchemy import TIMESTAMP, CheckConstraint, ForeignKey, Index, Integer, Text, func
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -39,6 +40,8 @@ class Resume(Base):
     filename: Mapped[str] = mapped_column(Text, nullable=False)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
     extracted_text: Mapped[str] = mapped_column(Text, nullable=False)
+    # Cached AI resume review (strengths, tailoring tips, roles to search); None until requested
+    insights: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
     )

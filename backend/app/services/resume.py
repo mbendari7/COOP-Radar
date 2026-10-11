@@ -13,7 +13,6 @@ Match pipeline (two stages):
 import io
 import json
 import logging
-import re
 from typing import Any
 from uuid import UUID
 
@@ -25,6 +24,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import ai
 from app.ai import AICredentials
 from app.config import get_settings
+from app.ingest.skill_match import mentions
 from app.llm import parse_json
 from app.models.match_result import MatchResult
 from app.models.posting import Posting
@@ -101,12 +101,7 @@ _OPEN = (Posting.closed_at.is_(None), Posting.deadline >= func.current_date())
 def skills_in_text(skills: list[str], text_value: str) -> list[str]:
     """Skills mentioned in the text as whole words ("C" must not match "C++" or "CSS")."""
     lowered = text_value.lower()
-    found = []
-    for skill in skills:
-        pattern = r"(?<![\w+#.])" + re.escape(skill.lower()) + r"(?![\w+#])"
-        if re.search(pattern, lowered):
-            found.append(skill)
-    return found
+    return [skill for skill in skills if mentions(skill, text_value, lowered)]
 
 
 async def _candidates_by_skills(db: AsyncSession, resume_text: str) -> list[Any]:

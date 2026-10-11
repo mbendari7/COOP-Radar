@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import date
+from datetime import date, datetime
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -27,6 +27,9 @@ class RawPosting:
     skills: list[str] = field(default_factory=list)
     source_ref: str | None = None
     source_url: str | None = None
+    # Optional extras some sources provide (career-board APIs do; feeds often don't)
+    province: str | None = None
+    posted_at: datetime | None = None
 
 
 class BaseAdapter(ABC):

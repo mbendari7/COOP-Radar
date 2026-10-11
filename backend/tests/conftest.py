@@ -7,7 +7,7 @@ service calls `await db.commit()` only a SAVEPOINT is released — the outer
 transaction is rolled back after the test and nothing leaks between tests.
 
 The schema is rebuilt from the ORM models once per session (drop_all + create_all),
-after enabling the `vector` and `fuzzystrmatch` extensions the models rely on.
+after enabling the `vector` extension the models rely on.
 """
 
 import os
@@ -49,7 +49,6 @@ async def db_engine() -> AsyncGenerator[AsyncEngine, None]:
     engine = create_async_engine(get_test_db_url(), echo=False)
     async with engine.begin() as conn:
         await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS fuzzystrmatch"))
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield engine

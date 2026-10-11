@@ -13,6 +13,8 @@ from typing import Any
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ingest.skill_match import match_skills
+
 
 @dataclass
 class ExtractedFields:
@@ -39,16 +41,8 @@ async def extract_fields(db: AsyncSession, text: str) -> ExtractedFields:
     taxonomy: list[tuple[str, list[str]]] = [(row[0], row[1]) for row in rows]
 
     # --- Stage 1: regex match ---
-    matched_skills: list[str] = []
+    matched_skills = match_skills(taxonomy, text)
     text_lower = text.lower()
-
-    for name, aliases in taxonomy:
-        candidates = [name] + (aliases or [])
-        for candidate in candidates:
-            pattern = r"\b" + re.escape(candidate.lower()) + r"\b"
-            if re.search(pattern, text_lower):
-                matched_skills.append(name)
-                break  # don't count the same skill twice
 
     # Simple heuristic confidence: ratio of fields we can extract via regex
     simple_fields_found = 0

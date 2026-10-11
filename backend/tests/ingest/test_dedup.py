@@ -1,4 +1,4 @@
-"""Tests for duplicate_exists — requires a real DB with fuzzystrmatch installed."""
+"""Tests for duplicate_exists — same company + city and a near-identical title."""
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession

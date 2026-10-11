@@ -3,6 +3,14 @@ from functools import lru_cache
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+# Canada, Canadian provinces and major cities, and "Remote - Canada"
+CANADA_LOCATION_FILTER = (
+    r"canada|toronto|waterloo|kitchener|ottawa|vancouver|montr[eé]al|calgary|edmonton|"
+    r"guelph|hamilton|mississauga|markham|burnaby|halifax|winnipeg|qu[eé]bec|regina|"
+    r"saskatoon|victoria, bc|london, on|ontario|british columbia|alberta|nova scotia|"
+    r"(?-i:\b(?:ON|BC|AB|QC|MB|SK|NS|NB|NL|PE)\b)"
+)
+
 
 class Settings(BaseSettings):
     """
@@ -47,6 +55,16 @@ class Settings(BaseSettings):
     # Folder with the built React app (index.html + assets/). When it exists, the API also
     # serves the website, so one container = the whole site. Set by the production Dockerfile.
     static_dir: str = ""
+
+    # Career-board imports keep only jobs whose location matches this regex (case-insensitive;
+    # province codes are matched case-sensitively). Empty = the Canada default below.
+    # Set to ".*" to keep every location.
+    ingest_location_filter: str = CANADA_LOCATION_FILTER
+
+    @field_validator("ingest_location_filter")
+    @classmethod
+    def _default_location_filter(cls, v: str) -> str:
+        return v.strip() or CANADA_LOCATION_FILTER
 
     @field_validator("database_url")
     @classmethod

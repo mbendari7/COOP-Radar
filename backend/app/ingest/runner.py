@@ -15,7 +15,7 @@ Each call:
 """
 
 import asyncio
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 from sqlalchemy import select
@@ -31,6 +31,10 @@ from app.models.ingest_source import IngestSource
 from app.models.posting import Posting, WorkMode
 
 _AUTO_PAUSE_THRESHOLD = 3
+# Most career boards don't publish a deadline. Postings without one get an *estimated*
+# "apply by" date this far ahead, flagged in low_confidence_fields and pushed forward on every
+# run while the job is still listed (it gets closed as soon as it disappears from the board).
+_ESTIMATED_DEADLINE = timedelta(days=45)
 _VALID_DURATIONS = {4, 8, 12, 16}
 
 
@@ -161,6 +165,9 @@ def _apply_updates(existing: Posting, raw: RawPosting) -> None:
         existing.description = raw.description
     if raw.deadline:
         existing.deadline = raw.deadline
+    elif "deadline" in (existing.low_confidence_fields or {}):
+        # Still listed → keep the estimated apply-by date ahead of today
+        existing.deadline = max(existing.deadline, date.today() + _ESTIMATED_DEADLINE)
     if raw.source_url:
         existing.source_url = raw.source_url
     if raw.skills:
@@ -200,15 +207,16 @@ async def _raw_to_posting(db: AsyncSession, raw: RawPosting, source_id: UUID) ->
     if not raw.deadline:
         low_confidence["deadline"] = 0.0
 
-    return Posting(
+    posting = Posting(
         title=raw.title,
         company=raw.company,
         city=raw.city or "Unknown",
-        province="ON",  # feeds rarely include a province; admins can correct it
+        # Career boards give a province when they can; RSS/JSON feeds rarely do
+        province=raw.province if raw.province is not None else "ON",
         work_mode=work_mode,
-        term=term or "TBD",
+        term=term or "Open",
         duration_months=duration,
-        deadline=raw.deadline or date.today(),
+        deadline=raw.deadline or date.today() + _ESTIMATED_DEADLINE,
         description=raw.description or "",
         source_url=raw.source_url,
         skills=skills,
@@ -216,3 +224,6 @@ async def _raw_to_posting(db: AsyncSession, raw: RawPosting, source_id: UUID) ->
         source_ref=raw.source_ref,
         low_confidence_fields={k: v for k, v in low_confidence.items() if v < 1.0},
     )
+    if raw.posted_at:
+        posting.posted_at = raw.posted_at
+    return posting

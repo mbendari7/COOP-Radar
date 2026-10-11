@@ -18,7 +18,6 @@ depends_on = None
 def upgrade() -> None:
     # ── Extensions ────────────────────────────────────────────────────────────
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
-    op.execute("CREATE EXTENSION IF NOT EXISTS fuzzystrmatch")
 
     # ── users.is_admin ────────────────────────────────────────────────────────
     op.add_column(
@@ -194,5 +193,4 @@ def downgrade() -> None:
     op.drop_index("idx_ingest_sources_enabled", table_name="ingest_sources")
     op.drop_table("ingest_sources")
     op.drop_column("users", "is_admin")
-    op.execute("DROP EXTENSION IF EXISTS fuzzystrmatch")
     op.execute("DROP EXTENSION IF EXISTS vector")

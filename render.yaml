@@ -3,6 +3,8 @@
 # database, and a Redis-compatible store, and redeploys on every push to main.
 # You'll be asked for two AI keys — leave both blank: visitors bring their own key
 # (Claude, ChatGPT, or Gemini) on the site's "AI key" page. See docs/DEPLOY.md.
+# On first start the site imports real Canadian jobs from ~27 employers' career boards
+# (takes a minute or two), then refreshes them every 6 hours.
 # Plans/pricing change over time — review them on the Blueprint screen before applying.
 
 services:
@@ -33,6 +35,13 @@ services:
         value: "20"
       - key: SEED_ON_START
         value: "true"
+      # Real jobs only: import from employer career boards, skip the made-up sample postings
+      - key: SEED_SAMPLE_POSTINGS
+        value: "false"
+      - key: SEED_DEV_SOURCES
+        value: "false"
+      - key: INGEST_INTERVAL_HOURS
+        value: "6"
 
   - type: keyvalue
     name: coopradar-redis

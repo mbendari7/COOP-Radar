@@ -59,6 +59,11 @@ services:
       DEMO_ENABLED: ${DEMO_ENABLED:-true}
       AI_DAILY_LIMIT: ${AI_DAILY_LIMIT:-20}
       SEED_ON_START: ${SEED_ON_START:-true}
+      # Real jobs from employer career boards; sample/dev data off for a public site
+      SEED_SAMPLE_POSTINGS: ${SEED_SAMPLE_POSTINGS:-false}
+      SEED_DEV_SOURCES: ${SEED_DEV_SOURCES:-false}
+      INGEST_INTERVAL_HOURS: ${INGEST_INTERVAL_HOURS:-6}
+      INGEST_LOCATION_FILTER: ${INGEST_LOCATION_FILTER:-}
       # Browsers only send Secure cookies over HTTPS (or to localhost). Set COOKIE_SECURE=false
       # only if you serve plain http on a real IP/domain — and prefer the https profile instead.
       COOKIE_SECURE: ${COOKIE_SECURE:-true}
