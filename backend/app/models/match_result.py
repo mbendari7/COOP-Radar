@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, SmallInteger, Text, UniqueConstraint, desc, func
+from sqlalchemy import CheckConstraint, ForeignKey, Index, SmallInteger, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -18,7 +18,7 @@ class MatchResult(Base):
     __table_args__ = (
         CheckConstraint("score >= 0 AND score <= 100", name="ck_match_results_score_range"),
         UniqueConstraint("resume_id", "posting_id", name="uq_match_results_resume_posting"),
-        Index("idx_match_results_resume_score", "resume_id", desc("score")),
+        Index("idx_match_results_resume_score", "resume_id", "score"),
     )
 
     id: Mapped[UUID] = mapped_column(
