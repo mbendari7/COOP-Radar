@@ -31,6 +31,14 @@ sets itself up on start, and offers a one-click demo account. See `docs/DEPLOY.m
 Verified locally: built site + API in one process against real Postgres (pages, client-side routes, demo account
 with 6 tracker items and 20 matches). The Docker image build itself is verified by the new CI `docker` job.
 
+## Bring your own AI key (2026-10-11)
+
+Visitors add their own Claude, ChatGPT, or Gemini key on the **AI key** page; it stays in their browser and is
+forwarded per request (never stored). The host needs no AI keys. Resume matching's shortlist now uses SQL skill
+overlap, so it works without embeddings. Verified: backend 177 tests, frontend 23 tests, and a live check of fake
+keys against the real Anthropic, OpenAI, and Google APIs (all reported as "key rejected", key never echoed).
+Not verified: a full answer from each provider with a real key (needs paid/free keys).
+
 ## Open work
 
 1. ~~Merge everything into `main`~~ (done 2026-10-10).

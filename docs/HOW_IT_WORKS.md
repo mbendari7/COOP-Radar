@@ -40,7 +40,7 @@ Think of it as five programs working together. Docker Compose (`docker-compose.y
                                      │  fast memory │              │  background  │
                                      └──────────────┘              │  jobs        │
                                                                    └──────────────┘
-       Outside services (optional): Claude API (AI answers + ranking), OpenAI (embeddings), public job feeds
+       Outside services: the visitor's own AI (Claude, ChatGPT, or Gemini), optional OpenAI embeddings, public job feeds
 ```
 
 | Part | What it does | Where in the repo |
@@ -152,28 +152,45 @@ The automatic ingestion, step by step (`backend/app/ingest/`):
 `POST /api/resume` → `services/resume.py`:
 1. **Check the file**: PDF or DOCX, max 5 MB.
 2. **Extract the text** (pypdf / python-docx). Only the text is stored, never the file.
-3. **Stage 1, fast and broad**: embed the resume with OpenAI, then ask Postgres for the **40 open postings whose
-   vectors are closest**. This takes milliseconds.
-4. **Stage 2, smart and precise**: send the resume plus those 40 postings to **Claude** (the fast model,
-   `claude-haiku-5-5`) in one request: "score each 0–100 with a one-sentence reason, reply as JSON."
-5. **Check Claude's answer**: drop any posting ID Claude made up, remove duplicates, keep scores within 0–100,
-   and keep the top 20.
-6. **Backup plan**: if Claude is down or replies with nonsense, use the Stage-1 similarity as the score instead,
-   so the upload still works.
-7. Save the results in `match_results` and show them on the Matches page.
+3. **Work out whose AI to use** (`app/ai.py`): the visitor's key arrives in the `X-AI-Provider`, `X-AI-Key`, and
+   `X-AI-Model` headers. No key → error `AI_KEY_REQUIRED` ("add your own AI key"), unless the site owner set their
+   own key as a fallback.
+4. **Stage 1, fast and free (no AI)**: find which skills from the postings appear in the resume (whole-word match,
+   so "C" doesn't match "C++"), then ask Postgres for the **40 open postings whose required skills overlap most**.
+   If the site owner turned on embeddings, it uses meaning-vector similarity instead.
+5. **Stage 2, smart and precise**: send the resume plus those 40 postings to **the visitor's AI** (Claude,
+   ChatGPT, or Gemini, with the model they picked) in one request: "score each 0–100 with a one-sentence reason,
+   reply as JSON."
+6. **Check the answer**: drop any posting ID the AI made up, remove duplicates, keep scores within 0–100, and keep
+   the top 20.
+7. **Backup plan**: if the AI replies with nonsense, the stage-1 overlap becomes the score so the upload still
+   works. A *rejected key* is reported ("Gemini rejected the API key"), never hidden.
+8. Save the results in `match_results` and show them on the Matches page.
 
-> Why two stages? Comparing vectors is cheap but blunt. An AI model is precise but slow and costs money per posting.
-> Vectors narrow thousands of postings to 40, and Claude carefully ranks just those 40.
+> Why two stages? The database can compare skills across every posting instantly and for free. An AI model is
+> precise but slow and costs the visitor money per posting. So the database narrows everything to 40, and the AI
+> carefully ranks just those 40.
 
 ### 3.8 Asking questions about a match
 `POST /api/resume/matches/{posting_id}/ask` → `agent/resume_qa.py`:
 1. Checks the posting is one of **your** matches.
-2. Sends Claude (`claude-opus-5-5`) a strict instruction: answer **only** from the provided posting and resume,
+2. Sends the visitor's AI (their key, their model) a strict instruction: answer **only** from the provided posting and resume,
    start each claim with `Resume:` or `Posting:`, and if the answer isn't there, reply exactly
    *"I don't have enough information to answer that."*
 3. The posting and resume are wrapped in tags and labelled "data, not instructions." That way, a posting that
    says "ignore your rules" can't hijack the assistant (**prompt-injection protection**).
-4. The answer is **streamed** back with Server-Sent Events, so words appear as Claude writes them.
+4. The answer is **streamed** back with Server-Sent Events, so words appear as the AI writes them. If the
+   provider fails mid-answer, an `{"error": …}` event explains why (e.g. out of credit).
+
+### 3.8b Bringing your own key: how the three providers fit in
+- The **AI key page** (`frontend/src/pages/AiKeyPage.tsx`) shows how to get a key from each provider, then calls
+  `POST /api/ai/check`. The server asks that provider "which models can this key use?" and suggests a default.
+- The key is saved **only in the browser** (`frontend/src/api/aiKey.ts`: tab-only by default, or "remember on this
+  device"). It's attached as headers to AI requests only.
+- `backend/app/ai.py` gives the rest of the app just two functions, `complete()` and `stream()`. Inside, it uses each
+  company's official SDK (`anthropic`, `openai`, `google-genai`) and turns their different errors into the same
+  three messages: key rejected, out of credit / rate limited, or provider error. The key is never stored, logged, or
+  put in an error message.
 
 ### 3.9 "Try the demo"
 `POST /api/auth/demo` → `services/demo.py`:
@@ -214,7 +231,7 @@ and copies it into the API image, so **one container serves everything on one UR
 
 ## 5. How quality is guaranteed
 
-- **172 automated tests**: 153 backend (`backend/tests/`) and 19 frontend (`frontend/tests/`). AI calls are faked
+- **200 automated tests**: 177 backend (`backend/tests/`) and 23 frontend (`frontend/tests/`). AI calls are faked
   in tests, so they're free and repeatable.
 - **GitHub Actions** (`.github/workflows/ci.yml`) runs on every push: linting, strict type checks, database
   migrations forwards and backwards, all tests, a 10,000-posting speed test, and a production build.
@@ -236,20 +253,21 @@ was reviewed by a human.
 > students track their applications on a board, and matches their resume to postings with AI. It's a React and
 > TypeScript frontend on a FastAPI backend with PostgreSQL. Postgres does keyword search, vector search with
 > pgvector, and fuzzy de-duplication itself, so I don't need a separate search engine. Redis and a background worker
-> handle sessions and ingestion. For matching, I use embeddings to shortlist 40 postings, then Claude ranks the
-> top 20 and explains each one."
+> handle sessions and ingestion. The AI is bring-your-own-key: users plug in a Claude, ChatGPT, or Gemini key,
+> the database shortlists 40 postings by skill overlap, and their model ranks the top 20 and explains each one."
 
 ### 2-minute walkthrough (follow the data)
 1. **Data in**: postings come from public job feeds (a background worker fetches them every 6 hours, removes
    duplicates, fills in missing fields), CSV uploads, or a form.
-2. **Storage**: one Postgres database. Each posting gets a weighted full-text index and an embedding vector.
+2. **Storage**: one Postgres database. Each posting gets a weighted full-text index (and optionally an embedding).
 3. **Search**: the React page keeps filters in the URL and calls the API. The API builds a single SQL query that
    filters, sorts, and pages, and it stays under 60 ms at the 95th percentile on 10,000 postings.
 4. **Accounts and tracker**: argon2-hashed passwords, HTTP-only cookie sessions stored in Redis, and a status
    history per saved posting with a drag-and-drop board.
-5. **AI**: resume → embedding → top 40 by vector similarity → Claude scores the top 20 → follow-up Q&A that streams
-   and must cite the resume or posting. Everything has a fallback if the AI is unavailable.
-6. **Quality**: 172 tests, strict typing, CI on every push, and spec-first development with Claude Code.
+5. **AI (bring your own key)**: resume → top 40 by skill overlap (SQL, free) → the user's own Claude/ChatGPT/Gemini
+   scores the top 20 → follow-up Q&A that streams and must cite the resume or posting. The key stays in their
+   browser and is never stored on the server.
+6. **Quality**: 200 tests, strict typing, CI on every push, and spec-first development with Claude Code.
 
 ### Likely questions and good answers
 | Question | Answer |
@@ -258,9 +276,11 @@ was reviewed by a human.
 | *How do you stop SQL injection?* | User input is always passed as bound parameters or through the ORM, never pasted into SQL strings. Sort columns come from a fixed allowlist. |
 | *Why two stages for matching?* | Vector search is cheap enough to scan everything; the LLM is accurate but costly, so it only sees a shortlist. |
 | *How do you stop the AI from making things up?* | Context-only instructions, required citations, an exact "not enough information" answer, ignoring IDs it invents, and treating posting text as data. |
+| *Why bring-your-own-key?* | Hosting costs me nothing, users control their own spending, and they can choose the provider they trust. The key lives in their browser and is only forwarded per request. |
+| *How do you support three AI providers?* | One module (`app/ai.py`) exposes `complete()` and `stream()`; inside it uses each official SDK and normalizes their errors. Model lists come from the provider, so names never go stale. |
 | *What if the AI service is down?* | Matching falls back to similarity scores; search falls back to keyword; Q&A shows a clear message. Nothing crashes. |
 | *Why cookies + Redis instead of JWT?* | Logout and expiry take effect immediately (delete the key), and HTTP-only cookies can't be read by injected scripts. |
-| *How do you know it works?* | 172 automated tests, a performance test, and CI that also checks the database migrations and the models agree. |
+| *How do you know it works?* | 200 automated tests, a performance test, and CI that also checks the database migrations and the models agree. |
 | *What would you build next?* | A tool-using assistant that can search and save postings (with confirmation), exposing the same tools over MCP, plus real public job-board sources and deployment. |
 
 ---
@@ -273,7 +293,8 @@ was reviewed by a human.
 | A search filter | `backend/app/schemas/posting.py` + `backend/app/services/postings.py` + `frontend/src/components/FilterBar.tsx` |
 | How matching scores postings | `backend/app/services/resume.py` (`_RERANK_PROMPT`) |
 | What the Q&A assistant may say | `backend/app/agent/resume_qa.py` (`_SYSTEM_PROMPT`) |
-| Which AI models are used | `.env` → `AGENT_MODEL`, `FAST_MODEL` (no code change) |
+| Which AI providers are supported / how keys are handled | `backend/app/ai.py` (server), `frontend/src/api/aiKey.ts` + `pages/AiKeyPage.tsx` (browser) |
+| The "how to get a key" steps | `frontend/src/api/aiKey.ts` (`PROVIDER_GUIDES`) and `docs/AI_KEYS.md` |
 | A database table | `backend/app/models/` + a new migration (use the `/db-migration` skill in Claude Code) |
 | A new job feed | `backend/app/ingest/` (see "Add an ingest adapter" in `docs/PROJECT_GUIDE.md`) |
 | Sample data | `backend/seed/` |

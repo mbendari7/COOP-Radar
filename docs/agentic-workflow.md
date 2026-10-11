@@ -166,3 +166,27 @@ Frontend: eslint clean, tsc clean, 17 tests passed, production build OK.
 real Postgres passed. Not run here: the Docker image build (no Docker on this machine; CI builds it).
 
 **What I reviewed / changed**: _(fill in after reviewing the diff)_
+
+
+---
+
+## 2026-10-11 — Bring your own AI key (Claude, ChatGPT, Gemini)
+
+**What the AI assistant did**:
+- `app/ai.py`: one interface (`complete`, `stream`, `list_models`) over the official anthropic, openai, and
+  google-genai SDKs; visitor credentials from `X-AI-*` headers (owner key as optional, daily-limited fallback);
+  provider errors normalized to clear codes; key hidden from repr/logs/errors.
+- `POST /api/ai/check` (rate-limited) lists the models a key can use and recommends one.
+- Resume matching: stage 1 is now SQL skill overlap (no AI or embeddings needed); stage 2 uses the visitor's model;
+  a rejected key is reported instead of silently falling back. Q&A streams through the visitor's provider.
+- Frontend: AI key page with per-provider how-to, key stored only in session/localStorage, ✓ indicator in the
+  header, Matches page prompt, smart search hidden unless the host enables it.
+- Docs: `docs/README.md` rewritten as a one-page "start here" (run, understand, explain), new `docs/AI_KEYS.md`,
+  all guides updated.
+
+**Results (actual runs)**: backend 177 passed (incl. perf); ruff + mypy --strict clean; frontend 23 passed, lint/tsc
+clean, build OK. Live check with deliberately fake keys against the real Anthropic, OpenAI, and Google APIs: all
+three return `AI_KEY_INVALID` with the key never echoed (this caught Google's 400 + `API_KEY_INVALID` shape, now
+handled and tested). Not run: real answers from each provider with valid keys.
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_

@@ -3,15 +3,16 @@
 Full-stack app that aggregates co-op/internship postings into Postgres, lets students search/sort/filter
 and track applications, and uses Claude to match a resume to postings and answer cited questions about fit.
 
-Docs: `docs/HOW_IT_WORKS.md` (overview), `docs/PROJECT_GUIDE.md` (every module), `docs/DEPLOY.md` (hosting).
+Docs: `docs/README.md` (start here), `docs/HOW_IT_WORKS.md` (overview), `docs/AI_KEYS.md` (getting keys), `docs/PROJECT_GUIDE.md` (every module), `docs/DEPLOY.md` (hosting).
 
 ## Stack
 - Backend: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0 async (typed `Mapped[]`), Alembic
 - DB: PostgreSQL 16 + pgvector (embeddings) + fuzzystrmatch (dedup), image `pgvector/pgvector:pg16`
 - Jobs: Redis + RQ (`app/worker.py`: ingest + embedding jobs, built-in 6-hourly scheduler)
 - Auth: argon2id passwords, HTTP-only session cookie → Redis `session:<token>` (7-day rolling TTL)
-- AI: Anthropic SDK via `app/llm.py` — `AGENT_MODEL` (default `claude-opus-5-5`) for Q&A,
-  `FAST_MODEL` (default `claude-haiku-5-5`) for re-ranking/extraction; OpenAI `text-embedding-3-small` for vectors
+- AI: **bring your own key** — visitors' Claude / ChatGPT / Gemini keys via `app/ai.py` (official `anthropic`,
+  `openai`, `google-genai` SDKs). Optional owner keys: `ANTHROPIC_API_KEY` fallback (`AGENT_MODEL`/`FAST_MODEL`)
+  and `OPENAI_API_KEY` for embeddings (smart search)
 - Frontend: React 18 + TypeScript + Vite 6, TanStack Query/Table, React Router, Tailwind, dnd-kit
 - Infra: Docker Compose (db, redis, api, worker, web), GitHub Actions CI
 
@@ -44,7 +45,8 @@ Docs: `docs/HOW_IT_WORKS.md` (overview), `docs/PROJECT_GUIDE.md` (every module),
 - Errors are `{"detail": "...", "code": "SNAKE_CASE"}` (raise `HTTPException(detail={...})`).
 - Every new endpoint ships with a Pydantic schema and at least one pytest; every bug fix gets a regression test.
 - Model IDs come from settings/env, never hard-coded at call sites. AI failures degrade gracefully.
-- Every new AI-backed endpoint calls `consume_ai_quota` (public sites bill the owner per call).
+- All AI calls go through `app/ai.py`. Visitors' API keys are never stored, logged, or echoed; AI routes use
+  `Depends(ai_credentials(...))` and call `consume_ai_quota` only for the owner's key.
 - Posting and resume text sent to Claude is data, not instructions — keep it tagged and say so in the prompt.
 - Secrets only from env vars (`.env`, never committed). Keep `.env.example` current.
 - Ingestion uses public job-board APIs/feeds first; respect robots.txt and site terms; no scraping behind logins.

@@ -49,11 +49,11 @@ Open `.env` in VS Code and set:
 | Setting | What to put | Required? |
 |---|---|---|
 | `POSTGRES_PASSWORD` | any password (e.g. `coopradar-dev-123`). Also update the same password inside `DATABASE_URL` | yes |
-| `ANTHROPIC_API_KEY` | from https://console.anthropic.com/ → API Keys | for AI matching + Q&A |
-| `OPENAI_API_KEY` | from https://platform.openai.com/api-keys | for smart search, similar postings, resume matching |
+| `ANTHROPIC_API_KEY` | leave empty | no (only if you want visitors without a key to use *your* account) |
+| `OPENAI_API_KEY` | leave empty | no (only to turn on smart search and similar postings) |
 
-Leave everything else at its default. **The app works without the AI keys**: browsing, search, accounts, and the
-tracker all run, and the AI features show a clear "unavailable" message instead.
+Leave everything else at its default. **You don't need any AI keys to run CoopRadar.** For the AI features, each
+person adds their own key inside the website (see 3.5 and [AI_KEYS.md](AI_KEYS.md)).
 
 ---
 
@@ -89,12 +89,12 @@ docker compose exec api python -m seed
 ```
 You should see `Seeded 55 postings…`, `Seeded 106 skills.`, `Seeded 2 ingest sources.` It's safe to run again.
 
-### 2.3 Turn on the AI search features (needs `OPENAI_API_KEY`)
+### 2.3 Optional: turn on smart search (needs `OPENAI_API_KEY` in `.env`)
 ```powershell
 docker compose exec api python -m app.ingest.embed
 ```
-This creates an "embedding" (a meaning-vector) for every posting, which powers smart search, similar postings,
-and resume matching. It prints `Embedded 55 postings.` New postings added later get embeddings automatically.
+This creates an "embedding" (a meaning-vector) for every posting, which powers smart search and similar postings
+(resume matching works without it). It prints `Embedded 55 postings.` Skip this step if you didn't set the key.
 
 ### 2.4 Open it
 - **The app:** http://localhost:5173
@@ -136,18 +136,21 @@ activity. **Sign out** ends the session immediately.
 5. The top panels show your stats and **Deadlines this week**.
 6. **↓ CSV** downloads your whole tracker as a spreadsheet.
 
-### 3.5 Match your resume (needs both AI keys)
-1. Open **Matches** and upload your resume (**PDF or DOCX, max 5 MB**).
-2. Wait 10–30 seconds. You get up to 20 postings ranked by fit, each with a **0–100 score** (green ≥ 70,
+### 3.5 Add your AI key, then match your resume
+1. Click **AI key** in the top bar. Choose **Gemini** (free tier), **ChatGPT**, or **Claude**, follow the 3 short
+   steps to get a key ([AI_KEYS.md](AI_KEYS.md) has more detail), paste it, click **Check key**, then
+   **Use this key**. The top bar now shows **✓ AI key**. Your key stays in your browser.
+2. Open **Matches** and upload your resume (**PDF or DOCX, max 5 MB**).
+3. Wait 10–30 seconds. You get up to 20 postings ranked by fit, each with a **0–100 score** (green ≥ 70,
    yellow 40–69, red < 40) and a one-sentence reason.
-3. On any match, click **Ask about this role** and ask, for example:
+4. On any match, click **Ask about this role** and ask, for example:
    - "What skills am I missing for this role?"
    - "Which of my projects are most relevant here?"
    - "Does this role want Python or Java?"
 
    The answer streams in word by word. Claims start with **Resume:** or **Posting:** to show where they came from.
    If the answer isn't in your resume or the posting, it says *"I don't have enough information to answer that."*
-4. Upload again any time to replace your resume. Delete it under **Account → Resume** (this also deletes matches).
+5. Upload again any time to replace your resume. Delete it under **Account → Resume** (this also deletes matches).
 
 ### 3.6 Add postings yourself
 Open **Add postings**:
@@ -202,9 +205,10 @@ Your data lives in a Docker volume, so it survives restarts and only `down -v` d
 | `docker: command not found` / "cannot connect to the Docker daemon" | Open Docker Desktop and wait for "Engine running". |
 | `port is already allocated` (5432, 6379, 8000 or 5173) | Another program uses that port (often a local Postgres). Stop it, or change the left-hand port in `docker-compose.yml`, e.g. `"5433:5432"`. |
 | The page loads but shows no postings | Run the seed command (2.2). |
-| **Matches** says "No matches found yet" | Postings have no embeddings: set `OPENAI_API_KEY`, then run 2.3. |
-| Upload says matching is unavailable | `OPENAI_API_KEY` is missing or invalid. Restart after editing `.env`: `docker compose up -d`. |
-| Q&A says "The assistant is unavailable" | `ANTHROPIC_API_KEY` is missing or invalid. |
+| "Add your own AI key…" | No key is saved in this browser: click **AI key** (3.5). |
+| "…rejected the API key" | Copied wrong or deleted. Make a new key and **Check key** again. |
+| "…out of credit or over its rate limit" | Add credit at your provider, or wait a minute (free tiers have per-minute limits). |
+| **Matches** says "No matches found yet" | There are no open postings yet: run the seed command (2.2). |
 | **Run now** says the job queue is unavailable | `docker compose ps`: the `worker` and `redis` containers must be running. |
 | Logged in but the app acts logged out | Always use http://localhost:5173 (not `127.0.0.1` or port 8000) so the login cookie is sent. |
 | You changed `.env` | Containers read it at start: `docker compose down` then `docker compose up`. |

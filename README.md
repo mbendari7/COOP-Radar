@@ -13,6 +13,8 @@ Upload a resume and Claude ranks the best-fit postings and answers cited questio
 
 | Read this | When you want to… |
 |---|---|
+| **[docs/README.md](docs/README.md)** | **Start here**: run it in 5 minutes, understand it, and explain it |
+| **[docs/AI_KEYS.md](docs/AI_KEYS.md)** | Get a Claude, ChatGPT, or Gemini API key to use the AI features |
 | **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** | Run it on your computer and **use** every feature, step by step |
 | **[docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md)** | Understand how the program works, where everything lives, and **how to explain it** |
 | **[docs/DEPLOY.md](docs/DEPLOY.md)** | Put it online as a website anyone can use from a link |
@@ -40,8 +42,9 @@ behind every claim.
 | **Application tracker** | Save postings, move them through 7 statuses (Saved → Applying → Applied → Interview → Offer / Rejected / Withdrawn) with dated notes. Table or drag-and-drop board view, "deadlines this week" panel, stats, CSV export. |
 | **Ingestion** | Pluggable source adapters (JSON APIs, RSS). Scheduled every 6 hours plus admin "Run now". Fuzzy de-duplication, closes postings that disappear from their feed, auto-pauses failing sources. Missing fields are extracted from the text and flagged as low-confidence. |
 | **Imports** | CSV upload (≤ 1,000 rows, per-line errors, 3 uploads/hour) and a manual "add posting" form. |
-| **AI resume matcher** | Upload a PDF or DOCX. Vector search picks the top 40 candidates, then Claude re-ranks them into the top 20, each with a 0–100 score and a one-sentence reason. Ask follow-up questions per posting; answers stream live and cite `Resume:` / `Posting:` sources, or say "I don't have enough information." |
+| **AI resume matcher** | Upload a PDF or DOCX. The database shortlists the 40 postings whose skills best overlap the resume, then *your* AI ranks the top 20, each with a 0–100 score and a one-sentence reason. Ask follow-up questions per posting; answers stream live and cite `Resume:` / `Posting:` sources, or say "I don't have enough information." |
 | **Admin** | Sources page with last-run stats, run history, re-enable for auto-paused sources. |
+| **Bring your own AI key** | Visitors paste their own **Claude, ChatGPT (OpenAI), or Gemini** key on the AI key page (with a how-to for each). It stays in their browser and is forwarded per request, never stored. The site owner pays nothing for AI. |
 | **One-click demo** | "Try the demo" creates a private account pre-filled with tracker history and resume matches (deleted after 24 h). A daily AI allowance per user keeps hosting costs safe. |
 
 ## Architecture
@@ -58,8 +61,8 @@ flowchart LR
       DB[("db :5432<br/>Postgres 16<br/>pgvector + fuzzystrmatch")]
       RD[("redis :6379<br/>sessions · rate limits · job queue")]
     end
-    CL["Claude API<br/>(Anthropic)"]
-    OA["OpenAI<br/>embeddings"]
+    CL["Visitor's AI provider<br/>Claude · ChatGPT · Gemini<br/>(their own key)"]
+    OA["OpenAI embeddings<br/>(optional, owner's key)"]
     SRC["Public job feeds<br/>(JSON / RSS)"]
 
     UI -->|"/api/* (same origin, cookie)"| WEB --> API
@@ -68,7 +71,7 @@ flowchart LR
     WK -->|"dequeue jobs"| RD
     WK --> DB
     WK -->|fetch| SRC
-    API -->|"Q&A (AGENT_MODEL), re-rank (FAST_MODEL)"| CL
+    API -->|"match ranking + Q&A"| CL
     WK -->|"field extraction (FAST_MODEL)"| CL
     API -->|"query/resume vectors"| OA
     WK -->|"posting vectors"| OA
@@ -83,23 +86,23 @@ flowchart LR
 | Migrations | Alembic (5 migrations; round-trip and drift-checked in CI) |
 | Background jobs | Redis + RQ worker with a built-in 6-hour ingest scheduler |
 | Auth | argon2id (argon2-cffi), opaque session tokens in Redis, HTTP-only Secure cookies |
-| AI | Anthropic Python SDK. `AGENT_MODEL` (default `claude-opus-5-5`) answers Q&A; `FAST_MODEL` (default `claude-haiku-5-5`) re-ranks and extracts. OpenAI `text-embedding-3-small` (1536-d) for embeddings |
+| AI | Bring your own key: official SDKs for Anthropic (Claude), OpenAI (ChatGPT), and Google (Gemini) behind one module (`app/ai.py`); the visitor picks the model their key can use. Optional owner keys: Claude fallback and OpenAI `text-embedding-3-small` for smart search |
 | Files | pypdf, python-docx (resumes) · pandas (CSV import/export) · feedparser (RSS) · httpx (JSON APIs) |
 | Frontend | React 18, TypeScript 5, Vite 6, TanStack Query v5, TanStack Table v8, React Router v6, Tailwind CSS v3, dnd-kit |
-| Testing | pytest + pytest-asyncio (153 tests incl. a 10k-row perf budget), Vitest + Testing Library (19 tests) |
+| Testing | pytest + pytest-asyncio (177 tests incl. a 10k-row perf budget), Vitest + Testing Library (23 tests) |
 | Quality | ruff, mypy `--strict`, eslint, `tsc --noEmit` |
 | CI / infra | GitHub Actions (tests + production-image smoke test) · Docker Compose · single production image (FastAPI serves the built site) · Caddy for automatic HTTPS · Render Blueprint |
 | AI-assisted workflow | [Spec Kit](https://github.com/github/spec-kit) + Claude Code skills (see below) |
 
 ## Quick start
 
-You only need **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** running.
-AI keys are optional ([Anthropic](https://console.anthropic.com/), [OpenAI](https://platform.openai.com/api-keys)).
+You only need **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** running. **No AI keys are
+needed to run it**: visitors (including you) add their own on the site's **AI key** page.
 
 ```bash
 git clone https://github.com/mbendari7/COOP-Radar.git
 cd COOP-Radar
-cp .env.example .env        # set POSTGRES_PASSWORD (+ AI keys if you have them)
+cp .env.example .env        # set POSTGRES_PASSWORD — that's all
 ```
 
 **Run the website (what a visitor sees):** one command, one URL.
@@ -113,12 +116,13 @@ themselves up.
 ```bash
 docker compose up --build
 docker compose exec api python -m seed               # first run: sample data
-docker compose exec api python -m app.ingest.embed   # AI search vectors (needs OPENAI_API_KEY)
+docker compose exec api python -m app.ingest.embed   # optional: smart-search vectors (needs OPENAI_API_KEY)
 ```
 Open **http://localhost:5173** (API docs at http://localhost:8000/docs).
 
-Without AI keys, browsing, search, accounts, the tracker, and the demo all work. Smart search and real resume
-matching show a clear "unavailable" message. Step-by-step usage: **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)**.
+To use resume matching and Q&A, click **AI key** in the top bar and add a Claude, ChatGPT, or Gemini key
+(Gemini has a free tier, see **[docs/AI_KEYS.md](docs/AI_KEYS.md)**). New here? Read
+**[docs/README.md](docs/README.md)**: run it, understand it, explain it, all on one page.
 To put it online: **[docs/DEPLOY.md](docs/DEPLOY.md)**.
 
 ## Development commands
@@ -152,9 +156,9 @@ All configuration is environment variables. See [`.env.example`](.env.example) f
 |---|---|---|
 | `DATABASE_URL` | (built by compose) | async SQLAlchemy URL (`postgresql+asyncpg://…`) |
 | `REDIS_URL` | `redis://redis:6379/0` | sessions, rate limits, job queue |
-| `ANTHROPIC_API_KEY` | empty | Claude: Q&A, re-ranking, extraction |
-| `OPENAI_API_KEY` | empty | embeddings |
-| `AGENT_MODEL` / `FAST_MODEL` | `claude-opus-5-5` / `claude-haiku-5-5` | which Claude models to use |
+| `ANTHROPIC_API_KEY` | empty | *Optional.* Lets visitors without their own key use AI on your account (limited by `AI_DAILY_LIMIT`) |
+| `OPENAI_API_KEY` | empty | *Optional.* Turns on smart search + similar postings (embeddings) |
+| `AGENT_MODEL` / `FAST_MODEL` | `claude-opus-5-5` / `claude-haiku-5-5` | models used with *your* Anthropic key (visitors choose their own) |
 | `EMBED_MODEL` | `text-embedding-3-small` | must output 1536-dim vectors |
 | `CORS_ORIGINS` | `http://localhost:5173` | only needed if the frontend calls the API cross-origin |
 | `COOKIE_SECURE` | `true` | keep `true`; the test suite sets it to `false` |
@@ -184,9 +188,10 @@ COOP-Radar/
 │   │   ├── config.py             Settings from env vars
 │   │   ├── db.py · redis.py      Database session · Redis pool
 │   │   ├── deps.py               Who is logged in (user / optional / admin)
-│   │   ├── llm.py                Claude client helpers
+│   │   ├── ai.py                 Bring-your-own-key: Claude / ChatGPT / Gemini behind one interface
+│   │   ├── llm.py                Claude client + JSON-reply helpers
 │   │   ├── worker.py             Background worker + ingest scheduler
-│   │   ├── api/                  Routes: postings, auth (+ demo), me, saved, resume, admin, config
+│   │   ├── api/                  Routes: postings, auth (+ demo), me, saved, resume, ai (key check), admin, config
 │   │   ├── services/             Logic + SQL (postings, auth, demo, usage limits, saved, resume, ingest)
 │   │   ├── schemas/              Pydantic request/response models
 │   │   ├── models/               Database tables (10)
@@ -200,7 +205,7 @@ COOP-Radar/
 └── frontend/                     React + TypeScript + Vite
     ├── src/
     │   ├── api/                  client.ts (apiFetch/ApiError) + data hooks per resource
-    │   ├── pages/                Postings, posting detail, Saved (tracker), Matches, Account, Admin
+    │   ├── pages/                Postings, posting detail, Saved (tracker), Matches, AI key, Account, Admin
     │   └── components/           Table, filters, board, welcome section, demo button, Q&A panel, …
     ├── tests/                    Vitest + Testing Library
     └── Dockerfile · vite.config.ts · tailwind.config.ts
@@ -218,10 +223,12 @@ COOP-Radar/
 | `GET/POST /api/saved` · `DELETE /api/saved/{id}` · `PATCH …/status` · `POST …/events` · `GET /api/saved/export/csv` | user | Tracker |
 | `POST/GET/DELETE /api/resume` · `GET /api/resume/matches` · `POST /api/resume/matches/{posting_id}/ask` (SSE) | user | Resume matcher |
 | `GET /api/admin/sources` · `…/{id}/runs` · `POST …/{id}/run` · `PATCH …/{id}` | admin | Ingestion admin |
+| `POST /api/ai/check` | — | Verify a visitor's AI key with its provider and list the models it can use (key never stored) |
 | `GET /api/config` | — | Which optional features are on (demo, AI, daily AI limit) |
 | `GET /api/health` | — | Liveness |
 
-Every error has the same shape: `{"detail": "Human-readable message", "code": "SNAKE_CASE"}`.
+AI routes (`POST /api/resume`, `…/ask`) read the visitor's key from the `X-AI-Provider`, `X-AI-Key`, and
+`X-AI-Model` headers. Every error has the same shape: `{"detail": "Human-readable message", "code": "SNAKE_CASE"}`.
 
 ## AI-assisted development: Spec Kit + Claude Code skills
 

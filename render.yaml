@@ -1,7 +1,8 @@
 # Render Blueprint: one-click hosting on https://render.com
 # Dashboard → New → Blueprint → pick this repo. Render creates the website, a Postgres
 # database, and a Redis-compatible store, and redeploys on every push to main.
-# You'll be asked for the two secret AI keys (both optional). See docs/DEPLOY.md.
+# You'll be asked for two AI keys — leave both blank: visitors bring their own key
+# (Claude, ChatGPT, or Gemini) on the site's "AI key" page. See docs/DEPLOY.md.
 # Plans/pricing change over time — review them on the Blueprint screen before applying.
 
 services:

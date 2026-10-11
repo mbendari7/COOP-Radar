@@ -1,6 +1,6 @@
 # Production / self-hosting: the whole website on any machine with Docker.
 #
-#   cp .env.example .env            # set POSTGRES_PASSWORD (+ AI keys)
+#   cp .env.example .env            # set POSTGRES_PASSWORD (AI keys optional — visitors bring their own)
 #   docker compose -f docker-compose.prod.yml up -d --build
 #   → http://localhost:8080
 #

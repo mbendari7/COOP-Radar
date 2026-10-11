@@ -20,8 +20,14 @@ set those up for you.
 - A **"Try the demo"** button. Each visitor gets a *private* demo account filled with sample applications and
   resume matches. Demo accounts are deleted after 24 hours, and each network can create 10 per hour.
 - Normal sign-up for anyone who wants to keep their own data.
-- A daily AI allowance per user (`AI_DAILY_LIMIT`, default 20 resume uploads + questions), so visitors can't run up
-  your Anthropic/OpenAI bill. Demo matches are computed without AI, so they cost nothing.
+- **Bring your own AI key**: each visitor adds their own Claude, ChatGPT, or Gemini key on the **AI key** page
+  (with step-by-step instructions). Their key stays in their browser, so **you pay nothing for AI** and need no
+  AI keys on the server.
+- Optional: set `ANTHROPIC_API_KEY` to let visitors *without* a key use AI on your account. That's capped by
+  `AI_DAILY_LIMIT` (default 20 actions per person per day). Demo matches never use AI.
+
+> **HTTPS matters here**: visitors' keys travel from their browser to your server. Always serve the public site
+> over HTTPS (option A3, or any host in options B/C, which provide it automatically).
 
 ---
 
@@ -39,7 +45,7 @@ curl -fsSL https://get.docker.com | sh
 git clone https://github.com/mbendari7/COOP-Radar.git
 cd COOP-Radar
 cp .env.example .env
-nano .env        # set POSTGRES_PASSWORD (a long random one) and, optionally, the two AI keys
+nano .env        # set POSTGRES_PASSWORD (a long random one); AI keys are optional
 ```
 
 ### A2. Start it
@@ -92,7 +98,7 @@ Redis-compatible store in one go, then redeploys on every push to `main`.
 3. Render shows the three resources it will create. Review the plans and prices on that screen; the file asks
    for free plans where available. Free web services sleep after inactivity, and free databases expire after a
    trial period, so pick paid plans for an always-on portfolio site.
-4. Enter `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` when asked (or leave them blank to run without AI).
+4. When asked for `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`, leave them blank: visitors bring their own keys.
 5. Click **Apply**. The first build takes several minutes. Your site is at `https://coopradar-xxxx.onrender.com`
    (you can add your own domain under the service's **Settings → Custom Domains**).
 
@@ -118,8 +124,8 @@ Railway, Fly.io, Google Cloud Run, Azure Container Apps, and similar hosts all w
 |---|---|---|---|
 | `DATABASE_URL` | ✅ | — | Postgres connection URL |
 | `REDIS_URL` | ✅ | — | Redis connection URL |
-| `ANTHROPIC_API_KEY` | for AI | empty | Resume match ranking + Q&A |
-| `OPENAI_API_KEY` | for AI | empty | Smart search, similar postings, resume matching |
+| `ANTHROPIC_API_KEY` | | empty | *Optional:* shared Claude key for visitors without their own (daily-limited) |
+| `OPENAI_API_KEY` | | empty | *Optional:* turns on smart search + similar postings |
 | `DEMO_ENABLED` | | `true` | Show the "Try the demo" button |
 | `AI_DAILY_LIMIT` | | `20` | AI actions per user per day (`0` = unlimited) |
 | `SEED_ON_START` | | `true` | Load the sample postings on start |
@@ -134,6 +140,6 @@ Railway, Fly.io, Google Cloud Run, Azure Container Apps, and similar hosts all w
 
 - [ ] Open the site in a private/incognito window and click **Try the demo**. You should land on a filled tracker.
 - [ ] Check **Matches** shows demo matches, and a posting's detail page loads.
-- [ ] With AI keys set: register a real account, upload a resume, and ask a question.
+- [ ] Click **AI key**, add your own key (Gemini's free tier is fine), upload a resume on **Matches**, and ask a question.
 - [ ] Put the link at the top of the README (replace the placeholder in the "Live demo" line).
 - [ ] Set a monthly spending limit in the Anthropic and OpenAI consoles as a second safety net.

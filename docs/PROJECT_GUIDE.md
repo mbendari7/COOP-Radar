@@ -227,25 +227,36 @@ To add a real source, insert an `ingest_sources` row with `adapter_type='json_ap
 `config={"url": "...", "field_map": {"title": "job_title", ...}}`, or write a new adapter (see recipes). Always
 check the site's terms and robots.txt first.
 
-### 6.5 Resume matcher (`services/resume.py`)
-1. **Upload**: the extension must be `.pdf`/`.docx` and the file ≤ 5 MB. Text comes out via pypdf/python-docx, and
+### 6.5 Resume matcher (`services/resume.py`) — bring your own key
+1. **Credentials** (`app/ai.py → ai_credentials`): the visitor's key arrives as `X-AI-Provider` / `X-AI-Key` /
+   `X-AI-Model` headers. With no key, the owner's `ANTHROPIC_API_KEY` is used if set (then `AI_DAILY_LIMIT`
+   applies via `services/usage.py`); otherwise 400 `AI_KEY_REQUIRED`.
+2. **Upload**: the extension must be `.pdf`/`.docx` and the file ≤ 5 MB. Text comes out via pypdf/python-docx, and
    empty text gives 422. The old resume is deleted (its matches cascade), and the new one is stored.
-2. **Stage 1, recall**: embed the first 8,000 characters of the resume, then take the top 40 open, unexpired
-   postings by cosine similarity (an SQL `ORDER BY <=> LIMIT 40` on the HNSW index).
-3. **Stage 2, precision**: one Claude call (`FAST_MODEL`, effort low) scores every candidate 0–100 with a reason and
-   returns a JSON array. The code drops IDs the model invented and any duplicates, clamps scores, and keeps the top 20.
-4. **Fallback**: if Claude fails or returns junk, the cosine similarity becomes the score
-   ("Ranked by semantic similarity…"). If the embedding call itself fails, the response is 503 `AI_UNAVAILABLE` and
-   the old resume is kept (the transaction rolls back).
-5. **Q&A** (`agent/resume_qa.py`): `POST /api/resume/matches/{posting_id}/ask` checks that the posting is in *your*
-   matches, then streams Server-Sent Events: `data: {"delta": "…"}` … `data: [DONE]`. The system prompt forces
-   `Resume:`/`Posting:` citations, the exact "I don't have enough information to answer that." line, and treats
-   the tagged posting/resume text as data (a prompt-injection guard). It uses `AGENT_MODEL` with effort low and
-   server-side refusal fallback. API errors arrive in-band as `data: {"error": "…"}` because the HTTP status is
-   already 200 once streaming starts.
+3. **Stage 1, recall (`find_candidates`)**: by default, `skills_in_text` finds which posting skills appear in the
+   resume (whole-word, so "C" ≠ "C++"), and SQL ranks open postings by the *share of their skills covered*
+   (`unnest(skills) … = ANY(:resume_skills)`). No AI, no cost. If the owner set `OPENAI_API_KEY`, pgvector cosine
+   similarity is used instead.
+4. **Stage 2, precision (`rank_with_ai`)**: one call through `ai.complete()` to the visitor's provider/model scores
+   every candidate 0–100 with a reason as a JSON array. The code drops invented IDs and duplicates, clamps scores,
+   and keeps the top 20.
+5. **Fallback**: unusable output → the stage-1 relevance becomes the score. A rejected key, unknown model, or
+   exhausted credit is **raised** (400/429 with a clear code) rather than hidden, and the old resume is kept
+   (the transaction rolls back).
+6. **Q&A** (`agent/resume_qa.py`): `POST /api/resume/matches/{posting_id}/ask` checks that the posting is in *your*
+   matches, then streams Server-Sent Events through `ai.stream()`: `data: {"delta": "…"}` … `data: [DONE]`. The
+   system prompt forces `Resume:`/`Posting:` citations, the exact "I don't have enough information to answer
+   that." line, and treats the tagged posting/resume text as data (a prompt-injection guard). Provider errors arrive
+   in-band as `data: {"error": "…"}` because the HTTP status is already 200 once streaming starts.
 
-**Why two stages?** Vectors are cheap and fast but blunt; an LLM is precise but costly per posting. Vectors narrow
-thousands of postings to 40, then one LLM call ranks just those.
+**`app/ai.py` in one paragraph:** `complete()` and `stream()` hide three official SDKs (`anthropic`, `openai`,
+`google-genai`). `list_models()` powers `POST /api/ai/check` (rate-limited per IP) so the UI offers only models the
+key can use, with `recommended_model()` pre-selecting a sensible default. `_translate()` maps every SDK's errors
+(including Google's 400 + `API_KEY_INVALID`) to `AI_KEY_INVALID`, `AI_MODEL_INVALID`, `AI_PROVIDER_RATE_LIMITED`,
+or `AI_PROVIDER_ERROR`, and never includes the key. `AICredentials` hides the key from `repr()`.
+
+**Why two stages?** SQL can compare skills across every posting instantly and for free; an LLM is precise but costs
+the visitor per posting. SQL narrows thousands of postings to 40, then one LLM call ranks just those.
 
 ---
 
@@ -254,9 +265,10 @@ thousands of postings to 40, then one LLM call ranks just those.
 | Piece | Where | Notes |
 |---|---|---|
 | Providers | `src/main.tsx` | `BrowserRouter` plus `QueryClientProvider` (30 s staleTime, 1 retry). |
-| Routes | `src/App.tsx` | `/` list · `/postings/:id` detail · `/saved` tracker · `/matches` resume matcher · `/account` · `/add` CSV + manual entry · `/admin/sources`. Signed-out visitors see `WelcomeHero` with the demo button. Heavy pages are lazy-loaded. |
+| Routes | `src/App.tsx` | `/` list · `/postings/:id` detail · `/saved` tracker · `/matches` resume matcher · `/ai-key` bring-your-own-key · `/account` · `/add` CSV + manual entry · `/admin/sources`. Signed-out visitors see `WelcomeHero` with the demo button. Heavy pages are lazy-loaded. |
 | HTTP | `src/api/client.ts` | `apiFetch` (relative `/api` URLs, cookies, JSON, throws `ApiError {status, code}`) and `toApiError`. |
-| Hooks | `src/api/{postings,auth,saved,resume,ingest}.ts` | One TanStack Query hook per endpoint. Mutations invalidate affected keys (e.g. saving invalidates `['saved']` and `['postings']` so `is_saved` refreshes). |
+| AI key | `src/api/aiKey.ts`, `pages/AiKeyPage.tsx` | Key kept in session/localStorage only; `aiHeaders()` attaches it to AI requests; provider how-to steps in `PROVIDER_GUIDES`. |
+| Hooks | `src/api/{postings,auth,saved,resume,ingest,meta,aiKey}.ts` | One TanStack Query hook per endpoint. Mutations invalidate affected keys (e.g. saving invalidates `['saved']` and `['postings']` so `is_saved` refreshes). |
 | URL state | `pages/PostingsListPage.tsx` | Reads every filter from `useSearchParams` and writes with `replace: true`, so links are shareable and Back works. |
 | Table | `components/PostingsTable.tsx` | TanStack Table in manual mode (it only *displays*; sort changes are sent back to the URL). Becomes `PostingCard`s below `md`. |
 | Tracker board | `components/TrackerBoard.tsx` | dnd-kit; dropping on a column calls the status mutation. |
@@ -271,7 +283,7 @@ origin (see `docs/DEPLOY.md`).
 
 ## 8. Testing: how it works and why
 
-**Backend** (`backend/tests/`, 153 tests):
+**Backend** (`backend/tests/`, 177 tests):
 - `conftest.py` rebuilds the schema once per session (`drop_all`/`create_all`, after enabling `vector` and
   `fuzzystrmatch`). Each test then runs inside an outer transaction with
   `join_transaction_mode="create_savepoint"`, so a service's `commit()` only releases a savepoint and everything
@@ -284,7 +296,7 @@ origin (see `docs/DEPLOY.md`).
 - Folders: `api/` endpoints · `ingest/` adapters, runner, dedup, extraction, admin · `resume/` upload, matching,
   Q&A · `eval/` output-handling cases for the matcher · `perf/` the 10k-row latency budget (`-m perf`).
 
-**Frontend** (`frontend/tests/`, 19 tests): FilterBar, PostingsTable, DemoButton, and the API client, using Vitest + Testing
+**Frontend** (`frontend/tests/`, 23 tests): FilterBar, PostingsTable, DemoButton, the AI key store + page, and the API client, using Vitest + Testing
 Library in jsdom.
 
 **CI** (`.github/workflows/ci.yml`) on every push runs ruff → mypy --strict → migrations up/down/up →
