@@ -1,8 +1,8 @@
 # CoopRadar — The Project Guide
 
 This is the deep technical reference: how every part works, so you can debug and extend it.
-Start with the shorter guides if you haven't: **[GETTING_STARTED.md](../GETTING_STARTED.md)** (run and use it) and
-**[HOW_IT_WORKS.md](../HOW_IT_WORKS.md)** (how it works, plus how to explain it).
+Start with the shorter guides if you haven't: **[GETTING_STARTED.md](GETTING_STARTED.md)** (run and use it) and
+**[HOW_IT_WORKS.md](HOW_IT_WORKS.md)** (how it works, plus how to explain it).
 
 **Contents**
 1. [The big picture](#1-the-big-picture)
@@ -254,7 +254,7 @@ thousands of postings to 40, then one LLM call ranks just those.
 | Piece | Where | Notes |
 |---|---|---|
 | Providers | `src/main.tsx` | `BrowserRouter` plus `QueryClientProvider` (30 s staleTime, 1 retry). |
-| Routes | `src/App.tsx` | `/` list · `/postings/:id` detail · `/saved` tracker · `/matches` resume matcher · `/account` · `/add` CSV + manual entry · `/admin/sources`. Heavy pages are lazy-loaded. |
+| Routes | `src/App.tsx` | `/` list · `/postings/:id` detail · `/saved` tracker · `/matches` resume matcher · `/account` · `/add` CSV + manual entry · `/admin/sources`. Signed-out visitors see `WelcomeHero` with the demo button. Heavy pages are lazy-loaded. |
 | HTTP | `src/api/client.ts` | `apiFetch` (relative `/api` URLs, cookies, JSON, throws `ApiError {status, code}`) and `toApiError`. |
 | Hooks | `src/api/{postings,auth,saved,resume,ingest}.ts` | One TanStack Query hook per endpoint. Mutations invalidate affected keys (e.g. saving invalidates `['saved']` and `['postings']` so `is_saved` refreshes). |
 | URL state | `pages/PostingsListPage.tsx` | Reads every filter from `useSearchParams` and writes with `replace: true`, so links are shareable and Back works. |
@@ -263,14 +263,15 @@ thousands of postings to 40, then one LLM call ranks just those.
 | SSE reader | `api/resume.ts → askAboutPosting` | Reads `res.body` with a stream reader, splits on lines, and parses `data:` events. |
 
 In development the browser only talks to `localhost:5173`; Vite forwards `/api/*` to the API (`API_PROXY_TARGET`).
-The cookie is therefore first-party and CORS never comes into play. In production, `frontend/nginx.conf` plays the
-same role.
+The cookie is therefore first-party and CORS never comes into play. In production there's no proxy at all: the
+root `Dockerfile` copies the built site into the API image and `main.py → mount_frontend` serves it from the same
+origin (see `docs/DEPLOY.md`).
 
 ---
 
 ## 8. Testing: how it works and why
 
-**Backend** (`backend/tests/`, 141 tests):
+**Backend** (`backend/tests/`, 153 tests):
 - `conftest.py` rebuilds the schema once per session (`drop_all`/`create_all`, after enabling `vector` and
   `fuzzystrmatch`). Each test then runs inside an outer transaction with
   `join_transaction_mode="create_savepoint"`, so a service's `commit()` only releases a savepoint and everything
@@ -283,11 +284,12 @@ same role.
 - Folders: `api/` endpoints · `ingest/` adapters, runner, dedup, extraction, admin · `resume/` upload, matching,
   Q&A · `eval/` output-handling cases for the matcher · `perf/` the 10k-row latency budget (`-m perf`).
 
-**Frontend** (`frontend/tests/`, 17 tests): FilterBar, PostingsTable, and the API client, using Vitest + Testing
+**Frontend** (`frontend/tests/`, 19 tests): FilterBar, PostingsTable, DemoButton, and the API client, using Vitest + Testing
 Library in jsdom.
 
 **CI** (`.github/workflows/ci.yml`) on every push runs ruff → mypy --strict → migrations up/down/up →
-`alembic check` → pytest → perf for the backend, and eslint → tsc → vitest → `vite build` for the frontend.
+`alembic check` → pytest → perf for the backend, eslint → tsc → vitest → `vite build` for the frontend, then builds
+the production image with `docker-compose.prod.yml` and smoke-tests the site, API, and demo login.
 
 ---
 

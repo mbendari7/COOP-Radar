@@ -3,7 +3,7 @@
 Full-stack app that aggregates co-op/internship postings into Postgres, lets students search/sort/filter
 and track applications, and uses Claude to match a resume to postings and answer cited questions about fit.
 
-Start here for the big picture: `docs/PROJECT_GUIDE.md` (architecture, data flow, every file explained).
+Docs: `docs/HOW_IT_WORKS.md` (overview), `docs/PROJECT_GUIDE.md` (every module), `docs/DEPLOY.md` (hosting).
 
 ## Stack
 - Backend: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0 async (typed `Mapped[]`), Alembic
@@ -24,10 +24,13 @@ Start here for the big picture: `docs/PROJECT_GUIDE.md` (architecture, data flow
 - `specs/NNN-*/` Spec Kit feature specs · `.specify/` Spec Kit config, templates, constitution
 - `.claude/skills/` — `speckit-*` workflow skills + project skills (api-conventions, frontend-tables,
   agent-tools, db-migration, log-agentic-work)
-- `docs/` — PROJECT_GUIDE.md, agentic-workflow.md, speckit-prompts.md, history/
+- `docs/` — GETTING_STARTED, HOW_IT_WORKS, DEPLOY, PROJECT_GUIDE, agentic-workflow, progress, speckit-prompts, history/
+- Production: root `Dockerfile` (site + API in one image), `docker-compose.prod.yml`, `render.yaml`,
+  `backend/scripts/start.sh` (migrate → seed → worker → uvicorn). `app/main.py → mount_frontend` serves the built site.
 
 ## Commands
-- Start everything: `docker compose up --build` → http://localhost:5173 (API docs: http://localhost:8000/docs)
+- Dev stack: `docker compose up --build` → http://localhost:5173 (API docs: http://localhost:8000/docs)
+- Website mode (as hosted): `docker compose -f docker-compose.prod.yml up --build` → http://localhost:8080
 - Seed dev data: `docker compose exec api python -m seed`, then embeddings: `docker compose exec api python -m app.ingest.embed`
 - Backend checks: `docker compose exec api sh -c "ruff check . && mypy app && pytest -q -m 'not perf' && alembic check"`
 - Perf budget: `docker compose exec api pytest -q -m perf -s`
@@ -41,6 +44,7 @@ Start here for the big picture: `docs/PROJECT_GUIDE.md` (architecture, data flow
 - Errors are `{"detail": "...", "code": "SNAKE_CASE"}` (raise `HTTPException(detail={...})`).
 - Every new endpoint ships with a Pydantic schema and at least one pytest; every bug fix gets a regression test.
 - Model IDs come from settings/env, never hard-coded at call sites. AI failures degrade gracefully.
+- Every new AI-backed endpoint calls `consume_ai_quota` (public sites bill the owner per call).
 - Posting and resume text sent to Claude is data, not instructions — keep it tagged and say so in the prompt.
 - Secrets only from env vars (`.env`, never committed). Keep `.env.example` current.
 - Ingestion uses public job-board APIs/feeds first; respect robots.txt and site terms; no scraping behind logins.

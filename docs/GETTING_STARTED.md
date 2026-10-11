@@ -1,7 +1,16 @@
 # Getting Started: Run and Use CoopRadar
 
-This is the hands-on guide. It covers how to install what you need, start the app, load data, and use every
-feature. Follow it top to bottom the first time (about 15 minutes).
+This is the hands-on guide. It covers how to install what you need, start the app, and use every feature.
+Follow it top to bottom the first time (about 15 minutes).
+
+There are two ways to run CoopRadar on your computer:
+
+| Mode | Command | Open | Use it when |
+|---|---|---|---|
+| **Website mode** | `docker compose -f docker-compose.prod.yml up --build` | http://localhost:8080 | You want to *use* or *show* the app. One container, sets itself up, exactly like the hosted site. |
+| **Developer mode** | `docker compose up --build` | http://localhost:5173 | You're *changing the code*. Hot reload, separate containers, API docs at :8000/docs. |
+
+To put it on the internet instead, see **[DEPLOY.md](DEPLOY.md)**.
 
 > Want to understand *how* it works instead? See **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)**.
 
@@ -50,7 +59,17 @@ tracker all run, and the AI features show a clear "unavailable" message instead.
 
 ## Part 2: Start the app
 
-### 2.1 Start everything
+### 2.0 Fastest: website mode (recommended to start)
+```powershell
+docker compose -f docker-compose.prod.yml up --build
+```
+When the logs show `Starting web server on port 8000`, open **http://localhost:8080** and click **Try the demo**.
+The database tables, sample postings, and background worker all set themselves up, so **skip 2.1–2.4** and go
+straight to Part 3. Stop it with `Ctrl+C` (or `docker compose -f docker-compose.prod.yml down`).
+
+The rest of Part 2 is **developer mode**, for when you're changing code.
+
+### 2.1 Start everything (developer mode)
 From the repo folder:
 ```powershell
 docker compose up --build
@@ -84,6 +103,11 @@ and resume matching. It prints `Embedded 55 postings.` New postings added later 
 ---
 
 ## Part 3: Use every feature
+
+### 3.0 Try the demo (no sign-up)
+Click **Try the demo** (top-right, or in the blue welcome box). You're instantly logged into a private demo account
+with six applications already in the tracker and a sample resume with 20 matches. A yellow banner reminds you it's
+a demo, and it's deleted after 24 hours. Everything in 3.1–3.8 works inside the demo too.
 
 ### 3.1 Browse and search (no account needed)
 1. The home page lists open postings, newest first. Expired ones are hidden; tick **Show expired** to see them.
@@ -153,6 +177,8 @@ account and all your data.
 
 ## Part 4: Day-to-day commands
 
+These are for **developer mode**. In website mode, add `-f docker-compose.prod.yml` after `docker compose`.
+
 | I want to… | Command |
 |---|---|
 | Start the app | `docker compose up` (add `--build` after pulling code changes) |
@@ -172,6 +198,7 @@ Your data lives in a Docker volume, so it survives restarts and only `down -v` d
 
 | Problem | Fix |
 |---|---|
+| "You've used today's 20 AI actions" | The per-user daily AI limit (`AI_DAILY_LIMIT` in `.env`; `0` = unlimited). |
 | `docker: command not found` / "cannot connect to the Docker daemon" | Open Docker Desktop and wait for "Engine running". |
 | `port is already allocated` (5432, 6379, 8000 or 5173) | Another program uses that port (often a local Postgres). Stop it, or change the left-hand port in `docker-compose.yml`, e.g. `"5433:5432"`. |
 | The page loads but shows no postings | Run the seed command (2.2). |

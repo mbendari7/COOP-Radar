@@ -24,13 +24,21 @@ Run against Postgres 16 + pgvector, Python 3.12, Node 24:
 Not verified here: a full `docker compose up` (Docker wasn't available) and live Claude/OpenAI calls
 (all AI calls are mocked in tests). Do those first — see "Your first run" in `docs/PROJECT_GUIDE.md`.
 
+## Hosting (2026-10-11)
+
+The repo is now a deployable website: one production image (root `Dockerfile`) serves the site and API,
+sets itself up on start, and offers a one-click demo account. See `docs/DEPLOY.md`.
+Verified locally: built site + API in one process against real Postgres (pages, client-side routes, demo account
+with 6 tracker items and 20 matches). The Docker image build itself is verified by the new CI `docker` job.
+
 ## Open work
 
 1. ~~Merge everything into `main`~~ (done 2026-10-10).
 2. First live run with real API keys; run `python -m app.ingest.embed` so matching has vectors to search.
 3. Add a real public job-board source (check its terms + robots.txt; document it in the plan).
 4. Remaining spec-004 scope: agent tools + MCP server + `agent_runs` + YAML eval runner (see the agent-tools skill).
-5. Optional Feature 005: deploy + observability (see `docs/speckit-prompts.md`).
+5. Deploy it (`docs/DEPLOY.md`) and put the live link at the top of the README.
+6. Observability: error tracking and a small usage dashboard.
 
 ## History
 

@@ -4,8 +4,8 @@ This file explains the whole program in plain language, step by step: what each 
 repo, what happens when you click something, and how to explain it to someone else (like in an interview).
 
 > To install and run it, see **[GETTING_STARTED.md](GETTING_STARTED.md)**.
-> For the deepest technical detail (every module, test strategy, recipes), see
-> **[docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md)**.
+> To put it online, see **[DEPLOY.md](DEPLOY.md)**. For the deepest technical detail (every module, test strategy,
+> recipes), see **[PROJECT_GUIDE.md](PROJECT_GUIDE.md)**.
 
 ---
 
@@ -80,9 +80,9 @@ Other important backend files:
 
 ### 3.1 Starting up (`docker compose up --build`)
 1. Docker starts **db** and **redis** and waits until both are healthy.
-2. **api** starts and runs `alembic upgrade head`. That runs the 5 migration files in order, creating any missing
+2. **api** starts and runs `alembic upgrade head`. That runs the 6 migration files in order, creating any missing
    tables (`0001` postings → `0002` users and saved → `0003` tracker history → `0004` ingestion and vectors →
-   `0005` resumes and matches). Then the web server starts on port 8000.
+   `0005` resumes and matches → `0006` demo accounts). Then the web server starts on port 8000.
 3. **worker** starts. It waits for jobs and, every 10 minutes, checks whether any job source is due for its
    6-hourly refresh.
 4. **web** starts the website on port 5173. Any request to `/api/...` is forwarded to the api container.
@@ -175,6 +175,25 @@ The automatic ingestion, step by step (`backend/app/ingest/`):
    says "ignore your rules" can't hijack the assistant (**prompt-injection protection**).
 4. The answer is **streamed** back with Server-Sent Events, so words appear as Claude writes them.
 
+### 3.9 "Try the demo"
+`POST /api/auth/demo` → `services/demo.py`:
+1. Rate-limits by network (10 demo accounts per hour) and deletes demo accounts older than 24 hours.
+2. Creates a brand-new private user (`is_demo = true`), so visitors never see each other's changes.
+3. Saves six upcoming postings across tracker statuses, with notes and dates.
+4. Adds a sample resume and scores postings by **skill overlap** (what share of a posting's skills the resume
+   has). This needs no AI call, so the demo is free and works even without API keys.
+5. Logs the visitor in with a normal session cookie and opens the tracker.
+
+### 3.10 Running as one website (production)
+In development the site and API are separate containers. In production the root `Dockerfile` builds the React site
+and copies it into the API image, so **one container serves everything on one URL**:
+- `/api/...` goes to FastAPI routes; anything else returns the built site (`main.py → mount_frontend`). That's
+  why refreshing on `/saved` still works.
+- On start, `backend/scripts/start.sh` runs the migrations, loads sample data, starts the worker, and launches the
+  web server.
+- `docker-compose.prod.yml` adds Postgres, Redis, and optional automatic HTTPS (Caddy). `render.yaml` does the same
+  on Render. A per-user daily AI limit (`services/usage.py`) protects the owner's API bill.
+
 ---
 
 ## 4. The database in one table
@@ -183,7 +202,7 @@ The automatic ingestion, step by step (`backend/app/ingest/`):
 |---|---|
 | `postings` | every job posting (+ a built-in search index) |
 | `posting_embeddings` | one meaning-vector per posting |
-| `users` | accounts (email, hashed password, admin flag) |
+| `users` | accounts (email, hashed password, admin flag, demo flag) |
 | `saved_postings` | which user saved which posting, and its current status |
 | `application_events` | history of status changes with notes and dates |
 | `resumes` | one resume's text per user |
@@ -195,7 +214,7 @@ The automatic ingestion, step by step (`backend/app/ingest/`):
 
 ## 5. How quality is guaranteed
 
-- **158 automated tests**: 141 backend (`backend/tests/`) and 17 frontend (`frontend/tests/`). AI calls are faked
+- **172 automated tests**: 153 backend (`backend/tests/`) and 19 frontend (`frontend/tests/`). AI calls are faked
   in tests, so they're free and repeatable.
 - **GitHub Actions** (`.github/workflows/ci.yml`) runs on every push: linting, strict type checks, database
   migrations forwards and backwards, all tests, a 10,000-posting speed test, and a production build.
@@ -230,7 +249,7 @@ was reviewed by a human.
    history per saved posting with a drag-and-drop board.
 5. **AI**: resume → embedding → top 40 by vector similarity → Claude scores the top 20 → follow-up Q&A that streams
    and must cite the resume or posting. Everything has a fallback if the AI is unavailable.
-6. **Quality**: 158 tests, strict typing, CI on every push, and spec-first development with Claude Code.
+6. **Quality**: 172 tests, strict typing, CI on every push, and spec-first development with Claude Code.
 
 ### Likely questions and good answers
 | Question | Answer |
@@ -241,7 +260,7 @@ was reviewed by a human.
 | *How do you stop the AI from making things up?* | Context-only instructions, required citations, an exact "not enough information" answer, ignoring IDs it invents, and treating posting text as data. |
 | *What if the AI service is down?* | Matching falls back to similarity scores; search falls back to keyword; Q&A shows a clear message. Nothing crashes. |
 | *Why cookies + Redis instead of JWT?* | Logout and expiry take effect immediately (delete the key), and HTTP-only cookies can't be read by injected scripts. |
-| *How do you know it works?* | 158 automated tests, a performance test, and CI that also checks the database migrations and the models agree. |
+| *How do you know it works?* | 172 automated tests, a performance test, and CI that also checks the database migrations and the models agree. |
 | *What would you build next?* | A tool-using assistant that can search and save postings (with confirmation), exposing the same tools over MCP, plus real public job-board sources and deployment. |
 
 ---
@@ -258,3 +277,6 @@ was reviewed by a human.
 | A database table | `backend/app/models/` + a new migration (use the `/db-migration` skill in Claude Code) |
 | A new job feed | `backend/app/ingest/` (see "Add an ingest adapter" in `docs/PROJECT_GUIDE.md`) |
 | Sample data | `backend/seed/` |
+| What the demo account contains | `backend/app/services/demo.py` |
+| The welcome section / demo button | `frontend/src/components/WelcomeHero.tsx`, `DemoButton.tsx` |
+| How the site is hosted | `Dockerfile`, `docker-compose.prod.yml`, `render.yaml`, `docs/DEPLOY.md` |

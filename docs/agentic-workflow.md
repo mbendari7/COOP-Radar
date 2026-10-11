@@ -143,3 +143,26 @@ Frontend: eslint clean, tsc clean, 17 tests passed, production build OK.
 **Not verified**: `docker compose up` (no Docker available) and live Claude/OpenAI calls (mocked in tests).
 
 **What I reviewed / changed**: _(fill in after reviewing the diff)_
+
+
+---
+
+## 2026-10-11 — Deployable website: one-container image, demo accounts, AI limits
+
+**What the AI assistant did**:
+- Production image (root `Dockerfile`): builds the React site and serves it from FastAPI (`mount_frontend`, SPA
+  fallback, path-traversal safe); `backend/scripts/start.sh` migrates, seeds, starts the worker and embeddings.
+- `docker-compose.prod.yml` (site + Postgres + Redis, optional Caddy HTTPS) and `render.yaml` Blueprint;
+  `DATABASE_URL` accepts host formats (`postgres://`, `sslmode=`).
+- One-click demo accounts (`services/demo.py`, migration 0006 `users.is_demo`): private per visitor, pre-filled
+  tracker + skill-overlap matches (no AI cost), 24 h expiry, 10/hour per IP. `GET /api/config` feature flags.
+- Per-user daily AI limit (`services/usage.py`) on resume upload and Q&A.
+- Frontend: welcome section, "Try the demo" button, demo banner, mobile-safe header.
+- Repo tidy-up: guides moved to `docs/` with an index; removed the redundant nginx frontend image; CI job that
+  builds the production stack and smoke-tests it.
+
+**Results (actual runs)**: backend 152 passed + perf; ruff + mypy --strict clean; migration 0006 up/down/up and
+`alembic check` clean; frontend lint/tsc clean, 19 tests passed, build OK; local smoke test of built site + API on
+real Postgres passed. Not run here: the Docker image build (no Docker on this machine; CI builds it).
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_

@@ -6,12 +6,16 @@ Upload a resume and Claude ranks the best-fit postings and answers cited questio
 
 [![CI](https://github.com/mbendari7/COOP-Radar/actions/workflows/ci.yml/badge.svg)](https://github.com/mbendari7/COOP-Radar/actions/workflows/ci.yml)
 
+**🌐 Live demo:** _add your link here after deploying (see [docs/DEPLOY.md](docs/DEPLOY.md))_. Click
+**Try the demo** to explore a pre-filled account with no sign-up.
+
 ## 📚 Documentation
 
 | Read this | When you want to… |
 |---|---|
-| **[GETTING_STARTED.md](GETTING_STARTED.md)** | Install, run, and **use** the app, step by step, including troubleshooting |
-| **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)** | Understand how the program works, where everything lives, and **how to explain it** |
+| **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)** | Run it on your computer and **use** every feature, step by step |
+| **[docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md)** | Understand how the program works, where everything lives, and **how to explain it** |
+| **[docs/DEPLOY.md](docs/DEPLOY.md)** | Put it online as a website anyone can use from a link |
 | [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | Go deep: every module, the database, testing strategy, recipes for common changes |
 | [CLAUDE.md](CLAUDE.md) | See the rules Claude Code follows in this repo |
 
@@ -38,6 +42,7 @@ behind every claim.
 | **Imports** | CSV upload (≤ 1,000 rows, per-line errors, 3 uploads/hour) and a manual "add posting" form. |
 | **AI resume matcher** | Upload a PDF or DOCX. Vector search picks the top 40 candidates, then Claude re-ranks them into the top 20, each with a 0–100 score and a one-sentence reason. Ask follow-up questions per posting; answers stream live and cite `Resume:` / `Posting:` sources, or say "I don't have enough information." |
 | **Admin** | Sources page with last-run stats, run history, re-enable for auto-paused sources. |
+| **One-click demo** | "Try the demo" creates a private account pre-filled with tracker history and resume matches (deleted after 24 h). A daily AI allowance per user keeps hosting costs safe. |
 
 ## Architecture
 
@@ -81,36 +86,40 @@ flowchart LR
 | AI | Anthropic Python SDK. `AGENT_MODEL` (default `claude-opus-5-5`) answers Q&A; `FAST_MODEL` (default `claude-haiku-5-5`) re-ranks and extracts. OpenAI `text-embedding-3-small` (1536-d) for embeddings |
 | Files | pypdf, python-docx (resumes) · pandas (CSV import/export) · feedparser (RSS) · httpx (JSON APIs) |
 | Frontend | React 18, TypeScript 5, Vite 6, TanStack Query v5, TanStack Table v8, React Router v6, Tailwind CSS v3, dnd-kit |
-| Testing | pytest + pytest-asyncio (141 tests incl. a 10k-row perf budget), Vitest + Testing Library (17 tests) |
+| Testing | pytest + pytest-asyncio (153 tests incl. a 10k-row perf budget), Vitest + Testing Library (19 tests) |
 | Quality | ruff, mypy `--strict`, eslint, `tsc --noEmit` |
-| CI / infra | GitHub Actions · Docker Compose · nginx (production frontend image) |
+| CI / infra | GitHub Actions (tests + production-image smoke test) · Docker Compose · single production image (FastAPI serves the built site) · Caddy for automatic HTTPS · Render Blueprint |
 | AI-assisted workflow | [Spec Kit](https://github.com/github/spec-kit) + Claude Code skills (see below) |
 
 ## Quick start
 
-You need **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** running. AI keys are optional
-([Anthropic](https://console.anthropic.com/), [OpenAI](https://platform.openai.com/api-keys)).
+You only need **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** running.
+AI keys are optional ([Anthropic](https://console.anthropic.com/), [OpenAI](https://platform.openai.com/api-keys)).
 
 ```bash
 git clone https://github.com/mbendari7/COOP-Radar.git
 cd COOP-Radar
-cp .env.example .env                                # set POSTGRES_PASSWORD (+ AI keys if you have them)
-
-docker compose up --build                           # starts db, redis, api, worker, web
-
-# in a second terminal (first run only)
-docker compose exec api python -m seed              # 55 sample postings, skills list, 2 demo sources
-docker compose exec api python -m app.ingest.embed  # AI search vectors (needs OPENAI_API_KEY)
+cp .env.example .env        # set POSTGRES_PASSWORD (+ AI keys if you have them)
 ```
 
-| Open | URL |
-|---|---|
-| The app | **http://localhost:5173** |
-| Interactive API docs | http://localhost:8000/docs |
+**Run the website (what a visitor sees):** one command, one URL.
+```bash
+docker compose -f docker-compose.prod.yml up --build
+```
+Open **http://localhost:8080** and click **Try the demo**. The database, sample data, and background worker set
+themselves up.
 
-Without AI keys, browsing, search, accounts, and the tracker all work; smart search, similar postings, and resume
-matching show a clear "unavailable" message. **[GETTING_STARTED.md](GETTING_STARTED.md)** covers using every
-feature, becoming an admin, stopping/resetting, and fixing common problems.
+**Develop (hot reload for code changes):**
+```bash
+docker compose up --build
+docker compose exec api python -m seed               # first run: sample data
+docker compose exec api python -m app.ingest.embed   # AI search vectors (needs OPENAI_API_KEY)
+```
+Open **http://localhost:5173** (API docs at http://localhost:8000/docs).
+
+Without AI keys, browsing, search, accounts, the tracker, and the demo all work. Smart search and real resume
+matching show a clear "unavailable" message. Step-by-step usage: **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)**.
+To put it online: **[docs/DEPLOY.md](docs/DEPLOY.md)**.
 
 ## Development commands
 
@@ -150,59 +159,51 @@ All configuration is environment variables. See [`.env.example`](.env.example) f
 | `CORS_ORIGINS` | `http://localhost:5173` | only needed if the frontend calls the API cross-origin |
 | `COOKIE_SECURE` | `true` | keep `true`; the test suite sets it to `false` |
 | `INGEST_INTERVAL_HOURS` | `6` | how often each source is re-fetched |
+| `DEMO_ENABLED` | `true` | show the one-click "Try the demo" button |
+| `AI_DAILY_LIMIT` | `20` | AI actions (resume uploads + questions) per user per day; `0` = unlimited |
 
 ## Project structure
 
 ```
 COOP-Radar/
-├── README.md                     You are here
-├── GETTING_STARTED.md            Install, run, and use the app step by step
-├── HOW_IT_WORKS.md               How the program works + how to explain it
-├── CLAUDE.md                     Instructions for Claude Code sessions in this repo
-├── LICENSE                       MIT
-├── docker-compose.yml            db · redis · api · worker · web
-├── .env.example                  Every config variable, documented
-├── .github/workflows/ci.yml      Backend + frontend quality gates
-├── .claude/
-│   ├── settings.json             Repo-wide Claude Code settings (no AI commit attribution)
-│   └── skills/                   speckit-* workflow skills + project skills (see below)
+├── README.md · LICENSE
+├── CLAUDE.md                     Rules for Claude Code sessions in this repo
+├── Dockerfile                    Production: the whole website in one container
+├── docker-compose.prod.yml       Production: website + Postgres + Redis (+ optional HTTPS)
+├── docker-compose.yml            Development: hot-reload stack (db · redis · api · worker · web)
+├── render.yaml                   One-click Render Blueprint
+├── .env.example                  Every setting, documented
+├── docs/                         Guides: getting started, how it works, deploy, deep dive
+├── specs/                        Spec Kit feature specs (001–004): spec, plan, data model, contracts, tasks
+├── .github/workflows/ci.yml      Lint, types, tests, migrations, perf budget, production-image smoke test
+├── .claude/                      Claude Code settings + skills (speckit-* and project skills)
 ├── .specify/                     Spec Kit: constitution, templates, scripts
-├── specs/                        One folder per feature: spec, plan, data model, contracts, tasks
-│   ├── 001-browse-search-postings/
-│   ├── 002-accounts-tracker/
-│   ├── 003-ingestion-search/
-│   └── 004-ai-resume-matcher/
-├── docs/
-│   ├── PROJECT_GUIDE.md          Deep dive: how the whole system works
-│   ├── agentic-workflow.md       Log of AI-assisted work and human review
-│   ├── progress.md               Status + open work
-│   ├── speckit-prompts.md        The prompts used to spec each feature
-│   └── history/                  Original kickoff prompt and CLAUDE.md
-├── backend/
-│   ├── Dockerfile · pyproject.toml · alembic.ini
-│   ├── alembic/versions/         0001 postings → 0002 auth → 0003 tracker → 0004 ingestion → 0005 resume matcher
-│   ├── seed/                     python -m seed (postings, skills taxonomy, demo sources)
+├── backend/                      FastAPI app
 │   ├── app/
-│   │   ├── main.py               App factory, routers, unified error handler, /api/health
+│   │   ├── main.py               App factory, routers, error handler, serves the built website
 │   │   ├── config.py             Settings from env vars
-│   │   ├── db.py · redis.py      Async engine/session · Redis pool
-│   │   ├── deps.py               get_current_user / get_optional_user / get_admin_user
-│   │   ├── llm.py                Claude client + response helpers
-│   │   ├── worker.py             RQ worker + ingest scheduler
-│   │   ├── api/                  Routers: postings, auth, me, saved, resume, admin
-│   │   ├── services/             Business logic + SQL for each router
+│   │   ├── db.py · redis.py      Database session · Redis pool
+│   │   ├── deps.py               Who is logged in (user / optional / admin)
+│   │   ├── llm.py                Claude client helpers
+│   │   ├── worker.py             Background worker + ingest scheduler
+│   │   ├── api/                  Routes: postings, auth (+ demo), me, saved, resume, admin, config
+│   │   ├── services/             Logic + SQL (postings, auth, demo, usage limits, saved, resume, ingest)
 │   │   ├── schemas/              Pydantic request/response models
-│   │   ├── models/               SQLAlchemy tables (10)
-│   │   ├── ingest/               Adapters (json_api, rss), runner, dedup, extract, embed, csv_validator
+│   │   ├── models/               Database tables (10)
+│   │   ├── ingest/               Feed adapters, runner, dedup, field extraction, embeddings
 │   │   └── agent/resume_qa.py    Streaming, cited resume Q&A
-│   └── tests/                    api/ · ingest/ · resume/ · eval/ · perf/ (+ conftest fixtures)
-└── frontend/
-    ├── Dockerfile · nginx.conf · vite.config.ts · tailwind.config.ts
+│   ├── alembic/versions/         Migrations 0001–0006
+│   ├── seed/                     Sample data (python -m seed)
+│   ├── scripts/start.sh          Production startup: migrate → seed → worker → web server
+│   ├── tests/                    pytest: api/ · ingest/ · resume/ · eval/ · perf/
+│   └── Dockerfile · pyproject.toml · alembic.ini
+└── frontend/                     React + TypeScript + Vite
     ├── src/
-    │   ├── api/                  client.ts (apiFetch/ApiError) + TanStack Query hooks per resource
-    │   ├── pages/                Postings list/detail, Saved (tracker), Matches, Account, Admin
-    │   └── components/           Table, filters, board, auth modal, resume upload, Q&A panel, …
-    └── tests/                    Vitest + Testing Library
+    │   ├── api/                  client.ts (apiFetch/ApiError) + data hooks per resource
+    │   ├── pages/                Postings, posting detail, Saved (tracker), Matches, Account, Admin
+    │   └── components/           Table, filters, board, welcome section, demo button, Q&A panel, …
+    ├── tests/                    Vitest + Testing Library
+    └── Dockerfile · vite.config.ts · tailwind.config.ts
 ```
 
 ## API overview
@@ -212,11 +213,12 @@ COOP-Radar/
 | `GET /api/postings` | optional | List/search/filter/sort/paginate (`q`, `search_mode`, `city`, `province`, `term`, `work_mode`, `duration`, `skills`, `show_expired`, `show_closed`, `sort`, `order`, `page`, `page_size`) |
 | `GET /api/postings/{id}` · `/{id}/similar` · `/meta/filters` | — | Detail · 5 similar · filter dropdown values |
 | `POST /api/postings` · `POST /api/postings/upload` | user | Manual posting · CSV import |
-| `POST /api/auth/register` · `login` · `logout` | — / user | Session cookie auth |
+| `POST /api/auth/register` · `login` · `logout` · `demo` | — / user | Session cookie auth; `demo` creates a pre-filled demo account |
 | `GET/PATCH/DELETE /api/me…` | user | Profile, change password, delete account |
 | `GET/POST /api/saved` · `DELETE /api/saved/{id}` · `PATCH …/status` · `POST …/events` · `GET /api/saved/export/csv` | user | Tracker |
 | `POST/GET/DELETE /api/resume` · `GET /api/resume/matches` · `POST /api/resume/matches/{posting_id}/ask` (SSE) | user | Resume matcher |
 | `GET /api/admin/sources` · `…/{id}/runs` · `POST …/{id}/run` · `PATCH …/{id}` | admin | Ingestion admin |
+| `GET /api/config` | — | Which optional features are on (demo, AI, daily AI limit) |
 | `GET /api/health` | — | Liveness |
 
 Every error has the same shape: `{"detail": "Human-readable message", "code": "SNAKE_CASE"}`.
@@ -269,7 +271,8 @@ attribution lines.
 - [x] 004 AI resume matcher (upload, ranked matches, cited streaming Q&A)
 - [ ] 004 remainder: tool-use assistant (search/compare/save with confirmation), MCP server, `agent_runs` logging, YAML eval runner
 - [ ] Real public job-board sources (each documented with its terms)
-- [ ] 005 Deploy & observability
+- [x] Deployable website: one-container image, one-click demo, daily AI limits, Render Blueprint
+- [ ] Hosted live demo link + error tracking / usage dashboard
 
 ## License
 
