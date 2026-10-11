@@ -1,0 +1,18 @@
+# Keep the production build context small and free of secrets
+.git
+.github
+.claude
+.specify
+specs
+docs
+**/.env
+**/node_modules
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.mypy_cache
+**/.ruff_cache
+**/.venv
+**/*.egg-info
+frontend/dist
+**/*.tsbuildinfo

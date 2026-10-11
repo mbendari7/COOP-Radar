@@ -2,6 +2,9 @@
 #
 #   docker compose up --build        # start everything (http://localhost:5173)
 #
+# This is the DEVELOPMENT stack (hot reload, separate containers). To run the site the way
+# it's hosted — one container on one URL — use docker-compose.prod.yml (see docs/DEPLOY.md).
+#
 # Values come from .env (copy .env.example). The api container applies database
 # migrations on startup, so a fresh clone needs no manual migration step.
 

@@ -104,3 +104,41 @@ jobs:
 
       - name: Production build
         run: npm run build
+
+  # ── Production image ─────────────────────────────────────────────────────
+  # Builds the all-in-one website image (root Dockerfile) and checks it starts:
+  # migrations, seed data, built site, and API all served on one port.
+  docker:
+    name: Production image (build · boot · smoke test)
+    runs-on: ubuntu-latest
+    needs: [backend, frontend]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build and start the production stack
+        env:
+          POSTGRES_PASSWORD: ci-password
+        run: docker compose -f docker-compose.prod.yml up -d --build
+
+      - name: Wait for the site to be healthy
+        run: |
+          for i in $(seq 1 60); do
+            curl -fsS http://localhost:8080/api/health && exit 0
+            sleep 3
+          done
+          docker compose -f docker-compose.prod.yml logs app
+          exit 1
+
+      - name: Smoke test website, API, and demo account
+        run: |
+          curl -fsS http://localhost:8080/ | grep -q '<div id="root">'
+          curl -fsS http://localhost:8080/saved | grep -q '<div id="root">'
+          curl -fsS http://localhost:8080/api/postings | grep -q '"total"'
+          curl -fsS -X POST http://localhost:8080/api/auth/demo | grep -q '"is_demo":true'
+
+      - name: Show logs on failure
+        if: failure()
+        env:
+          POSTGRES_PASSWORD: ci-password
+        run: docker compose -f docker-compose.prod.yml logs
