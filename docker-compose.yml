@@ -19,7 +19,7 @@ x-backend-env: &backend-env
   EMBED_MODEL: ${EMBED_MODEL:-text-embedding-3-small}
 
 services:
-  # PostgreSQL 16 with pgvector (embeddings) and fuzzystrmatch (dedup) available.
+  # PostgreSQL 16 with pgvector (embeddings) available.
   db:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
