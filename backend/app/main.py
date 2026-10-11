@@ -16,6 +16,7 @@ from app.api.admin import router as admin_router
 from app.api.auth import router as auth_router
 from app.api.me import router as me_router
 from app.api.postings import router as postings_router
+from app.api.resume import router as resume_router
 from app.api.saved import router as saved_router
 from app.config import get_settings
 from app.db import AsyncSessionLocal
@@ -63,6 +64,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router, prefix="/api")
     app.include_router(me_router, prefix="/api")
     app.include_router(saved_router, prefix="/api")
+    app.include_router(resume_router)
     app.include_router(admin_router, prefix="/api")
 
     return app

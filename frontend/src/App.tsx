@@ -15,6 +15,7 @@ import PostingDetailPage from './pages/PostingDetailPage'
 import PostingsListPage from './pages/PostingsListPage'
 
 // Lazy-load heavy pages so the initial bundle stays small
+const MatchResultsPage = lazy(() => import('./pages/MatchResultsPage'))
 const SavedPostingsPage = lazy(() => import('./pages/SavedPostingsPage'))
 const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage'))
 const AdminSourcesPage = lazy(() =>
@@ -55,6 +56,12 @@ function Header() {
                 className="text-sm text-gray-600 hover:text-gray-900 font-medium"
               >
                 Saved
+              </Link>
+              <Link
+                to="/matches"
+                className="text-sm text-gray-600 hover:text-gray-900 font-medium"
+              >
+                Matches
               </Link>
               <Link
                 to="/upload"
@@ -121,6 +128,7 @@ export default function App() {
             <Route path="/" element={<PostingsListPage />} />
             <Route path="/postings/:id" element={<PostingDetailPage />} />
             <Route path="/saved" element={<SavedPostingsPage />} />
+            <Route path="/matches" element={<MatchResultsPage />} />
             <Route path="/account" element={<AccountSettingsPage />} />
             <Route path="/upload" element={<div className="p-6 max-w-2xl mx-auto"><CsvUploadPage /></div>} />
             <Route path="/submit" element={<div className="p-6 max-w-2xl mx-auto"><ManualPostingPage /></div>} />

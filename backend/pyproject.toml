@@ -25,7 +25,9 @@ dependencies = [
     "pgvector>=0.3",         # pgvector SQLAlchemy integration
     "python-multipart>=0.0.9", # FastAPI file upload support
     "feedparser>=6.0",       # RSS/Atom feed parsing
-    "anthropic>=0.29",       # Claude Haiku skill extraction fallback
+    "anthropic>=0.29",       # Claude Haiku skill extraction fallback + resume Q&A
+    "pypdf>=4.0",            # PDF text extraction for resume upload
+    "python-docx>=1.1",      # DOCX text extraction for resume upload
 ]
 
 [project.optional-dependencies]

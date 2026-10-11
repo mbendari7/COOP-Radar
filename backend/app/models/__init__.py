@@ -7,6 +7,8 @@ from app.models.ingest_source import IngestSource
 from app.models.ingest_run import IngestRun
 from app.models.skill import Skill
 from app.models.posting_embedding import PostingEmbedding
+from app.models.resume import Resume
+from app.models.match_result import MatchResult
 
 __all__ = [
     "Posting", "WorkMode",
@@ -16,4 +18,6 @@ __all__ = [
     "IngestSource", "IngestRun",
     "Skill",
     "PostingEmbedding",
+    "Resume",
+    "MatchResult",
 ]

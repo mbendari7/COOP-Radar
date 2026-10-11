@@ -8,6 +8,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMe, useLogout } from '../api/auth'
+import ResumeUploadForm from '../components/ResumeUploadForm'
 
 const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
@@ -149,6 +150,14 @@ export default function AccountSettingsPage() {
             {pwLoading ? 'Updating…' : 'Update password'}
           </button>
         </form>
+      </section>
+
+      <hr className="border-gray-200 mb-10" />
+
+      {/* ── Resume ── */}
+      <section className="mb-10">
+        <h2 className="text-lg font-medium text-gray-900 mb-4">Resume</h2>
+        <ResumeUploadForm showStoredCard />
       </section>
 
       <hr className="border-gray-200 mb-10" />
