@@ -152,7 +152,7 @@ If the reply is garbage, it falls back to the free ranking.
 
 ## 5. How quality is guaranteed
 
-- **261 automated tests**: 234 backend (`backend/tests/`) and 27 frontend (`frontend/tests/`). AI providers and job
+- **264 automated tests**: 235 backend (`backend/tests/`) and 29 frontend (`frontend/tests/`). AI providers and job
   boards are mocked, so tests are free and offline.
 - **CI** (`.github/workflows/ci.yml`) on every push: ruff, mypy `--strict`, eslint, tsc, migrations up, down, and
   up again plus a drift check, all tests, a 10,000-posting latency budget, and a **production-image smoke test**
@@ -175,7 +175,7 @@ If the reply is garbage, it falls back to the free ranking.
 > employers' public Greenhouse, Lever, and Ashby APIs every six hours, with location parsing and de-duplication. Resume
 > matching runs in SQL first. Skill coverage plus a student-fit adjustment ranks jobs for free. Then an optional
 > bring-your-own-key layer uses Claude, ChatGPT, or Gemini for reviews, re-ranking, and streamed tailoring. One
-> container on Render, 261 tests, CI with a production smoke test."
+> container on Render, 264 tests, CI with a production smoke test."
 
 ### 2-minute walkthrough (follow the data)
 1. **Data in**: the worker pulls about 800 Canadian jobs from 27 employers' public job-board APIs, filters to
@@ -187,7 +187,7 @@ If the reply is garbage, it falls back to the free ranking.
    replies are validated, results are cached, and answers stream.
 5. **Product details**: no sign-up, keep the account later, a tracker board, mobile-friendly, keys never leave the
    browser except per request.
-6. **Quality**: 261 tests, strict typing, CI that boots the real production image.
+6. **Quality**: 264 tests, strict typing, CI that boots the real production image.
 
 ### Likely questions
 | Question | Answer |

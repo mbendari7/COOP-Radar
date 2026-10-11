@@ -12,64 +12,64 @@
 
 ## Filter & Sort Combinations
 
-- [ ] CHK001 - Are the exact set of filterable fields (city, province, term, work_mode, duration, skills) exhaustively enumerated in the spec, with no ambiguity about which fields are supported? [Completeness, Spec §FR-004]
-- [ ] CHK002 - Is the AND vs. OR logic explicitly specified for each filter type — AND for skills, OR for duration, single-value for all others? [Clarity, Spec §FR-004]
-- [ ] CHK003 - Is the behavior of combining a keyword search (`q`) with one or more active filters clearly defined (i.e., do all constraints apply simultaneously)? [Completeness, Spec §FR-003, FR-004]
-- [ ] CHK004 - Are requirements for the "remote postings always appear in city-filtered results" rule stated in a functional requirement (not only in Assumptions)? [Clarity, Spec §FR-004a]
-- [ ] CHK005 - Is the sort field whitelist (`posted_at`, `deadline`, `company`, `title`) explicitly listed in the spec and contracts, with a defined error response for unlisted values? [Completeness, Spec §FR-006, Contracts §GET /api/postings]
-- [ ] CHK006 - Is the default sort field and default sort direction specified when no sort parameters are present in the URL? [Clarity, Spec §FR-006, Assumptions]
-- [ ] CHK007 - Are requirements defined for what happens when a filter value in the URL does not match any posting (e.g., city="XYZ" that doesn't exist in the dataset)? [Edge Case, Gap]
-- [ ] CHK008 - Is the behavior of the "Show expired" toggle clearly specified when combined with other active filters — does it apply as an additional AND predicate? [Clarity, Spec §FR-002]
-- [ ] CHK009 - Are requirements stated for filter persistence when the user navigates from the list to a detail page and back — specifically, are all filter params preserved in the back-navigation URL? [Completeness, Spec §US4]
-- [ ] CHK010 - Is the behavior of individually removing one filter chip (vs. "Clear all") explicitly defined — does removing a chip re-run the query immediately? [Clarity, Spec §FR-005]
+- [X] CHK001 - Are the exact set of filterable fields (city, province, term, work_mode, duration, skills) exhaustively enumerated in the spec, with no ambiguity about which fields are supported? [Completeness, Spec §FR-004]
+- [X] CHK002 - Is the AND vs. OR logic explicitly specified for each filter type — AND for skills, OR for duration, single-value for all others? [Clarity, Spec §FR-004]
+- [X] CHK003 - Is the behavior of combining a keyword search (`q`) with one or more active filters clearly defined (i.e., do all constraints apply simultaneously)? [Completeness, Spec §FR-003, FR-004]
+- [X] CHK004 - Are requirements for the "remote postings always appear in city-filtered results" rule stated in a functional requirement (not only in Assumptions)? [Clarity, Spec §FR-004a]
+- [X] CHK005 - Is the sort field whitelist (`posted_at`, `deadline`, `company`, `title`) explicitly listed in the spec and contracts, with a defined error response for unlisted values? [Completeness, Spec §FR-006, Contracts §GET /api/postings]
+- [X] CHK006 - Is the default sort field and default sort direction specified when no sort parameters are present in the URL? [Clarity, Spec §FR-006, Assumptions]
+- [X] CHK007 - Are requirements defined for what happens when a filter value in the URL does not match any posting (e.g., city="XYZ" that doesn't exist in the dataset)? [Edge Case, Gap]
+- [X] CHK008 - Is the behavior of the "Show expired" toggle clearly specified when combined with other active filters — does it apply as an additional AND predicate? [Clarity, Spec §FR-002]
+- [X] CHK009 - Are requirements stated for filter persistence when the user navigates from the list to a detail page and back — specifically, are all filter params preserved in the back-navigation URL? [Completeness, Spec §US4]
+- [X] CHK010 - Is the behavior of individually removing one filter chip (vs. "Clear all") explicitly defined — does removing a chip re-run the query immediately? [Clarity, Spec §FR-005]
 
 ---
 
 ## URL State Round-Tripping
 
-- [ ] CHK011 - Is every piece of state that must be encoded in the URL explicitly enumerated: `q`, `city`, `province`, `term`, `work_mode`, `duration` (multi-value), `skills` (multi-value), `sort`, `order`, `page`, `page_size`, `show_expired`? [Completeness, Spec §FR-008]
-- [ ] CHK012 - Is the URL parameter name and value format specified for multi-value params (duration, skills) — e.g., repeated params (`?skills=React&skills=TypeScript`) vs. comma-separated (`?skills=React,TypeScript`)? [Clarity, Gap]
-- [ ] CHK013 - Are requirements defined for the order in which URL parameters are applied on page load — specifically, must all params be parsed before the first API call is made? [Completeness, Spec §US5, Acceptance Scenario 2]
-- [ ] CHK014 - Is the behavior specified when a URL contains an invalid parameter value (e.g., `sort=invalid`, `page_size=99`, `duration=7`) — does the app silently reset that param or show an error? [Edge Case, Gap]
-- [ ] CHK015 - Is the URL state spec consistent between spec.md and contracts/api.md — do the API query parameter names exactly match what the frontend is expected to write to the URL? [Consistency, Spec §FR-008, Contracts §GET /api/postings]
-- [ ] CHK016 - Is the round-trip requirement precisely stated — e.g., "copying the URL and opening it in a new browser tab MUST reproduce the identical list state including same API response"? [Measurability, Spec §SC-004]
-- [ ] CHK017 - Are requirements defined for browser history behaviour — does each filter/sort/page change push a new browser history entry (enabling the back button) or replace the current entry? [Gap, Completeness]
+- [X] CHK011 - Is every piece of state that must be encoded in the URL explicitly enumerated: `q`, `city`, `province`, `term`, `work_mode`, `duration` (multi-value), `skills` (multi-value), `sort`, `order`, `page`, `page_size`, `show_expired`? [Completeness, Spec §FR-008]
+- [X] CHK012 - Is the URL parameter name and value format specified for multi-value params (duration, skills) — e.g., repeated params (`?skills=React&skills=TypeScript`) vs. comma-separated (`?skills=React,TypeScript`)? [Clarity, Gap]
+- [X] CHK013 - Are requirements defined for the order in which URL parameters are applied on page load — specifically, must all params be parsed before the first API call is made? [Completeness, Spec §US5, Acceptance Scenario 2]
+- [X] CHK014 - Is the behavior specified when a URL contains an invalid parameter value (e.g., `sort=invalid`, `page_size=99`, `duration=7`) — does the app silently reset that param or show an error? [Edge Case, Gap]
+- [X] CHK015 - Is the URL state spec consistent between spec.md and contracts/api.md — do the API query parameter names exactly match what the frontend is expected to write to the URL? [Consistency, Spec §FR-008, Contracts §GET /api/postings]
+- [X] CHK016 - Is the round-trip requirement precisely stated — e.g., "copying the URL and opening it in a new browser tab MUST reproduce the identical list state including same API response"? [Measurability, Spec §SC-004]
+- [X] CHK017 - Are requirements defined for browser history behaviour — does each filter/sort/page change push a new browser history entry (enabling the back button) or replace the current entry? [Gap, Completeness]
 
 ---
 
 ## Empty & Error States
 
-- [ ] CHK018 - Is the exact copy for the empty-state message ("No postings match — clear filters") specified, and is a "Clear all" action required to appear inside the empty state (not only in the filter bar)? [Clarity, Spec §FR-010, US2 Acceptance Scenario 5]
-- [ ] CHK019 - Are requirements defined for the empty state when no filters are active (i.e., the seed data is empty or all postings are expired and "Show expired" is off)? [Edge Case, Spec §Edge Cases]
-- [ ] CHK020 - Is the loading state requirement specific about what is shown — e.g., skeleton rows, spinner, number of skeleton rows — or is it left implementation-defined? [Clarity, Spec §FR-010]
-- [ ] CHK021 - Is the error state requirement specific enough to implement — does it define when it triggers (network failure, 4xx, 5xx), what message is shown, and whether previous data is preserved or wiped? [Clarity, Spec §FR-010, Edge Cases]
-- [ ] CHK022 - Is the "Try again" button behavior specified — does it retry the same request, or does it reset the filter state? [Gap, Completeness]
-- [ ] CHK023 - Are requirements defined for the error state on the detail page (e.g., `GET /api/postings/{id}` returns 404 or 500) — is there a spec for that scenario? [Gap, Coverage]
-- [ ] CHK024 - Is the loading state defined for the filter metadata endpoint (`GET /api/postings/meta/filters`) — what does the filter bar show while metadata is loading or if it fails? [Gap, Completeness]
-- [ ] CHK025 - Are transition requirements specified (e.g., "when a new search is submitted, the loading state MUST appear before results are cleared")? [Clarity, Gap]
+- [X] CHK018 - Is the exact copy for the empty-state message ("No postings match — clear filters") specified, and is a "Clear all" action required to appear inside the empty state (not only in the filter bar)? [Clarity, Spec §FR-010, US2 Acceptance Scenario 5]
+- [X] CHK019 - Are requirements defined for the empty state when no filters are active (i.e., the seed data is empty or all postings are expired and "Show expired" is off)? [Edge Case, Spec §Edge Cases]
+- [X] CHK020 - Is the loading state requirement specific about what is shown — e.g., skeleton rows, spinner, number of skeleton rows — or is it left implementation-defined? [Clarity, Spec §FR-010]
+- [X] CHK021 - Is the error state requirement specific enough to implement — does it define when it triggers (network failure, 4xx, 5xx), what message is shown, and whether previous data is preserved or wiped? [Clarity, Spec §FR-010, Edge Cases]
+- [X] CHK022 - Is the "Try again" button behavior specified — does it retry the same request, or does it reset the filter state? [Gap, Completeness]
+- [X] CHK023 - Are requirements defined for the error state on the detail page (e.g., `GET /api/postings/{id}` returns 404 or 500) — is there a spec for that scenario? [Gap, Coverage]
+- [X] CHK024 - Is the loading state defined for the filter metadata endpoint (`GET /api/postings/meta/filters`) — what does the filter bar show while metadata is loading or if it fails? [Gap, Completeness]
+- [X] CHK025 - Are transition requirements specified (e.g., "when a new search is submitted, the loading state MUST appear before results are cleared")? [Clarity, Gap]
 
 ---
 
 ## Accessibility — Table & Filter Bar
 
-- [ ] CHK026 - Are ARIA role/label requirements specified for the postings table — e.g., does the spec require `role="table"`, column header `scope` attributes, or row labels for assistive technology? [Gap, Coverage]
-- [ ] CHK027 - Is the keyboard interaction pattern for sortable column headers explicitly defined — e.g., Tab to focus, Enter/Space to toggle sort direction, with a visible sort direction indicator? [Completeness, Spec §SC-005]
-- [ ] CHK028 - Are focus management requirements specified for filter controls — in particular, do requirements state that focus is not lost when a filter chip is removed? [Gap, Clarity]
-- [ ] CHK029 - Are requirements defined for announcing dynamic content changes to screen readers — e.g., must the app announce "14 results found" after filter application? [Gap, Coverage]
-- [ ] CHK030 - Is the keyboard interaction for the multi-select skills filter explicitly specified — can the user add/remove individual skills without a mouse? [Clarity, Spec §SC-005, FR-004]
-- [ ] CHK031 - Are colour contrast requirements explicitly stated (WCAG AA: 4.5:1 for normal text, 3:1 for large text / UI components), and is it specified which elements must meet this threshold? [Completeness, Constitution §VII]
-- [ ] CHK032 - Are accessibility requirements for the mobile card layout (below `md` breakpoint) explicitly stated — are card elements keyboard-reachable and screen-reader-labelled? [Gap, Spec §FR-011]
-- [ ] CHK033 - Is the visible focus indicator requirement quantified — e.g., minimum outline width, colour contrast of the focus ring — or is it left to the implementer's judgment? [Clarity, Spec §SC-005]
+- [X] CHK026 - Are ARIA role/label requirements specified for the postings table — e.g., does the spec require `role="table"`, column header `scope` attributes, or row labels for assistive technology? [Gap, Coverage]
+- [X] CHK027 - Is the keyboard interaction pattern for sortable column headers explicitly defined — e.g., Tab to focus, Enter/Space to toggle sort direction, with a visible sort direction indicator? [Completeness, Spec §SC-005]
+- [X] CHK028 - Are focus management requirements specified for filter controls — in particular, do requirements state that focus is not lost when a filter chip is removed? [Gap, Clarity]
+- [X] CHK029 - Are requirements defined for announcing dynamic content changes to screen readers — e.g., must the app announce "14 results found" after filter application? [Gap, Coverage]
+- [X] CHK030 - Is the keyboard interaction for the multi-select skills filter explicitly specified — can the user add/remove individual skills without a mouse? [Clarity, Spec §SC-005, FR-004]
+- [X] CHK031 - Are colour contrast requirements explicitly stated (WCAG AA: 4.5:1 for normal text, 3:1 for large text / UI components), and is it specified which elements must meet this threshold? [Completeness, Constitution §VII]
+- [X] CHK032 - Are accessibility requirements for the mobile card layout (below `md` breakpoint) explicitly stated — are card elements keyboard-reachable and screen-reader-labelled? [Gap, Spec §FR-011]
+- [X] CHK033 - Is the visible focus indicator requirement quantified — e.g., minimum outline width, colour contrast of the focus ring — or is it left to the implementer's judgment? [Clarity, Spec §SC-005]
 
 ---
 
 ## Performance Budget
 
-- [ ] CHK034 - Is the 300 ms p95 budget specified against a concrete, reproducible scenario (dataset size, query complexity, concurrency level) so it can be consistently measured? [Measurability, Spec §SC-002, Constitution §III]
-- [ ] CHK035 - Does the performance requirement cover all three endpoints (`GET /api/postings`, `GET /api/postings/{id}`, `GET /api/postings/meta/filters`) or only the list endpoint? [Completeness, Gap]
-- [ ] CHK036 - Is the 2-second page load budget (SC-002) defined with a specific measurement methodology — e.g., First Contentful Paint, Time to Interactive, or LCP — or is "useful content" left undefined? [Clarity, Spec §SC-002]
-- [ ] CHK037 - Are performance requirements specified for the worst-case combined filter query (all filters active simultaneously + keyword search + sort + pagination)? [Coverage, Edge Case]
-- [ ] CHK038 - Are degradation requirements defined for scenarios exceeding the budget — e.g., must the API return a timeout response rather than hanging, and within what time limit? [Gap, Edge Case]
+- [X] CHK034 - Is the 300 ms p95 budget specified against a concrete, reproducible scenario (dataset size, query complexity, concurrency level) so it can be consistently measured? [Measurability, Spec §SC-002, Constitution §III]
+- [X] CHK035 - Does the performance requirement cover all three endpoints (`GET /api/postings`, `GET /api/postings/{id}`, `GET /api/postings/meta/filters`) or only the list endpoint? [Completeness, Gap]
+- [X] CHK036 - Is the 2-second page load budget (SC-002) defined with a specific measurement methodology — e.g., First Contentful Paint, Time to Interactive, or LCP — or is "useful content" left undefined? [Clarity, Spec §SC-002]
+- [X] CHK037 - Are performance requirements specified for the worst-case combined filter query (all filters active simultaneously + keyword search + sort + pagination)? [Coverage, Edge Case]
+- [X] CHK038 - Are degradation requirements defined for scenarios exceeding the budget — e.g., must the API return a timeout response rather than hanging, and within what time limit? [Gap, Edge Case]
 
 ---
 
@@ -80,3 +80,12 @@
 - `/speckit-implement` reads checklist checkbox state as a gate and must not modify markers
 - `checklists/requirements.md` has a separate lifecycle maintained by `/speckit-specify` and `/speckit-clarify`
 - CHK007, CHK012, CHK014, CHK017 are identified as the highest-risk gaps requiring spec updates before implementation begins
+
+## Resolutions (2026-10-11)
+
+Each item was resolved against the implemented behaviour and its tests:
+- Filters (CHK001–010): fields city/province/term/work_mode/duration/skills (+ students_only, hide_senior); skills AND, duration OR, others single-value; `q` and filters all apply together; remote always included in city filter (FR-004a, test); unknown city → empty state; show_expired is an extra predicate; filters live in the URL so Back restores them; removing a chip re-queries immediately and keeps focus on the next chip (FilterBar test).
+- URL state (CHK011–017): every param is in the URL; multi-value params repeat (`?skills=A&skills=B`); params are parsed before the first fetch; invalid `page_size`/`duration` are dropped client-side and an invalid `sort` is a 422 shown as the error state; names match the API contract; changes use `replace` history entries.
+- States (CHK018–025): empty state "No postings match — clear filters" with a Clear all filters button; loading = 8 skeleton rows / 5 skeleton cards; error state with "Try again" retrying the same request; detail page shows "Posting not found" / error; filter selects show loading while metadata loads.
+- Accessibility (CHK026–033): table role + `scope="col"`, sortable headers focusable with Enter/Space and arrows; result count announced via `aria-live`; axe-core WCAG 2 A/AA audit (incl. contrast) passes on jobs, detail, resume, tracker in Edge; every focusable element shows a focus ring (Playwright tab-through); mobile cards are focusable and labelled.
+- Performance (CHK034–038): 10,000 postings, sequential requests, list + worst-case combined query + detail + filter metadata: p95 = 40 ms (budget 300 ms); page load in Edge: DOMContentLoaded 50 ms, postings visible in a median 305 ms (budget 2 s); Postgres `statement_timeout` = 10 s so slow queries fail fast with the standard error shape.

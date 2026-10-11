@@ -76,7 +76,7 @@ Full walkthrough and talking points: **[docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.
 | Auth | argon2id, opaque session tokens in Redis, HTTP-only Secure cookies, temporary (guest/demo) accounts with claim |
 | AI | Bring your own key: `anthropic`, `openai`, `google-genai` SDKs behind one module; streaming SSE; optional owner keys (Claude fallback with a daily limit, OpenAI embeddings) |
 | Frontend | React 18, TypeScript 5, Vite 6, TanStack Query v5, TanStack Table v8, React Router v6, Tailwind CSS v3, dnd-kit |
-| Testing | pytest + pytest-asyncio (**234**, incl. a 10k-row latency budget), Vitest + Testing Library (**27**) |
+| Testing | pytest + pytest-asyncio (**235**, incl. a 10k-row latency budget), Vitest + Testing Library (**29**) |
 | Quality | ruff, mypy `--strict`, eslint, `tsc --noEmit` |
 | Delivery | GitHub Actions (tests + production-image boot and smoke test), one-container `Dockerfile`, Render Blueprint, Compose + Caddy HTTPS |
 

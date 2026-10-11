@@ -163,12 +163,12 @@
 
 **Purpose**: Performance validation, type generation, CI readiness, documentation.
 
-- [ ] T049 [P] Run `npm run gen:api` (openapi-typescript v7) to generate `frontend/src/api/types.gen.ts` from FastAPI's `/openapi.json`; update all hooks in `frontend/src/api/postings.ts` to use generated types instead of inline types; add `gen:api` to CI frontend job
+- [X] T049 [P] Run `npm run gen:api` (openapi-typescript v7) to generate `frontend/src/api/types.gen.ts` from FastAPI's `/openapi.json`; update all hooks in `frontend/src/api/postings.ts` to use generated types instead of inline types; add `gen:api` to CI frontend job
 - [X] T050 [P] Create `backend/tests/perf/test_perf.py` (mark with `pytest.mark.perf`): insert 10,000 postings via bulk insert; fire 50 concurrent `GET /api/postings?q=python&city=Waterloo` requests using `httpx.AsyncClient`; assert p95 latency ≤ 300 ms; assert total count is correct
-- [ ] T051 [P] Verify mobile layout: open DevTools at 375 px width; confirm table is replaced by `PostingCard` list; confirm `FilterBar` collapses to off-canvas/drawer panel; fix any overflow or overlap issues
-- [ ] T052 Verify accessibility: tab through all interactive elements in PostingsListPage and PostingDetailPage; confirm visible focus ring on every control; confirm all form controls have accessible labels; confirm color contrast meets WCAG AA (use browser a11y audit tool)
+- [X] T051 [P] Verify mobile layout: open DevTools at 375 px width; confirm table is replaced by `PostingCard` list; confirm `FilterBar` collapses to off-canvas/drawer panel; fix any overflow or overlap issues
+- [X] T052 Verify accessibility: tab through all interactive elements in PostingsListPage and PostingDetailPage; confirm visible focus ring on every control; confirm all form controls have accessible labels; confirm color contrast meets WCAG AA (use browser a11y audit tool)
 - [X] T053 Create `docs/agentic-workflow.md` with initial entry for Feature 001 (what Claude Code built, what was reviewed, tests added and results)
-- [ ] T054 Run full test suite: `docker compose exec api pytest -q` (all backend tests including perf); `npm run test` (vitest run); confirm CI green locally before push
+- [X] T054 Run full test suite: `docker compose exec api pytest -q` (all backend tests including perf); `npm run test` (vitest run); confirm CI green locally before push
 
 ---
 
@@ -255,3 +255,5 @@ Frontend: T039, T040
 | Phase 7: US5 URL State | T047–T048 (2) | |
 | Phase 8: Polish | T049–T054 (6) | |
 | **Total** | **54** | |
+
+> 2026-10-11: T049 types generated from OpenAPI (`frontend/src/api/types.gen.ts`, drift-checked in CI); T051/T052 verified in Edge via Playwright (375 px no overflow, cards + filter drawer; axe WCAG AA clean, focus rings everywhere); T054 backend 235 passed incl. perf, frontend 29 passed.

@@ -120,9 +120,9 @@
 
 - [X] T034 [P] Update `frontend/src/api/postings.ts` — add `is_saved?: boolean | null` to `PostingListItem`
 - [X] T035 [P] Update `backend/tests/api/test_postings.py` — add `is_saved` test for unauthenticated requests
-- [ ] T036 [P] Run `docker compose exec api alembic upgrade head` and confirm migration clean; run `docker compose exec api pytest -q -m "not perf"` green; run `docker compose exec web npm test` green
-- [ ] T037 Manual quickstart.md validation — execute all 9 curl steps from `specs/002-accounts-tracker/quickstart.md`
-- [ ] T038 [P] Frontend smoke tests — register, bookmark, /saved, status badge, logout
+- [X] T036 [P] Run `docker compose exec api alembic upgrade head` and confirm migration clean; run `docker compose exec api pytest -q -m "not perf"` green; run `docker compose exec web npm test` green
+- [X] T037 Manual quickstart.md validation — execute all 9 curl steps from `specs/002-accounts-tracker/quickstart.md`
+- [X] T038 [P] Frontend smoke tests — register, bookmark, /saved, status badge, logout
 
 ---
 
@@ -186,3 +186,5 @@
 - argon2-cffi `PasswordHasher()` with defaults (time_cost=2, memory_cost=65536, parallelism=1) is adequate per research.md
 - If Redis is down, `get_current_user` raises HTTP 503 (not 500) to signal a retriable infrastructure error
 - T036–T038 require the Docker stack running — manual validation steps
+
+> 2026-10-11: T036 migrations 0001–0007 up/down/up + `alembic check` clean, tests green; T037 quickstart steps 1–8 executed against the running app (all expected responses); T038 register → bookmark → tracker → status persists → logout passed in Edge.
