@@ -102,3 +102,44 @@
 - Eval: 25 fixture-based eval cases (citation rate ≥80% gate, zero factual errors gate, score bucket validation)
 
 **Next step**: Set `OPENAI_API_KEY` + `ANTHROPIC_API_KEY` in `.env`, then `docker compose exec api alembic upgrade head` and upload a resume at /matches
+
+
+---
+
+## 2026-10-10 — Full-repo review, verification, and model update
+
+**Branch**: `004-ai-resume-matcher` (uncommitted working tree, for review before committing)
+
+**Why**: Features 001–004 had never been run end to end (no Docker on the dev machine). This pass ran everything
+against real Postgres 16 + pgvector (via `pgserver`), Python 3.12, and Node, and fixed what broke.
+
+**What the AI assistant did**:
+- Git history: removed `Co-Authored-By: Claude …` trailers from 12 commits on the four feature branches
+  (`git filter-branch --msg-filter`, trees verified identical, force-pushed with lease); `main` untouched.
+  Added `.claude/settings.json` (`attribution` off) and a CLAUDE.md rule so it can't recur.
+- Bugs fixed (each with a regression test): migration 0001 impossible to apply (STABLE function in generated
+  column); SQL injection in `?skills=`; CSV/manual postings never committed; CSV export crash; deadlines panel
+  dropping NULL-status postings; status counts query failing on Postgres (enum vs text CASE); similar-postings SQL
+  bind bug; invalid sort → 500 instead of 422; ingest re-run closing every posting; "Run now" leaving a stuck run;
+  embeddings never generated; `python -m seed` missing `__main__` and wiping saved postings; rq-scheduler never
+  started; `file://` dev sources unreadable; broken pyproject build backend; alembic couldn't import `app`;
+  9 indexes missing from models (would be dropped by autogenerate); API container missing AI keys.
+- AI code: model IDs moved to settings (`AGENT_MODEL=claude-opus-5-5`, `FAST_MODEL=claude-haiku-5-5`); shared
+  `app/llm.py` (reads text blocks only — current models emit thinking blocks first); explicit effort; refusal
+  fallback; prompt-injection guard; cosine fallback when Claude fails; 503 `AI_UNAVAILABLE` on embedding outage.
+- Unified error shape `{detail, code}`; frontend `api/client.ts` (`apiFetch`/`ApiError`); fetches moved out of
+  components; Vite proxy so cookies are first-party; generated `package-lock.json`; added `nginx.conf`.
+- Tests rebuilt: savepoint-isolated sessions, Secure-cookie fix, shared Claude/queue/embedding mocks, pytest-asyncio 1.x
+  config, perf test made non-destructive and latency-based.
+- Workspace: moved Spec Kit (`.specify/`, `specs/`) and all skills to the repo root so Claude Code loads them;
+  rewrote the 5 project skills; nested spec-history git repo preserved at `../COOP-Radar-spec-history-backup/`.
+- Docs: new README, `docs/PROJECT_GUIDE.md`, progress log, spec 003/004 amendments, CI on every branch with
+  migration round-trip + `alembic check` + perf budget + production build.
+
+**Results (actual runs)**: backend 141 passed (incl. perf: p50 ≈ 20 ms, p95 ≈ 55 ms on 10k postings);
+ruff clean; mypy --strict clean; migrations up/down/up OK; `alembic check` no drift; seed idempotent.
+Frontend: eslint clean, tsc clean, 17 tests passed, production build OK.
+
+**Not verified**: `docker compose up` (no Docker available) and live Claude/OpenAI calls (mocked in tests).
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_

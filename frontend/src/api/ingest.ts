@@ -4,7 +4,7 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
+import { apiFetch } from './client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -53,44 +53,16 @@ export interface SourcePatchIn {
 
 // ── Fetchers ──────────────────────────────────────────────────────────────────
 
-async function fetchAdminSources(): Promise<IngestSourceOut[]> {
-  const res = await fetch(`${API_BASE}/api/admin/sources`, { credentials: 'include' })
-  if (res.status === 403) throw new Error('FORBIDDEN')
-  if (!res.ok) throw new Error(`GET /api/admin/sources failed: ${res.status}`)
-  return res.json() as Promise<IngestSourceOut[]>
-}
+const fetchAdminSources = () => apiFetch<IngestSourceOut[]>('/api/admin/sources')
 
-async function fetchRunHistory(sourceId: string, page = 1): Promise<RunsPage> {
-  const res = await fetch(
-    `${API_BASE}/api/admin/sources/${sourceId}/runs?page=${page}`,
-    { credentials: 'include' }
-  )
-  if (!res.ok) throw new Error(`GET /api/admin/sources/${sourceId}/runs failed: ${res.status}`)
-  return res.json() as Promise<RunsPage>
-}
+const fetchRunHistory = (sourceId: string, page = 1) =>
+  apiFetch<RunsPage>(`/api/admin/sources/${sourceId}/runs?page=${page}`)
 
-async function postTriggerRun(sourceId: string): Promise<TriggerRunOut> {
-  const res = await fetch(`${API_BASE}/api/admin/sources/${sourceId}/run`, {
-    method: 'POST',
-    credentials: 'include',
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body?.detail?.code ?? `HTTP ${res.status}`)
-  }
-  return res.json() as Promise<TriggerRunOut>
-}
+const postTriggerRun = (sourceId: string) =>
+  apiFetch<TriggerRunOut>(`/api/admin/sources/${sourceId}/run`, { method: 'POST' })
 
-async function patchSource(sourceId: string, data: SourcePatchIn): Promise<IngestSourceOut> {
-  const res = await fetch(`${API_BASE}/api/admin/sources/${sourceId}`, {
-    method: 'PATCH',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) throw new Error(`PATCH /api/admin/sources/${sourceId} failed: ${res.status}`)
-  return res.json() as Promise<IngestSourceOut>
-}
+const patchSource = (sourceId: string, data: SourcePatchIn) =>
+  apiFetch<IngestSourceOut>(`/api/admin/sources/${sourceId}`, { method: 'PATCH', json: data })
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
 
@@ -117,6 +89,7 @@ export function useTriggerRun() {
     mutationFn: (sourceId: string) => postTriggerRun(sourceId),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ['adminSources'] })
+      void qc.invalidateQueries({ queryKey: ['runHistory'] })
     },
   })
 }

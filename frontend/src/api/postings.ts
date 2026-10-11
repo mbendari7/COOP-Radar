@@ -1,13 +1,12 @@
 /**
  * TanStack Query hooks for the postings API.
  *
- * All API types are inlined here until `npm run gen:api` generates types.gen.ts
- * from the FastAPI OpenAPI schema. Once generated, import from './types.gen.ts'.
+ * Types mirror the backend Pydantic schemas (app/schemas/posting.py). To regenerate
+ * them from the live OpenAPI schema run `npm run gen:api` (writes src/api/types.gen.ts).
  */
 
-import { useQuery } from '@tanstack/react-query'
-
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { apiFetch } from './client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -26,8 +25,7 @@ export interface PostingListItem {
   posted_at: string         // ISO datetime string
   skills: string[]
   source_url: string | null
-  closed_at: string | null
-  is_closed: boolean        // derived: closed_at !== null
+  closed_at: string | null  // set when the posting disappeared from its ingest source
   // Populated for authenticated requests; null/undefined for unauthenticated
   is_saved?: boolean | null
 }
@@ -118,29 +116,71 @@ function buildQueryString(params: PostingListParams): string {
   return qs ? `?${qs}` : ''
 }
 
-async function fetchPostings(params: PostingListParams): Promise<PostingsPage> {
-  const res = await fetch(`${API_BASE}/api/postings${buildQueryString(params)}`)
-  if (!res.ok) throw new Error(`GET /api/postings failed: ${res.status}`)
-  return res.json() as Promise<PostingsPage>
+const fetchPostings = (params: PostingListParams) =>
+  apiFetch<PostingsPage>(`/api/postings${buildQueryString(params)}`)
+
+const fetchPosting = (id: string) => apiFetch<PostingDetail>(`/api/postings/${id}`)
+
+const fetchSimilar = (postingId: string) =>
+  apiFetch<SimilarPostingsResponse>(`/api/postings/${postingId}/similar`)
+
+const fetchFilterMeta = () => apiFetch<FilterMeta>('/api/postings/meta/filters')
+
+// ── Imports: CSV upload + manual entry ────────────────────────────────────────
+
+export interface RowError {
+  row: number      // spreadsheet line number (header = line 1)
+  column: string
+  message: string
 }
 
-async function fetchPosting(id: string): Promise<PostingDetail> {
-  const res = await fetch(`${API_BASE}/api/postings/${id}`)
-  if (res.status === 404) throw new Error('Posting not found')
-  if (!res.ok) throw new Error(`GET /api/postings/${id} failed: ${res.status}`)
-  return res.json() as Promise<PostingDetail>
+export interface CsvUploadResult {
+  added: number
+  skipped_duplicates: number
+  errors: RowError[]
 }
 
-async function fetchSimilar(postingId: string): Promise<SimilarPostingsResponse> {
-  const res = await fetch(`${API_BASE}/api/postings/${postingId}/similar`)
-  if (!res.ok) throw new Error(`GET /api/postings/${postingId}/similar failed: ${res.status}`)
-  return res.json() as Promise<SimilarPostingsResponse>
+export interface ManualPostingIn {
+  title: string
+  company: string
+  city: string
+  term: string
+  deadline: string          // YYYY-MM-DD
+  province?: string
+  work_mode?: WorkMode
+  duration_months?: number
+  description?: string
+  skills?: string[]
+  source_url?: string
 }
 
-async function fetchFilterMeta(): Promise<FilterMeta> {
-  const res = await fetch(`${API_BASE}/api/postings/meta/filters`)
-  if (!res.ok) throw new Error(`GET /api/postings/meta/filters failed: ${res.status}`)
-  return res.json() as Promise<FilterMeta>
+/** Upload a CSV of postings (max 1,000 rows, 3 uploads per hour). */
+export function useUploadCsv() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData()
+      form.append('file', file)
+      return apiFetch<CsvUploadResult>('/api/postings/upload', { method: 'POST', body: form })
+    },
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['postings'] })
+      void qc.invalidateQueries({ queryKey: ['filterMeta'] })
+    },
+  })
+}
+
+/** Add one posting by hand. Fails with code DUPLICATE when a near-identical one exists. */
+export function useCreatePosting() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (data: ManualPostingIn) =>
+      apiFetch<PostingListItem>('/api/postings', { method: 'POST', json: data }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ['postings'] })
+      void qc.invalidateQueries({ queryKey: ['filterMeta'] })
+    },
+  })
 }
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────

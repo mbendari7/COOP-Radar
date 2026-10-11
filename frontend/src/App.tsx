@@ -3,12 +3,12 @@
  *
  * The header shows:
  * - Loading: skeleton placeholder
- * - Authenticated: user email + "Saved" nav link + "Account" link + "Sign out" button
+ * - Authenticated: Saved / Matches / Add postings (+ Admin) links, account link, "Sign out"
  * - Unauthenticated: "Sign in / Register" button that opens AuthModal
  */
 
 import { lazy, Suspense, useState } from 'react'
-import { Link, Route, Routes } from 'react-router-dom'
+import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { useMe, useLogout } from './api/auth'
 import AuthModal from './components/AuthModal'
 import PostingDetailPage from './pages/PostingDetailPage'
@@ -27,6 +27,16 @@ const CsvUploadPage = lazy(() =>
 const ManualPostingPage = lazy(() =>
   import('./components/ManualPostingForm').then((m) => ({ default: m.ManualPostingForm }))
 )
+
+/** CSV bulk import and single-posting form on one page. */
+function AddPostingsPage() {
+  return (
+    <div className="p-6 max-w-2xl mx-auto space-y-12">
+      <CsvUploadPage />
+      <ManualPostingPage />
+    </div>
+  )
+}
 
 function Header() {
   const { data: me, isLoading } = useMe()
@@ -64,10 +74,10 @@ function Header() {
                 Matches
               </Link>
               <Link
-                to="/upload"
+                to="/add"
                 className="text-sm text-gray-600 hover:text-gray-900 font-medium"
               >
-                Upload
+                Add postings
               </Link>
               {me.is_admin && (
                 <Link
@@ -130,8 +140,10 @@ export default function App() {
             <Route path="/saved" element={<SavedPostingsPage />} />
             <Route path="/matches" element={<MatchResultsPage />} />
             <Route path="/account" element={<AccountSettingsPage />} />
-            <Route path="/upload" element={<div className="p-6 max-w-2xl mx-auto"><CsvUploadPage /></div>} />
-            <Route path="/submit" element={<div className="p-6 max-w-2xl mx-auto"><ManualPostingPage /></div>} />
+            <Route path="/add" element={<AddPostingsPage />} />
+            {/* Older links */}
+            <Route path="/upload" element={<Navigate to="/add" replace />} />
+            <Route path="/submit" element={<Navigate to="/add" replace />} />
             <Route path="/admin/sources" element={<AdminSourcesPage />} />
           </Routes>
         </Suspense>

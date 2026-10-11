@@ -5,13 +5,13 @@ Routes are thin: validate input via Pydantic, call the service, set/clear
 the session cookie, return the result.  No business logic lives here.
 """
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Cookie, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-import redis.asyncio as aioredis
-
 from app.db import get_db
 from app.deps import get_current_user
+from app.models.user import User
 from app.redis import get_redis
 from app.schemas.auth import LoginIn, RegisterIn, UserOut
 from app.services import auth as auth_service
@@ -24,7 +24,7 @@ async def register(
     body: RegisterIn,
     response: Response,
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),  # type: ignore[type-arg]
+    redis: aioredis.Redis = Depends(get_redis),
 ) -> UserOut:
     """
     Create a new account and start a session.
@@ -40,7 +40,7 @@ async def login(
     body: LoginIn,
     response: Response,
     db: AsyncSession = Depends(get_db),
-    redis: aioredis.Redis = Depends(get_redis),  # type: ignore[type-arg]
+    redis: aioredis.Redis = Depends(get_redis),
 ) -> UserOut:
     """
     Authenticate and start a session.
@@ -55,8 +55,8 @@ async def login(
 async def logout(
     response: Response,
     session: str | None = Cookie(default=None),
-    _user=Depends(get_current_user),  # 401 if not authenticated
-    redis: aioredis.Redis = Depends(get_redis),  # type: ignore[type-arg]
+    _user: User = Depends(get_current_user),  # 401 if not authenticated
+    redis: aioredis.Redis = Depends(get_redis),
 ) -> None:
     """Invalidate the session immediately and clear the browser cookie."""
     if session:

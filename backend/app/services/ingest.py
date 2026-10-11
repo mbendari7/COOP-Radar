@@ -1,6 +1,6 @@
 """Service layer for admin ingest source management."""
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -10,6 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.ingest_run import IngestRun
 from app.models.ingest_source import IngestSource
 from app.schemas.ingest import IngestRunOut, IngestSourceOut, RunsPage, SourcePatchIn, TriggerRunOut
+
+
+def _source_not_found() -> HTTPException:
+    return HTTPException(
+        status_code=404, detail={"detail": "Source not found", "code": "NOT_FOUND"}
+    )
 
 
 async def list_sources(db: AsyncSession) -> list[IngestSourceOut]:
@@ -69,7 +75,7 @@ async def list_runs(
     """Return paginated run history for a source."""
     source = await db.get(IngestSource, source_id)
     if source is None:
-        raise HTTPException(status_code=404, detail={"detail": "Source not found", "code": "NOT_FOUND"})
+        raise _source_not_found()
 
     count_stmt = select(func.count()).where(IngestRun.source_id == source_id)
     total: int = (await db.execute(count_stmt)).scalar_one()
@@ -100,7 +106,7 @@ async def list_runs(
     return RunsPage(items=items, total=total, page=page, page_size=page_size)
 
 
-async def trigger_run(db: AsyncSession, redis: object, source_id: UUID) -> TriggerRunOut:
+async def trigger_run(db: AsyncSession, source_id: UUID) -> TriggerRunOut:
     """
     Trigger an immediate ingestion run for the given source.
     Returns 409 if a run is already in progress.
@@ -108,12 +114,15 @@ async def trigger_run(db: AsyncSession, redis: object, source_id: UUID) -> Trigg
     """
     source = await db.get(IngestSource, source_id)
     if source is None:
-        raise HTTPException(status_code=404, detail={"detail": "Source not found", "code": "NOT_FOUND"})
+        raise _source_not_found()
 
     if source.auto_paused:
         raise HTTPException(
             status_code=422,
-            detail={"detail": "Source is auto-paused. Re-enable it first.", "code": "SOURCE_PAUSED"},
+            detail={
+                "detail": "Source is auto-paused. Re-enable it first.",
+                "code": "SOURCE_PAUSED",
+            },
         )
 
     # Check if already running
@@ -128,24 +137,35 @@ async def trigger_run(db: AsyncSession, redis: object, source_id: UUID) -> Trigg
             detail={"detail": "A run is already in progress.", "code": "ALREADY_RUNNING"},
         )
 
-    # Create a run record to track it
+    # Create the run record now so the admin UI shows "running" immediately;
+    # the worker picks up this same run via run_id and fills in the results.
     run = IngestRun(
         source_id=source_id,
-        started_at=datetime.now(timezone.utc),
+        started_at=datetime.now(UTC),
         status="running",
     )
     db.add(run)
     await db.flush()
 
-    # Enqueue to RQ (best effort — fails gracefully if Redis is unavailable)
     try:
         from app.worker import create_queue
-        import redis as _redis
-        conn = _redis.from_url(__import__("os").getenv("REDIS_URL", "redis://localhost:6379/0"))
-        queue = create_queue(conn)
-        queue.enqueue("app.ingest.runner.run_source", str(source_id))
-    except Exception:
-        pass  # Run record created; worker will pick it up via scheduler
+
+        create_queue().enqueue("app.ingest.runner.run_source", str(source_id), str(run.id))
+    except Exception as exc:  # noqa: BLE001
+        # Without a queue the run could never finish — record it as failed instead
+        # of leaving a "running" row that would block every future trigger.
+        run.status = "failed"
+        run.finished_at = datetime.now(UTC)
+        run.errors = 1
+        run.error_log = [f"Could not enqueue run: {exc}"]
+        await db.commit()
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "detail": "Job queue unavailable. Try again shortly.",
+                "code": "QUEUE_UNAVAILABLE",
+            },
+        ) from exc
 
     await db.commit()
     return TriggerRunOut(run_id=run.id, message="Run queued.")
@@ -159,7 +179,7 @@ async def patch_source(
     """Enable, disable, or un-pause a source."""
     source = await db.get(IngestSource, source_id)
     if source is None:
-        raise HTTPException(status_code=404, detail={"detail": "Source not found", "code": "NOT_FOUND"})
+        raise _source_not_found()
 
     if data.enabled is not None:
         source.enabled = data.enabled

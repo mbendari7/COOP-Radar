@@ -4,10 +4,9 @@ Account management router — GET /me, PATCH /me/password, DELETE /me.
 All routes require authentication via get_current_user dependency.
 """
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Cookie, Depends, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
-
-import redis.asyncio as aioredis
 
 from app.db import get_db
 from app.deps import get_current_user
@@ -47,7 +46,7 @@ async def delete_account(
     session: str | None = Cookie(default=None),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
-    redis: aioredis.Redis = Depends(get_redis),  # type: ignore[type-arg]
+    redis: aioredis.Redis = Depends(get_redis),
 ) -> None:
     """
     Permanently delete the account and all associated data (saved postings, statuses).

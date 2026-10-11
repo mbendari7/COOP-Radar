@@ -5,15 +5,13 @@ Each test seeds only the data it needs via the rolled-back db_session fixture,
 so tests are fast and independent.
 """
 
-from datetime import date, datetime, timezone, timedelta
+from datetime import UTC, date, datetime, timedelta
 from uuid import uuid4
 
-import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.posting import Posting, WorkMode
-
 
 # --- Helpers ------------------------------------------------------------------
 
@@ -31,7 +29,7 @@ def make_posting(**kwargs) -> Posting:
         term="Summer 2027",
         duration_months=4,
         deadline=date.today() + timedelta(days=30),   # active by default
-        posted_at=datetime.now(tz=timezone.utc),
+        posted_at=datetime.now(tz=UTC),
         description="A great co-op role.",
         skills=["Python", "SQL"],
         source_url=None,
@@ -118,7 +116,8 @@ async def test_keyword_search_filters_by_title(client: AsyncClient, db_session: 
     await add(
         db_session,
         make_posting(title="Python Developer"),
-        make_posting(title="Java Engineer"),
+        # Override the default skills (which include Python) so only the title differs
+        make_posting(title="Java Engineer", skills=["Java"]),
     )
 
     body = (await client.get("/api/postings?q=python")).json()
@@ -226,7 +225,7 @@ async def test_get_posting_returns_full_detail(client: AsyncClient, db_session: 
 async def test_get_unknown_posting_returns_404(client: AsyncClient) -> None:
     response = await client.get(f"/api/postings/{uuid4()}")
     assert response.status_code == 404
-    assert response.json()["detail"]["code"] == "POSTING_NOT_FOUND"
+    assert response.json()["code"] == "POSTING_NOT_FOUND"
 
 
 # --- is_saved field (Feature 002) ---------------------------------------------
@@ -256,3 +255,77 @@ async def test_filter_meta_returns_sorted_distinct_values(
     assert body["provinces"] == ["ON"]
     assert "SQL" in body["skills"]
     assert body["skills"] == sorted(body["skills"])
+
+
+# --- Regression tests ------------------------------------------------------------
+
+async def test_skills_filter_treats_input_as_data(client: AsyncClient, db_session: AsyncSession) -> None:
+    """Quotes/brackets in a skill value are bound parameters, never SQL (was f-string SQL)."""
+    await add(db_session, make_posting(title="Safe"))
+
+    response = await client.get(
+        "/api/postings", params={"skills": "x']::text[]); DROP TABLE postings; --"}
+    )
+
+    assert response.status_code == 200
+    assert response.json()["total"] == 0
+    assert (await client.get("/api/postings")).json()["total"] == 1  # table still there
+
+
+async def test_semantic_search_orders_by_similarity(
+    client: AsyncClient, db_session: AsyncSession, mock_embedding
+) -> None:
+    from app.models.posting_embedding import PostingEmbedding
+
+    near, far = make_posting(title="Near"), make_posting(title="Far")
+    await add(db_session, near, far)
+    db_session.add_all([
+        PostingEmbedding(posting_id=near.id, embedding=[0.1] * 1536, model="test"),
+        PostingEmbedding(posting_id=far.id, embedding=[0.1] * 768 + [-0.1] * 768, model="test"),
+    ])
+    await db_session.flush()
+
+    body = (await client.get("/api/postings?q=anything&search_mode=semantic")).json()
+
+    assert [item["title"] for item in body["items"]] == ["Near", "Far"]
+
+
+async def test_semantic_search_falls_back_to_keyword(
+    client: AsyncClient, db_session: AsyncSession, monkeypatch
+) -> None:
+    from unittest.mock import AsyncMock
+
+    monkeypatch.setattr(
+        "app.ingest.embed.generate_embedding", AsyncMock(side_effect=RuntimeError("no key"))
+    )
+    await add(
+        db_session,
+        make_posting(title="Rust Developer", skills=["Rust"]),
+        make_posting(title="Other", skills=["Go"]),
+    )
+
+    body = (await client.get("/api/postings?q=rust&search_mode=semantic")).json()
+
+    assert [item["title"] for item in body["items"]] == ["Rust Developer"]
+
+
+async def test_similar_postings_returns_nearest(client: AsyncClient, db_session: AsyncSession) -> None:
+    from app.models.posting_embedding import PostingEmbedding
+
+    target = make_posting(title="Target")
+    twin = make_posting(title="Twin")
+    closed = make_posting(title="Closed", closed_at=datetime.now(tz=UTC))
+    await add(db_session, target, twin, closed)
+    for p in (target, twin, closed):
+        db_session.add(PostingEmbedding(posting_id=p.id, embedding=[0.2] * 1536, model="test"))
+    await db_session.flush()
+
+    body = (await client.get(f"/api/postings/{target.id}/similar")).json()
+
+    assert [item["title"] for item in body["items"]] == ["Twin"]  # never itself, never closed
+    assert body["items"][0]["similarity"] > 0.99
+
+
+async def test_error_responses_have_flat_shape(client: AsyncClient) -> None:
+    body = (await client.get(f"/api/postings/{uuid4()}")).json()
+    assert body == {"detail": "Posting not found", "code": "POSTING_NOT_FOUND"}

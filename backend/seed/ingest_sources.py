@@ -1,12 +1,15 @@
 """Seed fixture-backed dev/test ingest sources."""
 
 import asyncio
-import os
+import json
+from pathlib import Path
+
 from sqlalchemy import text
+
 from app.db import AsyncSessionLocal
 
-# Path to fixture files relative to the backend root (mounted as /app in Docker)
-_FIXTURE_BASE = "/app/tests/fixtures/ingest"
+# Fixture files live in backend/tests/fixtures/ingest (works in Docker and locally)
+_FIXTURE_DIR = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "ingest"
 
 
 SOURCES = [
@@ -14,7 +17,7 @@ SOURCES = [
         "name": "Acme Jobs (Dev Fixture)",
         "adapter_type": "json_api",
         "config": {
-            "url": f"file://{_FIXTURE_BASE}/acme_jobs.json",
+            "url": (_FIXTURE_DIR / "acme_jobs.json").as_uri(),
             "field_map": {},
         },
     },
@@ -22,21 +25,21 @@ SOURCES = [
         "name": "Shopify RSS (Dev Fixture)",
         "adapter_type": "rss",
         "config": {
-            "url": f"file://{_FIXTURE_BASE}/shopify_rss.xml",
+            "url": (_FIXTURE_DIR / "shopify_rss.xml").as_uri(),
         },
     },
 ]
 
 
 async def seed_sources() -> None:
+    """Insert the dev sources, skipping any whose name already exists (idempotent)."""
     async with AsyncSessionLocal() as db:
         for source in SOURCES:
-            import json
             await db.execute(
                 text(
                     "INSERT INTO ingest_sources (id, name, adapter_type, config) "
-                    "VALUES (gen_random_uuid(), :name, :adapter_type, :config) "
-                    "ON CONFLICT DO NOTHING"
+                    "SELECT gen_random_uuid(), :name, :adapter_type, CAST(:config AS jsonb) "
+                    "WHERE NOT EXISTS (SELECT 1 FROM ingest_sources WHERE name = :name)"
                 ),
                 {
                     "name": source["name"],

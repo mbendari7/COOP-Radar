@@ -1,11 +1,25 @@
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, SmallInteger, Text, UniqueConstraint, func
+from sqlalchemy import (
+    TIMESTAMP,
+    CheckConstraint,
+    ForeignKey,
+    Index,
+    SmallInteger,
+    Text,
+    UniqueConstraint,
+    func,
+    text,
+)
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+
+if TYPE_CHECKING:
+    from app.models.resume import Resume
 
 
 class MatchResult(Base):
@@ -18,7 +32,7 @@ class MatchResult(Base):
     __table_args__ = (
         CheckConstraint("score >= 0 AND score <= 100", name="ck_match_results_score_range"),
         UniqueConstraint("resume_id", "posting_id", name="uq_match_results_resume_posting"),
-        Index("idx_match_results_resume_score", "resume_id", "score"),
+        Index("idx_match_results_resume_score", "resume_id", text("score DESC")),
     )
 
     id: Mapped[UUID] = mapped_column(
@@ -39,9 +53,9 @@ class MatchResult(Base):
     score: Mapped[int] = mapped_column(SmallInteger, nullable=False)
     reason: Mapped[str] = mapped_column(Text, nullable=False)
     ranked_at: Mapped[datetime] = mapped_column(
-        nullable=False, server_default=func.now()
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
     )
 
-    resume: Mapped["Resume"] = relationship(  # type: ignore[name-defined]
+    resume: Mapped["Resume"] = relationship(
         "Resume", back_populates="match_results"
     )

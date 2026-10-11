@@ -30,3 +30,11 @@ Thumbs.db
 .vscode/
 .idea/
 *.swp
+
+# TypeScript incremental build info
+*.tsbuildinfo
+
+# Coverage
+.coverage
+htmlcov/
+coverage/

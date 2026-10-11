@@ -14,7 +14,7 @@ from fastapi import Request
 from app.config import get_settings
 
 
-def create_redis_pool() -> aioredis.Redis:  # type: ignore[type-arg]
+def create_redis_pool() -> aioredis.Redis:
     """
     Create an async Redis connection pool from the configured REDIS_URL.
     Called once in app lifespan startup; result stored on app.state.redis.
@@ -27,7 +27,7 @@ def create_redis_pool() -> aioredis.Redis:  # type: ignore[type-arg]
     )
 
 
-async def get_redis(request: Request) -> AsyncGenerator[aioredis.Redis, None]:  # type: ignore[type-arg]
+async def get_redis(request: Request) -> AsyncGenerator[aioredis.Redis, None]:
     """
     FastAPI dependency that yields the application-level Redis pool.
     Routes that need Redis declare: redis: aioredis.Redis = Depends(get_redis)

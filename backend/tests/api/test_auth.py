@@ -1,69 +1,16 @@
 """
 Tests for authentication endpoints.
 
-These tests use a mock Redis dependency so no real Redis instance is needed.
-The mock tracks session keys in a plain dict.
+These tests use the in-memory MockRedis from conftest, so no real Redis is needed.
 """
 
 import pytest
 from httpx import AsyncClient
-from unittest.mock import AsyncMock, MagicMock
-
-from app.redis import get_redis
-
-
-# ── Redis mock fixture ────────────────────────────────────────────────────────
-
-class MockRedis:
-    """In-memory Redis stand-in for tests."""
-
-    def __init__(self) -> None:
-        self._store: dict[str, dict[str, str]] = {}
-        self._ttls: dict[str, int] = {}
-        self._counters: dict[str, int] = {}
-
-    async def hset(self, key: str, field: str, value: str) -> None:
-        self._store.setdefault(key, {})[field] = value
-
-    async def hget(self, key: str, field: str) -> str | None:
-        return self._store.get(key, {}).get(field)
-
-    async def incr(self, key: str) -> int:
-        self._counters[key] = self._counters.get(key, 0) + 1
-        return self._counters[key]
-
-    async def expire(self, key: str, ttl: int) -> None:
-        self._ttls[key] = ttl
-
-    async def delete(self, key: str) -> None:
-        self._store.pop(key, None)
-        self._counters.pop(key, None)
-
-    async def aclose(self) -> None:
-        pass
 
 
 @pytest.fixture
-def mock_redis():
-    return MockRedis()
-
-
-@pytest.fixture
-async def auth_client(client: AsyncClient, mock_redis: MockRedis) -> AsyncClient:
-    """Client with Redis dependency overridden to use in-memory mock."""
-    from app.main import create_app
-    from app.db import get_db
-
-    app = client._transport.app  # type: ignore[attr-defined]
-
-    async def override_redis(request=None):
-        yield mock_redis
-
-    app.dependency_overrides[get_redis] = override_redis
-
-    # Also patch app.state.redis for the lifespan-dependent code
-    app.state.redis = mock_redis
-
+def auth_client(client: AsyncClient) -> AsyncClient:
+    """The shared client already uses the in-memory Redis from conftest."""
     return client
 
 

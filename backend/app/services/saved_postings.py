@@ -11,11 +11,11 @@ Design decisions:
 """
 
 import io
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException, status
-from sqlalchemy import case, func, select, text
+from sqlalchemy import String, case, cast, func, or_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -28,6 +28,13 @@ from app.schemas.saved_posting import (
     SavedPostingOut,
     SavedPostingsPage,
 )
+
+# Statuses where the deadline no longer matters to the student
+_CLOSED_STATUSES = [
+    ApplicationStatus.offer,
+    ApplicationStatus.rejected,
+    ApplicationStatus.withdrawn,
+]
 
 
 async def list_saved(
@@ -72,8 +79,9 @@ async def list_saved(
     counts_stmt = (
         select(
             case(
-                (SavedPosting.status == None, "none"),  # noqa: E711
-                else_=SavedPosting.status,
+                (SavedPosting.status.is_(None), "none"),
+                # Cast the enum to text so both CASE branches have the same type
+                else_=cast(SavedPosting.status, String),
             ).label("s"),
             func.count().label("n"),
         )
@@ -88,17 +96,22 @@ async def list_saved(
     for s, n in counts_rows:
         status_counts[str(s)] = n
 
-    # Deadlines within the next 7 days (all saved postings, not just current page)
-    now = datetime.now(timezone.utc)
-    week_end = now + timedelta(days=7)
+    # Deadlines within the next 7 days (all saved postings, not just current page).
+    # deadline is a DATE column, so compare against dates. Postings with no status
+    # (NULL) must be included explicitly — NULL NOT IN (...) is NULL, not TRUE.
+    today = date.today()
+    week_end = today + timedelta(days=7)
     deadlines_stmt = (
         select(SavedPosting.id, Posting.id, Posting.title, Posting.company, Posting.deadline)
         .join(Posting, SavedPosting.posting_id == Posting.id)
         .where(
             SavedPosting.user_id == user_id,
-            Posting.deadline >= now,
+            Posting.deadline >= today,
             Posting.deadline <= week_end,
-            SavedPosting.status.not_in([ApplicationStatus.offer, ApplicationStatus.rejected, ApplicationStatus.withdrawn]),
+            or_(
+                SavedPosting.status.is_(None),
+                SavedPosting.status.not_in(_CLOSED_STATUSES),
+            ),
         )
         .order_by(Posting.deadline.asc())
     )
@@ -220,15 +233,13 @@ async def update_status(
     saved_posting_id: UUID,
     new_status: ApplicationStatus | None,
     notes: str | None = None,
-    event_date: "date | None" = None,  # type: ignore[name-defined]
+    event_date: date | None = None,
 ) -> SavedPosting:
     """
     Update (or clear) the application status on a saved posting.
     Automatically creates an ApplicationEvent for every status change.
     Raises 404 if not found or owned by another user.
     """
-    from datetime import date  # noqa: F811
-
     row = (
         await db.execute(
             select(SavedPosting).where(
@@ -245,7 +256,7 @@ async def update_status(
         )
 
     row.status = new_status
-    row.last_status_at = datetime.now(timezone.utc)
+    row.last_status_at = datetime.now(UTC)
 
     # Record the status change in the event history (skip if clearing status)
     if new_status is not None:
@@ -268,7 +279,7 @@ async def add_event(
     saved_posting_id: UUID,
     new_status: ApplicationStatus,
     notes: str | None,
-    event_date: "date | None",  # type: ignore[name-defined]
+    event_date: date | None,
 ) -> SavedPosting:
     """
     Manually add a status event (e.g. note an interview date retroactively).
@@ -285,7 +296,7 @@ async def export_csv(
     Build a CSV file of the user's full tracker data using pandas.
     Returns raw bytes ready to be streamed as a file download.
     """
-    import pandas as pd  # local import — pandas is optional dep for this path
+    import pandas as pd  # local import keeps pandas off the hot path of other endpoints
 
     # Fetch all saved postings with their posting data
     from sqlalchemy.orm import selectinload
@@ -309,7 +320,7 @@ async def export_csv(
             "Work Mode": p.work_mode.value if p.work_mode else "",
             "Term": p.term,
             "Duration (months)": p.duration_months,
-            "Deadline": p.deadline.date().isoformat() if p.deadline else "",
+            "Deadline": p.deadline.isoformat() if p.deadline else "",
             "Status": row.status.value if row.status else "",
             "Saved At": row.saved_at.date().isoformat(),
             "Last Updated": row.last_status_at.date().isoformat() if row.last_status_at else "",

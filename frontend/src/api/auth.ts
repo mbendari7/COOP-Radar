@@ -1,13 +1,12 @@
 /**
- * TanStack Query hooks for authentication.
+ * TanStack Query hooks for authentication and account management.
  *
- * All fetch calls include credentials: 'include' so the browser attaches
- * the HttpOnly session cookie automatically.
+ * Every call goes through apiFetch, which sends the HTTP-only session cookie
+ * (credentials: 'include') and throws ApiError({ status, code }) on failure.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
+import { ApiError, apiFetch } from './client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -18,56 +17,37 @@ export interface UserOut {
   is_admin: boolean
 }
 
+interface Credentials {
+  email: string
+  password: string
+}
+
 // ── Fetchers ──────────────────────────────────────────────────────────────────
 
-async function fetchMe(): Promise<UserOut> {
-  const res = await fetch(`${API_BASE}/api/me`, { credentials: 'include' })
-  if (res.status === 401) throw new Error('NOT_AUTHENTICATED')
-  if (!res.ok) throw new Error(`GET /api/me failed: ${res.status}`)
-  return res.json() as Promise<UserOut>
-}
-
-async function postRegister(body: { email: string; password: string }): Promise<UserOut> {
-  const res = await fetch(`${API_BASE}/api/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body),
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw Object.assign(new Error(err.detail ?? 'Registration failed'), { status: res.status, code: err.code })
+/** Current user, or null when not signed in (a 401 is an expected answer here). */
+async function fetchMe(): Promise<UserOut | null> {
+  try {
+    return await apiFetch<UserOut>('/api/me')
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 401) return null
+    throw err
   }
-  return res.json() as Promise<UserOut>
 }
 
-async function postLogin(body: { email: string; password: string }): Promise<UserOut> {
-  const res = await fetch(`${API_BASE}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify(body),
+export function changePassword(currentPassword: string, newPassword: string): Promise<void> {
+  return apiFetch<void>('/api/me/password', {
+    method: 'PATCH',
+    json: { current_password: currentPassword, new_password: newPassword },
   })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({}))
-    throw Object.assign(new Error(err.detail ?? 'Login failed'), { status: res.status, code: err.code })
-  }
-  return res.json() as Promise<UserOut>
 }
 
-async function postLogout(): Promise<void> {
-  await fetch(`${API_BASE}/api/auth/logout`, {
-    method: 'POST',
-    credentials: 'include',
-  })
+export function deleteAccount(password: string): Promise<void> {
+  return apiFetch<void>('/api/me', { method: 'DELETE', json: { password } })
 }
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
 
-/**
- * Returns the currently authenticated user, or undefined if not logged in.
- * retry: false prevents React Query from retrying 401s endlessly.
- */
+/** The signed-in user (null when signed out). retry: false so 401s aren't retried. */
 export function useMe() {
   return useQuery({
     queryKey: ['me'],
@@ -77,32 +57,30 @@ export function useMe() {
   })
 }
 
-/** Mutation to register a new account. Invalidates the 'me' query on success. */
+/** Register a new account. Refreshes 'me' on success. */
 export function useRegister() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: postRegister,
+    mutationFn: (body: Credentials) => apiFetch<UserOut>('/api/auth/register', { method: 'POST', json: body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['me'] }),
   })
 }
 
-/** Mutation to log in. Invalidates the 'me' query on success. */
+/** Log in. Refreshes 'me' and any per-user data (e.g. is_saved flags) on success. */
 export function useLogin() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: postLogin,
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['me'] }),
+    mutationFn: (body: Credentials) => apiFetch<UserOut>('/api/auth/login', { method: 'POST', json: body }),
+    onSuccess: () => qc.invalidateQueries(),
   })
 }
 
-/**
- * Mutation to log out.
- * Clears all cached queries so stale user data isn't shown after logout.
- */
+/** Log out. Clears every cached query so no stale user data is shown afterwards. */
 export function useLogout() {
   const qc = useQueryClient()
   return useMutation({
-    mutationFn: postLogout,
-    onSuccess: () => qc.clear(),
+    mutationFn: () => apiFetch<void>('/api/auth/logout', { method: 'POST' }),
+    // Clear even if the server call failed (e.g. session already expired)
+    onSettled: () => qc.clear(),
   })
 }

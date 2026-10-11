@@ -2,10 +2,9 @@
 
 import asyncio
 from datetime import date
-from email.utils import parsedate_to_datetime
 from typing import Any
 
-import feedparser  # type: ignore[import-untyped]
+import feedparser
 
 from app.ingest.base import AdapterError, BaseAdapter, RawPosting
 
@@ -18,7 +17,7 @@ class RssAdapter(BaseAdapter):
       - url: str  — the feed URL
     """
 
-    async def fetch(self, source: Any) -> list[RawPosting]:  # type: ignore[override]
+    async def fetch(self, source: Any) -> list[RawPosting]:
         config = source.config
         url = config.get("url", "")
 

@@ -46,8 +46,8 @@ async def test_happy_path_returns_raw_postings():
 @pytest.mark.asyncio
 async def test_http_500_raises_adapter_error():
     """Non-200 HTTP response raises AdapterError."""
-    with respx.mock():
-        respx.get("https://broken.example.com/jobs").mock(
+    with respx.mock() as mock:
+        mock.get("https://broken.example.com/jobs").mock(
             return_value=Response(500)
         )
         adapter = JsonApiAdapter()
@@ -60,8 +60,8 @@ async def test_http_500_raises_adapter_error():
 @pytest.mark.asyncio
 async def test_empty_array_returns_empty_list():
     """Empty array response returns an empty list (no exception)."""
-    with respx.mock():
-        respx.get("https://empty.example.com/jobs").mock(
+    with respx.mock() as mock:
+        mock.get("https://empty.example.com/jobs").mock(
             return_value=Response(200, json=[])
         )
         adapter = JsonApiAdapter()
@@ -90,8 +90,8 @@ async def test_field_map_remapping():
         "term": "period",
         "deadline": "due_date",
     }
-    with respx.mock():
-        respx.get("https://mapped.example.com/jobs").mock(
+    with respx.mock() as mock:
+        mock.get("https://mapped.example.com/jobs").mock(
             return_value=Response(200, json=data)
         )
         adapter = JsonApiAdapter()

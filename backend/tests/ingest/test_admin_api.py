@@ -1,6 +1,5 @@
 """Tests for admin source management endpoints."""
 
-from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
@@ -38,7 +37,7 @@ async def test_non_admin_gets_403(client: AsyncClient, db_session: AsyncSession)
     session = await _register_login(client, "student_admin_test@example.com")
     resp = await client.get("/api/admin/sources", cookies={"session": session})
     assert resp.status_code == 403
-    assert resp.json()["detail"]["code"] == "FORBIDDEN"
+    assert resp.json()["code"] == "FORBIDDEN"
 
 
 @pytest.mark.asyncio
@@ -106,7 +105,7 @@ async def test_trigger_already_running_409(client: AsyncClient, db_session: Asyn
         f"/api/admin/sources/{source_id}/run", cookies={"session": session}
     )
     assert resp2.status_code == 409
-    assert resp2.json()["detail"]["code"] == "ALREADY_RUNNING"
+    assert resp2.json()["code"] == "ALREADY_RUNNING"
 
 
 @pytest.mark.asyncio
@@ -140,3 +139,22 @@ async def test_patch_source_re_enables(client: AsyncClient, db_session: AsyncSes
     assert resp.status_code == 200
     body = resp.json()
     assert body["auto_paused"] is False
+
+
+@pytest.mark.asyncio
+async def test_trigger_run_enqueues_job_with_run_id(
+    client: AsyncClient, db_session: AsyncSession, fake_queue
+):
+    await _register_login(client, "admin_queue@example.com")
+    await _make_admin(db_session, "admin_queue@example.com")
+    source_id = await _create_source(db_session, "Queue Source")
+    await client.post(
+        "/api/auth/login", json={"email": "admin_queue@example.com", "password": "TestPass123!"}
+    )
+
+    resp = await client.post(f"/api/admin/sources/{source_id}/run")
+
+    assert resp.status_code == 202
+    fake_queue.enqueue.assert_called_once_with(
+        "app.ingest.runner.run_source", source_id, resp.json()["run_id"]
+    )

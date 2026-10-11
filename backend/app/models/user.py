@@ -7,14 +7,17 @@ is an argon2id hash — the plaintext is never stored or logged.
 """
 
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import BOOLEAN, Text, text
+from sqlalchemy import BOOLEAN, TIMESTAMP, Index, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import TIMESTAMP
 
 from app.db import Base
+
+if TYPE_CHECKING:
+    from app.models.saved_posting import SavedPosting
 
 
 class User(Base):
@@ -32,6 +35,8 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(BOOLEAN, nullable=False, server_default=text("FALSE"))
 
     # Back-reference so we can access user.saved_postings if needed
-    saved_postings: Mapped[list["SavedPosting"]] = relationship(  # noqa: F821
+    saved_postings: Mapped[list["SavedPosting"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
+
+    __table_args__ = (Index("idx_users_email", "email", unique=True),)

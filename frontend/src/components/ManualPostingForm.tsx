@@ -1,41 +1,20 @@
+/**
+ * ManualPostingForm — add a single posting by hand. Optional fields left blank are
+ * omitted from the request so the backend applies its defaults.
+ */
+
 import { useState } from 'react'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { ApiError } from '../api/client'
+import { useCreatePosting, type ManualPostingIn } from '../api/postings'
 
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
-
-interface ManualPostingIn {
-  title: string
-  company: string
-  city: string
-  term: string
-  deadline: string
-  province?: string
-  work_mode?: 'onsite' | 'hybrid' | 'remote'
-  duration_months?: number
-  description?: string
-  skills?: string[]
-  source_url?: string
-}
-
-async function createPosting(data: ManualPostingIn) {
-  const res = await fetch(`${API_BASE}/api/postings`, {
-    method: 'POST',
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ...data,
-      skills: data.skills ?? [],
-    }),
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body?.detail?.code ?? `HTTP ${res.status}`)
-  }
-  return res.json()
+/** Drop empty optional fields: the API rejects "" for enums and URLs. */
+function cleanForm(form: ManualPostingIn): ManualPostingIn {
+  return Object.fromEntries(
+    Object.entries(form).filter(([, v]) => v !== '' && v !== undefined),
+  ) as unknown as ManualPostingIn
 }
 
 export function ManualPostingForm() {
-  const qc = useQueryClient()
   const [success, setSuccess] = useState(false)
   const [form, setForm] = useState<ManualPostingIn>({
     title: '',
@@ -45,14 +24,7 @@ export function ManualPostingForm() {
     deadline: '',
   })
 
-  const mutation = useMutation({
-    mutationFn: createPosting,
-    onSuccess: () => {
-      setSuccess(true)
-      setForm({ title: '', company: '', city: '', term: '', deadline: '' })
-      void qc.invalidateQueries({ queryKey: ['postings'] })
-    },
-  })
+  const mutation = useCreatePosting()
 
   function set(field: keyof ManualPostingIn) {
     return (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
@@ -63,9 +35,11 @@ export function ManualPostingForm() {
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    mutation.mutate({
-      ...form,
-      skills: form.skills,
+    mutation.mutate(cleanForm(form), {
+      onSuccess: () => {
+        setSuccess(true)
+        setForm({ title: '', company: '', city: '', term: '', deadline: '' })
+      },
     })
   }
 
@@ -76,11 +50,11 @@ export function ManualPostingForm() {
       <form onSubmit={handleSubmit} className="space-y-4" noValidate>
         {(
           [
-            { id: 'title', label: 'Title *', type: 'text', required: true },
-            { id: 'company', label: 'Company *', type: 'text', required: true },
-            { id: 'city', label: 'City *', type: 'text', required: true },
+            { id: 'title', label: 'Title *', type: 'text', required: true, placeholder: undefined },
+            { id: 'company', label: 'Company *', type: 'text', required: true, placeholder: undefined },
+            { id: 'city', label: 'City *', type: 'text', required: true, placeholder: undefined },
             { id: 'term', label: 'Term *', type: 'text', required: true, placeholder: 'e.g. Summer 2027' },
-            { id: 'deadline', label: 'Deadline *', type: 'date', required: true },
+            { id: 'deadline', label: 'Deadline *', type: 'date', required: true, placeholder: undefined },
           ] as const
         ).map(({ id, label, type, required, placeholder }) => (
           <div key={id}>
@@ -160,9 +134,11 @@ export function ManualPostingForm() {
 
       {mutation.isError && (
         <div role="alert" className="mt-4 p-3 rounded-md bg-red-50 text-sm text-red-700">
-          {mutation.error instanceof Error && mutation.error.message === 'DUPLICATE'
+          {mutation.error instanceof ApiError && mutation.error.code === 'DUPLICATE'
             ? 'A similar posting already exists.'
-            : 'Failed to add posting. Please try again.'}
+            : mutation.error instanceof ApiError && mutation.error.code === 'VALIDATION_ERROR'
+              ? 'Please fill in all required fields (title, company, city, term, deadline).'
+              : 'Failed to add posting. Please try again.'}
         </div>
       )}
     </div>

@@ -1,11 +1,15 @@
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID
 
-from sqlalchemy import CheckConstraint, ForeignKey, Index, Integer, Text, func
+from sqlalchemy import TIMESTAMP, CheckConstraint, ForeignKey, Index, Integer, Text, func
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+
+if TYPE_CHECKING:
+    from app.models.match_result import MatchResult
 
 
 class Resume(Base):
@@ -36,9 +40,9 @@ class Resume(Base):
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
     extracted_text: Mapped[str] = mapped_column(Text, nullable=False)
     uploaded_at: Mapped[datetime] = mapped_column(
-        nullable=False, server_default=func.now()
+        TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
     )
 
-    match_results: Mapped[list["MatchResult"]] = relationship(  # type: ignore[name-defined]
+    match_results: Mapped[list["MatchResult"]] = relationship(
         "MatchResult", back_populates="resume", cascade="all, delete-orphan"
     )

@@ -1,76 +1,82 @@
 """
 Shared pytest fixtures.
 
-We spin up a test database using the same DATABASE_URL but a separate schema
-(or a test-only DB if configured) and reset it between test sessions.
-Each test gets its own transaction that is rolled back at the end — this is
-faster than truncating tables and keeps tests from interfering with each other.
+Database isolation: every test runs inside one outer transaction on a dedicated
+connection. The session uses join_transaction_mode="create_savepoint", so when a
+service calls `await db.commit()` only a SAVEPOINT is released — the outer
+transaction is rolled back after the test and nothing leaks between tests.
+
+The schema is rebuilt from the ORM models once per session (drop_all + create_all),
+after enabling the `vector` and `fuzzystrmatch` extensions the models rely on.
 """
 
-import asyncio
-from collections.abc import AsyncGenerator
+import os
 
-import pytest
-import pytest_asyncio
-from httpx import ASGITransport, AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+# Must be set before the app (and its cached settings) are imported: httpx won't
+# send Secure cookies over the plain-http test transport.
+os.environ.setdefault("COOKIE_SECURE", "false")
 
-from app.config import get_settings
-from app.db import Base, get_db
-from app.main import create_app
-from app.redis import get_redis
+from collections.abc import AsyncGenerator, Callable  # noqa: E402
+from typing import Any  # noqa: E402
+from unittest.mock import AsyncMock, MagicMock  # noqa: E402
+
+import pytest  # noqa: E402
+import pytest_asyncio  # noqa: E402
+from httpx import ASGITransport, AsyncClient  # noqa: E402
+from sqlalchemy import text  # noqa: E402
+from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, create_async_engine  # noqa: E402
+
+import app.models  # noqa: E402,F401 — registers every table on Base.metadata
+from app.config import get_settings  # noqa: E402
+from app.db import Base, get_db  # noqa: E402
+from app.main import create_app  # noqa: E402
+from app.redis import get_redis  # noqa: E402
+
+get_settings.cache_clear()
 
 
-# Use a separate test database to avoid stomping on dev data.
-# The CI workflow sets DATABASE_URL to the test DB; locally you can
-# set TEST_DATABASE_URL or it falls back to the configured DB.
 def get_test_db_url() -> str:
-    import os
+    """CI points DATABASE_URL at a throwaway DB; locally you can set TEST_DATABASE_URL."""
     return os.getenv("TEST_DATABASE_URL", get_settings().database_url)
 
 
-@pytest.fixture(scope="session")
-def event_loop():  # type: ignore[override]
-    """
-    Use a single event loop for the whole test session.
-    Without this, session-scoped async fixtures break with asyncio.
-    """
-    loop = asyncio.new_event_loop()
-    yield loop
-    loop.close()
-
-
 @pytest_asyncio.fixture(scope="session")
-async def db_engine():
-    """Create the test database schema once for the whole session."""
+async def db_engine() -> AsyncGenerator[AsyncEngine, None]:
+    """Create a fresh schema once for the whole test session."""
     engine = create_async_engine(get_test_db_url(), echo=False)
     async with engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS fuzzystrmatch"))
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield engine
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.drop_all)
     await engine.dispose()
 
 
 @pytest_asyncio.fixture
-async def db_session(db_engine) -> AsyncGenerator[AsyncSession, None]:  # type: ignore[type-arg]
-    """
-    Each test gets its own session with an open transaction that is rolled back
-    after the test finishes.  This gives us complete isolation without re-creating
-    the schema for every test.
-    """
-    session_factory = async_sessionmaker(bind=db_engine, expire_on_commit=False)
-    async with session_factory() as session:
-        yield session
-        await session.rollback()
+async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, None]:
+    """A session whose commits are savepoints inside a transaction rolled back after the test."""
+    async with db_engine.connect() as conn:
+        outer = await conn.begin()
+        session = AsyncSession(
+            bind=conn,
+            join_transaction_mode="create_savepoint",
+            expire_on_commit=False,
+        )
+        try:
+            yield session
+        finally:
+            await session.close()
+            await outer.rollback()
 
 
-class _MockRedis:
-    """In-memory Redis stub for tests — avoids needing a real Redis instance."""
+class MockRedis:
+    """In-memory Redis stand-in — covers every command the app uses."""
 
     def __init__(self) -> None:
         self._store: dict[str, dict[str, str]] = {}
         self._counters: dict[str, int] = {}
+        self.ttls: dict[str, int] = {}
 
     async def hset(self, key: str, field: str, value: str) -> None:
         self._store.setdefault(key, {})[field] = value
@@ -83,7 +89,7 @@ class _MockRedis:
         return self._counters[key]
 
     async def expire(self, key: str, ttl: int) -> None:
-        pass
+        self.ttls[key] = ttl
 
     async def delete(self, key: str) -> None:
         self._store.pop(key, None)
@@ -93,20 +99,37 @@ class _MockRedis:
         pass
 
 
-@pytest_asyncio.fixture
-async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+@pytest.fixture
+def mock_redis() -> MockRedis:
+    return MockRedis()
+
+
+@pytest.fixture(autouse=True)
+def fake_queue(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """
-    Async HTTP client wired to the FastAPI app.
-    Overrides get_db and get_redis so tests are fully in-memory — no real
-    DB commits, no real Redis instance required.
+    Replace the RQ queue so no test needs a real Redis. Tests can assert on
+    `fake_queue.enqueue` to check which jobs were queued.
+    """
+    queue = MagicMock()
+    monkeypatch.setattr("app.worker.create_queue", lambda conn=None: queue)
+    return queue
+
+
+@pytest_asyncio.fixture
+async def client(
+    db_session: AsyncSession, mock_redis: MockRedis
+) -> AsyncGenerator[AsyncClient, None]:
+    """
+    Async HTTP client wired to the FastAPI app, sharing the test's DB session
+    and the in-memory Redis. The client keeps cookies, so register/login once
+    and later requests are authenticated.
     """
     app = create_app()
-    mock_redis = _MockRedis()
 
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
-    async def override_get_redis(request=None):  # type: ignore[override]
+    async def override_get_redis() -> AsyncGenerator[MockRedis, None]:
         yield mock_redis
 
     app.dependency_overrides[get_db] = override_get_db
@@ -114,7 +137,61 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
     app.state.redis = mock_redis
 
     async with AsyncClient(
-        transport=ASGITransport(app=app),  # type: ignore[arg-type]
+        transport=ASGITransport(app=app),
         base_url="http://test",
     ) as ac:
         yield ac
+
+
+# ── Claude mocks ──────────────────────────────────────────────────────────────
+
+
+def text_message(text_value: str) -> MagicMock:
+    """A fake Messages API response: a thinking block followed by one text block."""
+    thinking = MagicMock(spec=["type", "thinking"], type="thinking", thinking="")
+    text_block = MagicMock(spec=["type", "text"], type="text", text=text_value)
+    return MagicMock(content=[thinking, text_block], stop_reason="end_turn")
+
+
+@pytest.fixture
+def mock_claude_create(monkeypatch: pytest.MonkeyPatch) -> Callable[[str], AsyncMock]:
+    """Patch `client.messages.create` to return `text_value`. Returns the create mock."""
+
+    def _install(text_value: str) -> AsyncMock:
+        client = MagicMock()
+        client.messages.create = AsyncMock(return_value=text_message(text_value))
+        monkeypatch.setattr("anthropic.AsyncAnthropic", MagicMock(return_value=client))
+        return client.messages.create
+
+    return _install
+
+
+@pytest.fixture
+def mock_claude_stream(monkeypatch: pytest.MonkeyPatch) -> Callable[..., MagicMock]:
+    """Patch `client.beta.messages.stream` to stream `text_value` in small chunks."""
+
+    def _install(text_value: str, stop_reason: str = "end_turn") -> MagicMock:
+        async def text_stream() -> AsyncGenerator[str, None]:
+            for i in range(0, len(text_value), 5):
+                yield text_value[i : i + 5]
+
+        stream: Any = MagicMock()
+        stream.__aenter__ = AsyncMock(return_value=stream)
+        stream.__aexit__ = AsyncMock(return_value=False)
+        stream.text_stream = text_stream()
+        stream.get_final_message = AsyncMock(return_value=MagicMock(stop_reason=stop_reason))
+
+        client = MagicMock()
+        client.beta.messages.stream = MagicMock(return_value=stream)
+        monkeypatch.setattr("anthropic.AsyncAnthropic", MagicMock(return_value=client))
+        return client.beta.messages.stream
+
+    return _install
+
+
+@pytest.fixture
+def mock_embedding(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
+    """Patch OpenAI embedding generation with a deterministic vector."""
+    mock = AsyncMock(return_value=[0.1] * 1536)
+    monkeypatch.setattr("app.ingest.embed.generate_embedding", mock)
+    return mock

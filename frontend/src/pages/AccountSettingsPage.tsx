@@ -6,11 +6,10 @@
  */
 
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { useMe, useLogout } from '../api/auth'
+import { Navigate, useNavigate } from 'react-router-dom'
+import { changePassword, deleteAccount, useLogout, useMe } from '../api/auth'
+import { ApiError } from '../api/client'
 import ResumeUploadForm from '../components/ResumeUploadForm'
-
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
 export default function AccountSettingsPage() {
   const navigate = useNavigate()
@@ -35,8 +34,7 @@ export default function AccountSettingsPage() {
   }
 
   if (!me) {
-    navigate('/')
-    return null
+    return <Navigate to="/" replace />
   }
 
   const handleChangePassword = async (e: React.FormEvent) => {
@@ -46,27 +44,18 @@ export default function AccountSettingsPage() {
     setPwLoading(true)
 
     try {
-      const res = await fetch(`${API_BASE}/api/me/password`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ current_password: currentPw, new_password: newPw }),
-      })
-
-      if (res.status === 401) {
-        const err = await res.json()
-        setPwError(err.detail ?? 'Current password is incorrect.')
-      } else if (res.status === 422) {
+      await changePassword(currentPw, newPw)
+      setPwSuccess(true)
+      setCurrentPw('')
+      setNewPw('')
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setPwError('Current password is incorrect.')
+      } else if (err instanceof ApiError && err.status === 422) {
         setPwError('New password must be at least 10 characters.')
-      } else if (!res.ok) {
-        setPwError('Something went wrong. Please try again.')
       } else {
-        setPwSuccess(true)
-        setCurrentPw('')
-        setNewPw('')
+        setPwError('Something went wrong. Please try again.')
       }
-    } catch {
-      setPwError('Network error. Please try again.')
     } finally {
       setPwLoading(false)
     }
@@ -78,25 +67,16 @@ export default function AccountSettingsPage() {
     setDeleteLoading(true)
 
     try {
-      const res = await fetch(`${API_BASE}/api/me`, {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify({ password: deletePassword }),
-      })
-
-      if (res.status === 401) {
-        const err = await res.json()
-        setDeleteError(err.detail ?? 'Password is incorrect.')
-      } else if (!res.ok) {
-        setDeleteError('Something went wrong. Please try again.')
+      await deleteAccount(deletePassword)
+      // Account deleted — clear cached data and go home
+      await logout.mutateAsync().catch(() => undefined)
+      navigate('/')
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) {
+        setDeleteError('Password is incorrect.')
       } else {
-        // Account deleted — clear cache and go home
-        await logout.mutateAsync()
-        navigate('/')
+        setDeleteError('Something went wrong. Please try again.')
       }
-    } catch {
-      setDeleteError('Network error. Please try again.')
     } finally {
       setDeleteLoading(false)
     }

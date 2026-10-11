@@ -7,11 +7,11 @@ results directly; no business logic lives in the router.
 """
 
 import io
-from datetime import date, datetime, timezone
+from datetime import date
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import func, select, text
+from sqlalchemy import func, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.posting import Posting, WorkMode
@@ -66,41 +66,34 @@ async def list_postings(
         stmt = stmt.where(Posting.deadline >= date.today())
 
     if params.q and params.search_mode == "semantic":
-        # Semantic mode: rank by cosine similarity to query embedding
+        # Semantic mode: rank by cosine distance to the query embedding (pgvector).
+        # Postings without an embedding drop out of semantic results.
         from app.ingest.embed import generate_embedding
         from app.models.posting_embedding import PostingEmbedding
-        from sqlalchemy import cast
-        from pgvector.sqlalchemy import Vector
 
         try:
             query_vec = await generate_embedding(params.q)
-            vec_literal = str(query_vec)
+        except Exception:  # noqa: BLE001 — embedding service down: fall back to keyword
+            query_vec = None
+
+        if query_vec is not None:
             stmt = stmt.join(
-                PostingEmbedding,
-                PostingEmbedding.posting_id == Posting.id,
-            ).order_by(
-                text(f"posting_embeddings.embedding <=> '{vec_literal}'::vector")
-            )
-        except Exception:
-            # Embedding service unavailable — fall back to keyword
+                PostingEmbedding, PostingEmbedding.posting_id == Posting.id
+            ).order_by(PostingEmbedding.embedding.cosine_distance(query_vec))
+        else:
             stmt = stmt.where(
-                Posting.search_vector.op("@@")(
-                    func.websearch_to_tsquery("english", params.q)
-                )
+                Posting.search_vector.op("@@")(func.websearch_to_tsquery("english", params.q))
             )
     elif params.q:
         # websearch_to_tsquery handles quoted phrases and minus exclusions
         # (e.g. "react -native") without crashing on special characters.
         stmt = stmt.where(
-            Posting.search_vector.op("@@")(
-                func.websearch_to_tsquery("english", params.q)
-            )
+            Posting.search_vector.op("@@")(func.websearch_to_tsquery("english", params.q))
         )
 
     if params.city:
         # Remote postings always appear in city-filtered results (FR-004a).
         # We include a posting if its city matches OR it's flagged as remote work.
-        from sqlalchemy import or_
         stmt = stmt.where(
             or_(
                 Posting.city.ilike(params.city),
@@ -123,13 +116,9 @@ async def list_postings(
 
     if params.skills:
         # AND logic: posting must have ALL selected skills.
-        # @> is the Postgres array "contains" operator.
-        # cast keeps mypy and asyncpg happy about the array literal type.
-        stmt = stmt.where(
-            Posting.skills.op("@>")(
-                text(f"ARRAY{params.skills!r}::text[]")
-            )
-        )
+        # .contains() compiles to the Postgres array "contains" operator (@>) with the
+        # list sent as a bound parameter — user input never touches the SQL string.
+        stmt = stmt.where(Posting.skills.contains(params.skills))
 
     # --- Total count (before pagination) ---
     # We run this as a subquery so it sees the same WHERE clauses.
@@ -137,13 +126,14 @@ async def list_postings(
     total: int = (await db.execute(count_stmt)).scalar_one()
 
     # --- Sort ---
-    # Skip sort for semantic mode — already ordered by cosine similarity
+    # Semantic mode is already ordered by similarity; otherwise apply the whitelisted sort.
+    # Posting.id is a tiebreaker so pagination is stable when sort values repeat.
     if params.search_mode != "semantic" or not params.q:
         sort_col = _SORT_MAP[params.sort]
         if params.order == "desc":
-            stmt = stmt.order_by(sort_col.desc())
+            stmt = stmt.order_by(sort_col.desc(), Posting.id)
         else:
-            stmt = stmt.order_by(sort_col.asc())
+            stmt = stmt.order_by(sort_col.asc(), Posting.id)
 
     # --- Pagination ---
     offset = (params.page - 1) * params.page_size
@@ -182,8 +172,6 @@ async def get_posting(posting_id: UUID, db: AsyncSession) -> PostingDetail:
     Fetch a single posting by ID.
     Raises 404 via HTTPException if the ID doesn't exist.
     """
-    from fastapi import HTTPException
-
     stmt = select(Posting).where(Posting.id == posting_id)
     posting = (await db.execute(stmt)).scalar_one_or_none()
 
@@ -231,6 +219,14 @@ async def get_filter_meta(db: AsyncSession) -> FilterMeta:
     return FilterMeta(cities=cities, provinces=provinces, terms=terms, skills=skills)
 
 
+def _clean(value: object) -> str:
+    """Normalise a pandas cell: NaN/None become '', everything else a stripped string."""
+    if value is None:
+        return ""
+    text_value = str(value).strip()
+    return "" if text_value.lower() == "nan" else text_value
+
+
 async def upload_csv(
     db: AsyncSession,
     user_id: UUID,
@@ -239,17 +235,22 @@ async def upload_csv(
     """
     Parse a CSV file and bulk-insert valid, non-duplicate postings.
     Returns a CsvUploadResult with counts and per-row errors.
+    New postings get an embedding job queued after the commit.
     """
     import pandas as pd
-    from app.ingest.csv_validator import validate_csv_row, RowError as CsvRowError
+
+    from app.ingest.csv_validator import validate_csv_row
+    from app.ingest.dedup import duplicate_exists
+    from app.ingest.embed import enqueue_embed_job
 
     try:
-        df = pd.read_csv(io.BytesIO(file_bytes))
-    except Exception as exc:
+        # dtype=str keeps values like "2027-03-01" and "4" exactly as typed
+        df = pd.read_csv(io.BytesIO(file_bytes), dtype=str, keep_default_na=False)
+    except Exception as exc:  # noqa: BLE001
         raise HTTPException(
             status_code=400,
             detail={"detail": f"CSV is not parseable: {exc}", "code": "INVALID_CSV"},
-        )
+        ) from exc
 
     if len(df) > 1000:
         raise HTTPException(
@@ -257,70 +258,65 @@ async def upload_csv(
             detail={"detail": "CSV exceeds 1,000 row limit.", "code": "FILE_TOO_LARGE"},
         )
 
+    df.columns = df.columns.str.strip().str.lower()
     required_cols = {"title", "company", "city", "term", "deadline"}
-    missing = required_cols - set(df.columns.str.lower())
+    missing = required_cols - set(df.columns)
     if missing:
         raise HTTPException(
             status_code=400,
-            detail={"detail": f"Missing required columns: {missing}", "code": "INVALID_CSV"},
+            detail={
+                "detail": f"Missing required columns: {', '.join(sorted(missing))}",
+                "code": "INVALID_CSV",
+            },
         )
-
-    # Normalise column names to lowercase
-    df.columns = df.columns.str.lower()
 
     added = 0
     skipped = 0
     errors: list[RowError] = []
+    new_postings: list[Posting] = []
 
-    from app.ingest.dedup import duplicate_exists
-
-    for i, row in df.iterrows():
-        row_num = int(i) + 2  # 1-indexed, header is row 1
-        row_dict = row.to_dict()
-        row_errors = validate_csv_row(row_dict, row_num)
+    for i, row in enumerate(df.to_dict(orient="records")):
+        row_num = i + 2  # 1-indexed, header is row 1
+        row_errors = validate_csv_row(row, row_num)
         if row_errors:
-            for e in row_errors:
-                errors.append(RowError(row=e.row, column=e.column, message=e.message))
+            errors.extend(
+                RowError(row=e.row, column=e.column, message=e.message) for e in row_errors
+            )
             continue
 
-        is_dup = await duplicate_exists(
-            db,
-            str(row_dict.get("company", "")),
-            str(row_dict.get("title", "")),
-            str(row_dict.get("city", "")),
-        )
-        if is_dup:
+        title, company, city = _clean(row["title"]), _clean(row["company"]), _clean(row["city"])
+        if await duplicate_exists(db, company, title, city):
             skipped += 1
             continue
 
-        from datetime import date as date_type
-        work_mode_val = row_dict.get("work_mode")
-        work_mode = WorkMode.onsite
-        if work_mode_val and str(work_mode_val).strip().lower() in WorkMode.__members__:
-            work_mode = WorkMode(str(work_mode_val).strip().lower())
-
-        raw_skills = row_dict.get("skills", "")
-        skills: list[str] = []
-        if raw_skills and str(raw_skills).lower() != "nan":
-            skills = [s.strip() for s in str(raw_skills).split(",") if s.strip()]
+        work_mode_val = _clean(row.get("work_mode")).lower()
+        work_mode = WorkMode(work_mode_val) if work_mode_val in WorkMode.__members__ else None
+        duration_val = _clean(row.get("duration_months"))
+        skills_val = _clean(row.get("skills"))
 
         posting = Posting(
-            title=str(row_dict["title"]),
-            company=str(row_dict["company"]),
-            city=str(row_dict["city"]),
-            province=str(row_dict.get("province", "ON") or "ON"),
-            work_mode=work_mode,
-            term=str(row_dict["term"]),
-            duration_months=int(row_dict.get("duration_months", 4) or 4),
-            deadline=date_type.fromisoformat(str(row_dict["deadline"]).strip()),
-            description=str(row_dict.get("description", "") or ""),
-            source_url=str(row_dict.get("source_url", "") or "") or None,
-            skills=skills,
+            title=title,
+            company=company,
+            city=city,
+            province=_clean(row.get("province")) or "ON",
+            work_mode=work_mode or WorkMode.onsite,
+            term=_clean(row["term"]),
+            duration_months=int(duration_val) if duration_val in {"4", "8", "12", "16"} else 4,
+            deadline=date.fromisoformat(_clean(row["deadline"])),
+            description=_clean(row.get("description")),
+            source_url=_clean(row.get("source_url")) or None,
+            skills=[s.strip() for s in skills_val.split(",") if s.strip()],
         )
         db.add(posting)
+        # Flush so the next row's duplicate check sees this one too
+        await db.flush()
+        new_postings.append(posting)
         added += 1
 
-    await db.flush()
+    await db.commit()
+    for posting in new_postings:
+        enqueue_embed_job(posting.id)
+
     return CsvUploadResult(added=added, skipped_duplicates=skipped, errors=errors)
 
 
@@ -334,21 +330,20 @@ async def create_manual(
     Raises 409 DUPLICATE if a near-identical posting already exists.
     """
     from app.ingest.dedup import duplicate_exists
+    from app.ingest.embed import enqueue_embed_job
 
-    is_dup = await duplicate_exists(db, data.company, data.title, data.city)
-    if is_dup:
+    if await duplicate_exists(db, data.company, data.title, data.city):
         raise HTTPException(
             status_code=409,
             detail={"detail": "A similar posting already exists.", "code": "DUPLICATE"},
         )
 
-    work_mode = data.work_mode or WorkMode.onsite
     posting = Posting(
         title=data.title,
         company=data.company,
         city=data.city,
         province=data.province or "ON",
-        work_mode=work_mode,
+        work_mode=data.work_mode or WorkMode.onsite,
         term=data.term,
         duration_months=data.duration_months or 4,
         deadline=data.deadline,
@@ -357,8 +352,9 @@ async def create_manual(
         skills=data.skills,
     )
     db.add(posting)
-    await db.flush()
+    await db.commit()
     await db.refresh(posting)
+    enqueue_embed_job(posting.id)
     return PostingListItem.model_validate(posting)
 
 
@@ -368,62 +364,44 @@ async def similar_postings(
     limit: int = 5,
 ) -> SimilarPostingsResponse:
     """
-    Return up to `limit` postings most similar to the target by cosine similarity.
-    Returns empty items list if target has no embedding.
+    Return up to `limit` open postings most similar to the target by cosine similarity.
+    Returns an empty list if the target has no embedding yet.
     """
     from app.models.posting_embedding import PostingEmbedding
 
-    # Check target posting exists
-    target_posting = (await db.execute(select(Posting).where(Posting.id == posting_id))).scalar_one_or_none()
+    target_posting = await db.get(Posting, posting_id)
     if target_posting is None:
         raise HTTPException(
             status_code=404,
             detail={"detail": "Posting not found", "code": "POSTING_NOT_FOUND"},
         )
 
-    # Check target has an embedding
-    target_emb = (
-        await db.execute(
-            select(PostingEmbedding).where(PostingEmbedding.posting_id == posting_id)
-        )
-    ).scalar_one_or_none()
-
+    target_emb = await db.get(PostingEmbedding, posting_id)
     if target_emb is None:
         return SimilarPostingsResponse(items=[])
 
-    emb_str = str(list(target_emb.embedding))
-
-    stmt = text(
-        """
-        SELECT p.id, p.title, p.company, p.city, p.province, p.work_mode,
-               p.term, p.deadline,
-               1 - (pe.embedding <=> :target_vec::vector) AS similarity
-        FROM posting_embeddings pe
-        JOIN postings p ON p.id = pe.posting_id
-        WHERE pe.posting_id != :posting_id
-        ORDER BY pe.embedding <=> :target_vec::vector
-        LIMIT :limit
-        """
+    distance = PostingEmbedding.embedding.cosine_distance(target_emb.embedding)
+    stmt = (
+        select(Posting, (1 - distance).label("similarity"))
+        .join(PostingEmbedding, PostingEmbedding.posting_id == Posting.id)
+        .where(Posting.id != posting_id, Posting.closed_at.is_(None))
+        .order_by(distance)
+        .limit(limit)
     )
-    rows = (
-        await db.execute(
-            stmt,
-            {"target_vec": emb_str, "posting_id": str(posting_id), "limit": limit},
-        )
-    ).mappings().all()
+    rows = (await db.execute(stmt)).all()
 
     items = [
         SimilarPostingOut(
-            id=row["id"],
-            title=row["title"],
-            company=row["company"],
-            city=row["city"],
-            province=row["province"],
-            work_mode=WorkMode(row["work_mode"]) if row["work_mode"] else None,
-            term=row["term"],
-            deadline=row["deadline"],
-            similarity=float(row["similarity"]),
+            id=p.id,
+            title=p.title,
+            company=p.company,
+            city=p.city,
+            province=p.province,
+            work_mode=p.work_mode,
+            term=p.term,
+            deadline=p.deadline,
+            similarity=float(similarity),
         )
-        for row in rows
+        for p, similarity in rows
     ]
     return SimilarPostingsResponse(items=items)

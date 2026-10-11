@@ -1,11 +1,23 @@
 """JsonApiAdapter — fetches postings from a JSON API endpoint."""
 
+import asyncio
+import json
 from datetime import date
+from pathlib import Path
 from typing import Any
+from urllib.parse import unquote, urlparse
 
 import httpx
 
 from app.ingest.base import AdapterError, BaseAdapter, RawPosting
+
+
+def _read_local_json(url: str) -> Any:
+    path = Path(unquote(urlparse(url).path))
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        raise AdapterError(f"JsonApiAdapter could not read {url}: {exc}") from exc
 
 
 class JsonApiAdapter(BaseAdapter):
@@ -19,25 +31,35 @@ class JsonApiAdapter(BaseAdapter):
                               Fields not in the map fall back to the RawPosting field name.
     """
 
-    async def fetch(self, source: Any) -> list[RawPosting]:  # type: ignore[override]
+    async def fetch(self, source: Any) -> list[RawPosting]:
         config = source.config
         url = config.get("url", "")
         field_map: dict[str, str] = config.get("field_map", {})
 
-        transport = httpx.AsyncHTTPTransport(retries=3)
-        async with httpx.AsyncClient(
-            timeout=30.0,
-            headers={"User-Agent": self.user_agent},
-            transport=transport,
-        ) as client:
-            response = await client.get(url)
+        if url.startswith("file://"):
+            # Local fixture files (used by the dev seed sources) — httpx can't read file://
+            data = await asyncio.to_thread(_read_local_json, url)
+        else:
+            transport = httpx.AsyncHTTPTransport(retries=3)
+            async with httpx.AsyncClient(
+                timeout=30.0,
+                headers={"User-Agent": self.user_agent},
+                transport=transport,
+            ) as client:
+                try:
+                    response = await client.get(url)
+                except httpx.HTTPError as exc:
+                    raise AdapterError(f"JsonApiAdapter could not reach {url}: {exc}") from exc
 
-        if response.status_code != 200:
-            raise AdapterError(
-                f"JsonApiAdapter got HTTP {response.status_code} from {url}"
-            )
+            if response.status_code != 200:
+                raise AdapterError(
+                    f"JsonApiAdapter got HTTP {response.status_code} from {url}"
+                )
+            try:
+                data = response.json()
+            except ValueError as exc:
+                raise AdapterError(f"JsonApiAdapter got invalid JSON from {url}") from exc
 
-        data = response.json()
         if not isinstance(data, list):
             # Support {"items": [...]} envelope
             data = data.get("items", data.get("postings", []))

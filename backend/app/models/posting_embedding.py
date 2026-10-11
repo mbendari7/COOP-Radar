@@ -4,10 +4,9 @@ from datetime import datetime
 from uuid import UUID
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import Text, text
+from sqlalchemy import TIMESTAMP, ForeignKey, Index, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import TIMESTAMP, ForeignKey
+from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
 
@@ -24,4 +23,15 @@ class PostingEmbedding(Base):
     model: Mapped[str] = mapped_column(Text, nullable=False)
     generated_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False
+    )
+
+    __table_args__ = (
+        # HNSW index for fast approximate cosine-distance (<=>) queries
+        Index(
+            "idx_posting_embeddings_hnsw",
+            "embedding",
+            postgresql_using="hnsw",
+            postgresql_with={"m": 16, "ef_construction": 64},
+            postgresql_ops={"embedding": "vector_cosine_ops"},
+        ),
     )

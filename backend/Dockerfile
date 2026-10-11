@@ -1,20 +1,21 @@
 FROM python:3.12-slim
 
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
 WORKDIR /app
 
-# Install system deps needed by asyncpg (libpq) and psycopg2 builds.
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev gcc && rm -rf /var/lib/apt/lists/*
-
-# Copy deps first so Docker can cache this layer independently of source changes.
+# Install dependencies first so this layer is cached until pyproject.toml changes.
+# Empty package stubs let the editable install resolve before the source is copied.
 COPY pyproject.toml ./
+RUN mkdir -p app seed \
+    && touch app/__init__.py seed/__init__.py \
+    && pip install -e ".[dev]"
 
-# Install all deps including dev/test extras.
-RUN pip install --no-cache-dir -e ".[dev]"
-
-# Source is bind-mounted in dev; this COPY is for production-like builds.
+# Source is bind-mounted in dev (docker-compose); this COPY is for standalone builds.
 COPY . .
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000"]

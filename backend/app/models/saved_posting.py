@@ -12,20 +12,22 @@ Both FKs use ON DELETE CASCADE so:
 
 import enum
 from datetime import datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import TIMESTAMP, Enum, ForeignKey, UniqueConstraint, text
+from sqlalchemy import TIMESTAMP, Enum, ForeignKey, Index, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from app.models.application_event import ApplicationEvent
+    from app.models.posting import Posting
+    from app.models.user import User
 
 from app.db import Base
 
 
-class ApplicationStatus(str, enum.Enum):
+class ApplicationStatus(enum.StrEnum):
     """
     Seven stages of a co-op application lifecycle.
     str mixin lets FastAPI serialise these as plain strings automatically.
@@ -64,8 +66,8 @@ class SavedPosting(Base):
         TIMESTAMP(timezone=True), nullable=True
     )
 
-    user: Mapped["User"] = relationship(back_populates="saved_postings")  # noqa: F821
-    posting: Mapped["Posting"] = relationship()  # noqa: F821
+    user: Mapped["User"] = relationship(back_populates="saved_postings")
+    posting: Mapped["Posting"] = relationship()
     events: Mapped[list["ApplicationEvent"]] = relationship(
         back_populates="saved_posting",
         order_by="ApplicationEvent.created_at.desc()",
@@ -75,4 +77,11 @@ class SavedPosting(Base):
 
     __table_args__ = (
         UniqueConstraint("user_id", "posting_id", name="ux_saved_postings_user_posting"),
+        Index("idx_saved_postings_user_id", "user_id"),
+        Index("idx_saved_postings_posting_id", "posting_id"),
+        Index("idx_saved_postings_status", "status"),
+        Index("idx_saved_postings_saved_at", text("saved_at DESC")),
+        # Redundant with the unique constraint above, but migration 0002 created it;
+        # declaring it keeps autogenerate from proposing to drop it.
+        Index("ux_saved_postings_user_posting_idx", "user_id", "posting_id", unique=True),
     )

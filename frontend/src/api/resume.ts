@@ -3,8 +3,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
+import { API_BASE, apiFetch, toApiError } from './client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -39,57 +38,17 @@ export interface MatchesResponse {
 
 // ── Fetchers ──────────────────────────────────────────────────────────────────
 
-async function fetchResume(): Promise<ResumeOut> {
-  const res = await fetch(`${API_BASE}/api/resume`, { credentials: 'include' })
-  if (res.status === 404) throw new Error('RESUME_NOT_FOUND')
-  if (!res.ok) throw new Error(`GET /api/resume failed: ${res.status}`)
-  return res.json() as Promise<ResumeOut>
-}
+const fetchMatches = () => apiFetch<MatchesResponse>('/api/resume/matches')
 
-async function fetchMatches(): Promise<MatchesResponse> {
-  const res = await fetch(`${API_BASE}/api/resume/matches`, { credentials: 'include' })
-  if (!res.ok) throw new Error(`GET /api/resume/matches failed: ${res.status}`)
-  return res.json() as Promise<MatchesResponse>
-}
-
-async function uploadResumeFile(file: File): Promise<UploadResponse> {
+function uploadResumeFile(file: File): Promise<UploadResponse> {
   const form = new FormData()
   form.append('file', file)
-  const res = await fetch(`${API_BASE}/api/resume`, {
-    method: 'POST',
-    body: form,
-    credentials: 'include',
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({})) as { detail?: { code?: string; detail?: string } | string }
-    const detail = typeof body.detail === 'object' ? body.detail : { detail: String(body.detail ?? 'Upload failed') }
-    throw Object.assign(new Error(detail.detail ?? 'Upload failed'), { code: detail.code })
-  }
-  return res.json() as Promise<UploadResponse>
+  return apiFetch<UploadResponse>('/api/resume', { method: 'POST', body: form })
 }
 
-async function deleteResumeFile(): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/resume`, {
-    method: 'DELETE',
-    credentials: 'include',
-  })
-  if (res.status === 404) throw new Error('RESUME_NOT_FOUND')
-  if (!res.ok) throw new Error(`DELETE /api/resume failed: ${res.status}`)
-}
+const deleteResumeFile = () => apiFetch<void>('/api/resume', { method: 'DELETE' })
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
-
-/** Get stored resume metadata. Throws if none on file (404 → error state). */
-export function useResume() {
-  return useQuery({
-    queryKey: ['resume'],
-    queryFn: fetchResume,
-    retry: (count, err) => {
-      if (err instanceof Error && err.message === 'RESUME_NOT_FOUND') return false
-      return count < 2
-    },
-  })
-}
 
 /** Get stored ranked match results. Returns empty list when no resume on file. */
 export function useMatches() {
@@ -144,13 +103,7 @@ export async function askAboutPosting(
       credentials: 'include',
     })
 
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({})) as { detail?: { detail?: string } | string }
-      const msg = typeof body.detail === 'object'
-        ? (body.detail.detail ?? 'Request failed')
-        : String(body.detail ?? 'Request failed')
-      throw new Error(msg)
-    }
+    if (!res.ok) throw await toApiError(res)
 
     if (!res.body) throw new Error('No response body')
 
@@ -158,7 +111,7 @@ export async function askAboutPosting(
     const decoder = new TextDecoder()
     let buffer = ''
 
-    while (true) {
+    for (;;) {
       const { done, value } = await reader.read()
       if (done) break
       buffer += decoder.decode(value, { stream: true })
@@ -173,12 +126,15 @@ export async function askAboutPosting(
           onDone()
           return
         }
+        let parsed: { delta?: string; error?: string }
         try {
-          const parsed = JSON.parse(payload) as { delta?: string }
-          if (parsed.delta) onDelta(parsed.delta)
+          parsed = JSON.parse(payload) as { delta?: string; error?: string }
         } catch {
-          // skip malformed SSE lines
+          continue // skip malformed SSE lines
         }
+        // The backend reports failures in-band once streaming has started
+        if (parsed.error) throw new Error(parsed.error)
+        if (parsed.delta) onDelta(parsed.delta)
       }
     }
     onDone()

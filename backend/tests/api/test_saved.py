@@ -2,7 +2,7 @@
 Tests for saved postings endpoints.
 
 These tests require a seeded posting to save.  We create one in a fixture
-and use the same MockRedis pattern as test_auth.py.
+and rely on the in-memory Redis from conftest.
 """
 
 import pytest
@@ -10,13 +10,6 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.posting import Posting, WorkMode
-from app.redis import get_redis
-from tests.api.test_auth import MockRedis
-
-
-@pytest.fixture
-def mock_redis():
-    return MockRedis()
 
 
 @pytest.fixture
@@ -42,15 +35,8 @@ async def posting(db_session: AsyncSession) -> Posting:
 
 
 @pytest.fixture
-async def saved_client(client: AsyncClient, mock_redis: MockRedis, posting: Posting) -> AsyncClient:
+async def saved_client(client: AsyncClient, posting: Posting) -> AsyncClient:
     """Authenticated client — registers a user and injects mock Redis."""
-    app = client._transport.app  # type: ignore[attr-defined]
-
-    async def override_redis(request=None):
-        yield mock_redis
-
-    app.dependency_overrides[get_redis] = override_redis
-    app.state.redis = mock_redis
 
     await client.post(
         "/api/auth/register",
@@ -61,15 +47,8 @@ async def saved_client(client: AsyncClient, mock_redis: MockRedis, posting: Post
 
 # ── Tests ─────────────────────────────────────────────────────────────────────
 
-async def test_list_saved_unauthenticated_returns_401(client: AsyncClient, mock_redis: MockRedis):
+async def test_list_saved_unauthenticated_returns_401(client: AsyncClient):
     """GET /api/saved without cookie returns 401."""
-    app = client._transport.app  # type: ignore[attr-defined]
-
-    async def override_redis(request=None):
-        yield mock_redis
-
-    app.dependency_overrides[get_redis] = override_redis
-    app.state.redis = mock_redis
 
     res = await client.get("/api/saved")
     assert res.status_code == 401
@@ -170,3 +149,36 @@ async def test_add_event_with_notes(saved_client: AsyncClient, posting: Posting)
     assert data["status"] == "interview"
     assert data["events"][0]["notes"] == "Phone screen scheduled"
     assert data["events"][0]["event_date"] == "2027-02-01"
+
+
+async def test_export_csv_downloads_tracker(saved_client: AsyncClient, posting: Posting):
+    """CSV export used to crash calling .date() on a DATE column."""
+    await saved_client.post("/api/saved", json={"posting_id": str(posting.id)})
+
+    res = await saved_client.get("/api/saved/export/csv")
+
+    assert res.status_code == 200
+    assert res.headers["content-type"].startswith("text/csv")
+    lines = res.text.strip().splitlines()
+    assert lines[0].startswith("Title,Company")
+    assert "2027-03-01" in lines[1]
+
+
+async def test_deadlines_this_week_includes_postings_without_status(
+    saved_client: AsyncClient, db_session: AsyncSession
+):
+    """NULL status must count as still open (NULL NOT IN (...) used to drop it)."""
+    from datetime import date, timedelta
+
+    soon = Posting(
+        title="Due Soon", company="Acme Inc", city="Toronto", province="ON",
+        work_mode=WorkMode.onsite, term="Winter 2027", duration_months=4,
+        deadline=date.today() + timedelta(days=2), description="d", skills=[],
+    )
+    db_session.add(soon)
+    await db_session.flush()
+    await saved_client.post("/api/saved", json={"posting_id": str(soon.id)})
+
+    data = (await saved_client.get("/api/saved")).json()
+
+    assert [d["title"] for d in data["deadlines_this_week"]] == ["Due Soon"]

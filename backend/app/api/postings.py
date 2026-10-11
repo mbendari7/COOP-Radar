@@ -8,7 +8,7 @@ For authenticated requests (cookie present), each posting item gets an
 is_saved: bool field injected.  Unauthenticated requests leave it as None.
 """
 
-from typing import Literal
+from typing import Annotated
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, Request, UploadFile, status
@@ -16,6 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.deps import get_current_user, get_optional_user
+from app.models.user import User
 from app.schemas.posting import (
     CsvUploadResult,
     FilterMeta,
@@ -55,7 +56,7 @@ async def upload_csv_endpoint(
     request: Request,
     file: UploadFile = File(...),
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> CsvUploadResult:
     """
     Bulk-import postings from a CSV file.
@@ -80,7 +81,7 @@ async def upload_csv_endpoint(
 async def create_manual_posting(
     data: ManualPostingIn,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
 ) -> PostingListItem:
     """Add a single posting manually. Returns 409 if a duplicate already exists."""
     return await create_manual(db, current_user.id, data)
@@ -88,45 +89,16 @@ async def create_manual_posting(
 
 @router.get("", response_model=PostingsPage)
 async def get_postings(
-    q: str | None = Query(default=None, max_length=200),
-    city: str | None = Query(default=None),
-    province: str | None = Query(default=None),
-    term: str | None = Query(default=None),
-    work_mode: str | None = Query(default=None),
-    duration: list[int] | None = Query(default=None),
-    skills: list[str] | None = Query(default=None),
-    show_expired: bool = Query(default=False),
-    show_closed: bool = Query(default=False),
-    search_mode: str = Query(default="keyword"),
-    sort: str = Query(default="posted_at"),
-    order: str = Query(default="desc"),
-    page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=25),
+    params: Annotated[PostingListParams, Query()],
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_optional_user),
+    current_user: User | None = Depends(get_optional_user),
 ) -> PostingsPage:
     """
-    List postings with optional keyword search, filters, sort, and pagination.
+    List postings with optional keyword/semantic search, filters, sort, and pagination.
+    FastAPI validates every query param against PostingListParams, so an unknown
+    sort column or page size is a 422 before the service runs.
     Authenticated users also get is_saved on each item.
     """
-    from app.models.posting import WorkMode
-
-    params = PostingListParams(
-        q=q,
-        city=city,
-        province=province,
-        term=term,
-        work_mode=WorkMode(work_mode) if work_mode else None,
-        duration=duration,  # type: ignore[arg-type]
-        skills=skills,
-        show_expired=show_expired,
-        show_closed=show_closed,
-        search_mode=search_mode,  # type: ignore[arg-type]
-        sort=sort,  # type: ignore[arg-type]
-        order=order,  # type: ignore[arg-type]
-        page=page,
-        page_size=page_size,  # type: ignore[arg-type]
-    )
     return await list_postings(params, db, user_id=current_user.id if current_user else None)
 
 
@@ -143,7 +115,7 @@ async def get_similar_postings(
 async def get_posting_detail(
     posting_id: UUID,
     db: AsyncSession = Depends(get_db),
-    current_user=Depends(get_optional_user),
+    current_user: User | None = Depends(get_optional_user),
 ) -> PostingDetail:
     """Full detail for a single posting. Returns 404 if the ID doesn't exist."""
     detail = await get_posting(posting_id, db)

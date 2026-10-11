@@ -59,7 +59,7 @@ async def test_llm_fallback_triggered(db_session: AsyncSession):
         "duration_months": None,
     })) as mock_llm:
         # Use text with no clear signals to trigger low confidence
-        result = await extract_fields(db_session, "Unique role with specialized responsibilities in niche domain.")
+        await extract_fields(db_session, "Unique role with specialized responsibilities in niche domain.")
         # Verify LLM was called (confidence < 0.6)
         mock_llm.assert_called_once()
 

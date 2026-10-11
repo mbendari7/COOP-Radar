@@ -8,14 +8,17 @@ so the router stays thin and the service never sees invalid input.
 """
 
 from datetime import date, datetime
-from typing import Generic, Literal, TypeVar
+from typing import Literal, TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.posting import WorkMode
 
 T = TypeVar("T")
+
+_DURATIONS = {4, 8, 12, 16}
+_PAGE_SIZES = {10, 25, 50}
 
 
 # ── Response schemas ──────────────────────────────────────────────────────────
@@ -47,10 +50,10 @@ class PostingListItem(BaseModel):
 class PostingDetail(PostingListItem):
     """Full posting detail — includes description for the detail page."""
     description: str
-    low_confidence_fields: dict | None = None
+    low_confidence_fields: dict[str, float] | None = None
 
 
-class Page(BaseModel, Generic[T]):
+class Page[T](BaseModel):
     """
     Generic paginated response wrapper.
     All list endpoints return Page[SomeItem] so the frontend knows the shape.
@@ -155,7 +158,7 @@ class PostingListParams(BaseModel):
     term: str | None = None
     work_mode: WorkMode | None = None
     # duration accepts a list so multiple values can be OR'd (4 and/or 8 months)
-    duration: list[Literal[4, 8, 12, 16]] | None = None
+    duration: list[int] | None = None
     skills: list[str] | None = None
     show_expired: bool = False
     show_closed: bool = False
@@ -166,4 +169,20 @@ class PostingListParams(BaseModel):
     order: Literal["asc", "desc"] = "desc"
 
     page: int = Field(default=1, ge=1)
-    page_size: Literal[10, 25, 50] = 25
+    page_size: int = 25
+
+    # Query strings arrive as text, and Literal[...] int fields reject "10" — so these
+    # are plain ints validated against the allowed values (still a 422 when invalid).
+    @field_validator("duration")
+    @classmethod
+    def _valid_durations(cls, v: list[int] | None) -> list[int] | None:
+        if v is not None and any(d not in _DURATIONS for d in v):
+            raise ValueError(f"duration must be one of {sorted(_DURATIONS)}")
+        return v
+
+    @field_validator("page_size")
+    @classmethod
+    def _valid_page_size(cls, v: int) -> int:
+        if v not in _PAGE_SIZES:
+            raise ValueError(f"page_size must be one of {sorted(_PAGE_SIZES)}")
+        return v

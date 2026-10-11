@@ -18,16 +18,17 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_db
 from app.deps import get_current_user
+from app.models.user import User
 from app.schemas.resume import AskRequest, MatchesResponse, ResumeOut, UploadResponse
 from app.services.resume import delete_resume, get_matches, get_resume, upload_resume
 
-router = APIRouter(prefix="/api/resume", tags=["resume"])
+router = APIRouter(prefix="/resume", tags=["resume"])
 
 
 @router.post("", response_model=UploadResponse, status_code=status.HTTP_200_OK)
 async def upload_resume_endpoint(
     file: UploadFile = File(...),
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> UploadResponse:
     """
@@ -41,7 +42,7 @@ async def upload_resume_endpoint(
 
 @router.get("", response_model=ResumeOut, status_code=status.HTTP_200_OK)
 async def get_resume_endpoint(
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ResumeOut:
     """Return stored resume metadata for the authenticated user."""
@@ -56,7 +57,7 @@ async def get_resume_endpoint(
 
 @router.delete("", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_resume_endpoint(
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     """Permanently delete the resume and all match results."""
@@ -66,7 +67,7 @@ async def delete_resume_endpoint(
 
 @router.get("/matches", response_model=MatchesResponse, status_code=status.HTTP_200_OK)
 async def get_matches_endpoint(
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> MatchesResponse:
     """Return stored ranked match results. Empty list if no resume on file."""
@@ -77,7 +78,7 @@ async def get_matches_endpoint(
 async def ask_about_posting(
     posting_id: UUID,
     body: AskRequest,
-    current_user=Depends(get_current_user),
+    current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> StreamingResponse:
     """

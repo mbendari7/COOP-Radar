@@ -31,15 +31,11 @@ from app.services import saved_postings as svc
 router = APIRouter(prefix="/saved", tags=["saved"])
 
 
-def _build_out(row: object, db: object) -> SavedPostingOut:
-    """Load posting + events onto a SavedPosting row and return the output schema."""
-    return row  # type: ignore[return-value]  # handled by response_model
-
-
 async def _load_full(saved_id: UUID, db: AsyncSession) -> SavedPostingOut:
     """Fetch a SavedPosting with its posting + events eagerly loaded."""
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
+
     from app.models.saved_posting import SavedPosting
     from app.schemas.posting import PostingListItem
     from app.schemas.saved_posting import ApplicationEventOut
@@ -88,7 +84,8 @@ async def export_csv(
 async def list_saved(
     status_filter: ApplicationStatus | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
-    page_size: int = Query(default=25),
+    # The board view loads up to 200 cards at once; the table uses 25
+    page_size: int = Query(default=25, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> SavedPostingsPage:
@@ -144,7 +141,11 @@ async def update_status(
     return await _load_full(saved_posting_id, db)
 
 
-@router.post("/{saved_posting_id}/events", response_model=SavedPostingOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/{saved_posting_id}/events",
+    response_model=SavedPostingOut,
+    status_code=status.HTTP_201_CREATED,
+)
 async def add_event(
     saved_posting_id: UUID,
     body: EventCreateIn,

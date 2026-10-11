@@ -44,7 +44,7 @@ async def test_valid_csv_adds_five_postings(client: AsyncClient, db_session: Asy
 
 @pytest.mark.asyncio
 async def test_csv_with_error_row(client: AsyncClient, db_session: AsyncSession):
-    """CSV with one invalid deadline row: 4 added, 1 error on row 3."""
+    """CSV with one invalid deadline: 4 added, 1 error on line 4 (3rd data row; header is line 1)."""
     session_token = await _login(client, db_session)
     csv_content = (FIXTURE_DIR / "sample_postings_with_error.csv").read_bytes()
 
@@ -57,7 +57,7 @@ async def test_csv_with_error_row(client: AsyncClient, db_session: AsyncSession)
     body = resp.json()
     assert body["added"] == 4
     assert len(body["errors"]) == 1
-    assert body["errors"][0]["row"] == 3
+    assert body["errors"][0]["row"] == 4
     assert body["errors"][0]["column"] == "deadline"
 
 
@@ -122,7 +122,7 @@ async def test_rate_limit_on_fourth_upload(client: AsyncClient, db_session: Asyn
         cookies={"session": session_token},
     )
     assert resp.status_code == 429
-    assert resp.json()["detail"]["code"] == "RATE_LIMITED"
+    assert resp.json()["code"] == "RATE_LIMITED"
 
 
 @pytest.mark.asyncio
@@ -163,4 +163,24 @@ async def test_manual_duplicate_returns_409(client: AsyncClient, db_session: Asy
 
     resp2 = await client.post("/api/postings", json=payload, cookies={"session": session_token})
     assert resp2.status_code == 409
-    assert resp2.json()["detail"]["code"] == "DUPLICATE"
+    assert resp2.json()["code"] == "DUPLICATE"
+
+
+@pytest.mark.asyncio
+async def test_manual_entry_is_committed_and_queued_for_embedding(
+    client: AsyncClient, db_session: AsyncSession, fake_queue
+):
+    """create_manual used to flush without committing, so postings vanished."""
+    session_token = await _login(client, db_session)
+
+    resp = await client.post(
+        "/api/postings",
+        json={"title": "Persisted Co-op", "company": "KeepCo", "city": "Guelph",
+              "term": "Fall 2027", "deadline": "2027-07-01"},
+        cookies={"session": session_token},
+    )
+    posting_id = resp.json()["id"]
+
+    detail = await client.get(f"/api/postings/{posting_id}")
+    assert detail.status_code == 200
+    fake_queue.enqueue.assert_called_with("app.ingest.embed.run_embed_job", posting_id)

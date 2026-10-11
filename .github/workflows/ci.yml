@@ -2,18 +2,19 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ["**"]
   pull_request:
     branches: [main]
 
 jobs:
   # ── Backend ──────────────────────────────────────────────────────────────
   backend:
-    name: Backend (ruff · mypy · pytest)
+    name: Backend (ruff · mypy · migrations · pytest)
     runs-on: ubuntu-latest
 
     services:
       postgres:
+        # Same image as docker-compose: ships pgvector and fuzzystrmatch
         image: pgvector/pgvector:pg16
         env:
           POSTGRES_USER: coopradar
@@ -33,7 +34,8 @@ jobs:
 
     env:
       DATABASE_URL: postgresql+asyncpg://coopradar:coopradar@localhost:5432/coopradar_test
-      REDIS_URL: redis://localhost:6379/0
+      # Tests mock Redis, the RQ queue, Claude, and OpenAI — no keys or services needed.
+      COOKIE_SECURE: "false"
 
     steps:
       - uses: actions/checkout@v4
@@ -51,21 +53,27 @@ jobs:
       - name: Lint (ruff)
         run: ruff check .
 
-      - name: Type check (mypy)
-        run: mypy --strict app
+      - name: Type check (mypy --strict)
+        run: mypy app
 
-      - name: Run migrations
-        run: alembic upgrade head
+      - name: Migrations apply, roll back, and re-apply
+        run: |
+          alembic upgrade head
+          alembic downgrade base
+          alembic upgrade head
 
-      - name: Seed test data
-        run: python -m seed
+      - name: Models match migrations (no autogenerate drift)
+        run: alembic check
 
       - name: Run tests
         run: pytest -q --tb=short -m "not perf"
 
+      - name: Performance budget (p95 < 300 ms on 10k postings)
+        run: pytest -q --tb=short -m perf -s
+
   # ── Frontend ─────────────────────────────────────────────────────────────
   frontend:
-    name: Frontend (eslint · tsc · vitest)
+    name: Frontend (eslint · tsc · vitest · build)
     runs-on: ubuntu-latest
 
     defaults:
@@ -75,10 +83,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up Node 20
+      - name: Set up Node 22
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "22"
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
@@ -93,3 +101,6 @@ jobs:
 
       - name: Run tests (vitest)
         run: npm test
+
+      - name: Production build
+        run: npm run build

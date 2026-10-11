@@ -4,12 +4,11 @@ Covers US1 (upload + match), US3 (view metadata, delete, cross-user isolation).
 All Anthropic and OpenAI calls are mocked.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 from httpx import AsyncClient
-
 
 # ---------------------------------------------------------------------------
 # Helpers
@@ -115,7 +114,7 @@ async def test_upload_invalid_file_type(
         files={"file": ("image.png", b"PNGDATA", "image/png")},
     )
     assert resp.status_code == 400
-    assert resp.json()["detail"]["code"] == "INVALID_FILE_TYPE"
+    assert resp.json()["code"] == "INVALID_FILE_TYPE"
 
 
 @pytest.mark.asyncio
@@ -131,7 +130,7 @@ async def test_upload_file_too_large(
         files={"file": ("big.pdf", big_bytes, "application/pdf")},
     )
     assert resp.status_code == 400
-    assert resp.json()["detail"]["code"] == "FILE_TOO_LARGE"
+    assert resp.json()["code"] == "FILE_TOO_LARGE"
 
 
 @pytest.mark.asyncio
@@ -210,7 +209,7 @@ async def test_get_resume_not_found(client: AsyncClient) -> None:
     await _register_and_login(client, "noresume@test.com")
     resp = await client.get("/api/resume")
     assert resp.status_code == 404
-    assert resp.json()["detail"]["code"] == "RESUME_NOT_FOUND"
+    assert resp.json()["code"] == "RESUME_NOT_FOUND"
 
 
 @pytest.mark.asyncio

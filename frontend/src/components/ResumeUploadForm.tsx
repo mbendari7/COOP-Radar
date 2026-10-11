@@ -8,7 +8,8 @@
  */
 
 import { useRef, useState } from 'react'
-import { useDeleteResume, useResume, useUploadResume, type ResumeOut } from '../api/resume'
+import { useDeleteResume, useMatches, useUploadResume } from '../api/resume'
+import type { ResumeOut } from '../api/resume'
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024  // 5 MB
 
@@ -34,7 +35,9 @@ interface Props {
 }
 
 export default function ResumeUploadForm({ onUploaded, onDeleted, showStoredCard = true }: Props) {
-  const { data: resume, isError: noResume } = useResume()
+  // The matches response carries the stored resume's metadata (null when none)
+  const { data: matches } = useMatches()
+  const resume: ResumeOut | null = matches?.resume ?? null
   const upload = useUploadResume()
   const deleteResume = useDeleteResume()
   const inputRef = useRef<HTMLInputElement>(null)
@@ -62,19 +65,19 @@ export default function ResumeUploadForm({ onUploaded, onDeleted, showStoredCard
         onUploaded?.()
       },
       onError: (err) => {
-        setClientError((err as Error).message ?? 'Upload failed.')
+        setClientError(err.message || 'Upload failed.')
       },
     })
   }
 
-  const hasResume = Boolean(resume && !noResume)
+  const hasResume = resume !== null
 
   return (
     <div className="space-y-4">
       {/* Stored resume card */}
       {showStoredCard && hasResume && (
         <StoredResumeCard
-          resume={resume as ResumeOut}
+          resume={resume}
           onDeleteClick={() => setDeleteConfirm(true)}
           isDeleting={deleteResume.isPending}
         />
@@ -101,9 +104,9 @@ export default function ResumeUploadForm({ onUploaded, onDeleted, showStoredCard
       </div>
 
       {/* Upload errors */}
-      {(clientError ?? upload.error) && (
+      {(clientError || upload.error) && (
         <p id="resume-upload-error" role="alert" className="text-sm text-red-600">
-          {clientError ?? (upload.error as Error)?.message}
+          {clientError ?? upload.error?.message}
         </p>
       )}
 

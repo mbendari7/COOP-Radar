@@ -1,98 +1,39 @@
 # CoopRadar — Progress Log
 
-**Repo**: `C:\Users\myfun\OneDrive\Documents\GitHub\COOP-Radar`
-**Note on path**: Ground rules reference `C:\dev\COOP-Radar`; actual path is above. Update any CI/script references accordingly.
+## Current status (2026-10-10)
 
----
+| Feature | Branch | Status |
+|---|---|---|
+| 001 Browse & Search | `001-browse-search` | Done |
+| 002 Accounts & Application Tracker | `002-accounts-tracker` | Done |
+| 003 Real Postings Ingestion & Semantic Search | `003-ingestion-search` | Done |
+| 004 AI Resume Matcher | `004-ai-resume-matcher` | Core done (upload, match, cited Q&A); tool-use agent, MCP server, YAML evals not built |
 
-## Current phase
+All four branches build on each other; `004-ai-resume-matcher` contains everything. `main` still holds only the
+repo skeleton — merge the feature work into `main` via a pull request when ready.
 
-**Phase 0 complete** — repo skeleton ready.
-**Next**: Gate 0 review, then Phase 1 (Feature 001 — Browse & Search).
+## Verification (2026-10-10 full-repo review)
 
----
+Run against Postgres 16 + pgvector, Python 3.12, Node 24:
 
-## Phase 0 — Repo readiness (2026-10-10)
+- Backend: `ruff` clean · `mypy --strict` clean · **141 tests pass** (incl. 10k-posting perf test: p95 ≈ 55 ms)
+- Migrations: `upgrade head → downgrade base → upgrade head` succeeds; `alembic check` reports no drift
+- Seed: `python -m seed` idempotent (55 postings, 106 skills, 2 dev sources)
+- Frontend: eslint clean · `tsc` clean · **17 tests pass** · production build succeeds
 
-### Completed
-- `CLAUDE.md` copied to repo root (source: `coopradar-claude-setup/CLAUDE.md`)
-- `.gitattributes` added — enforces LF line endings globally
-- `.editorconfig` added — indent, charset, and newline rules
-- `docs/progress.md` (this file) created
-- Constitution confirmed at `coopradar/coopradar/.specify/memory/constitution.md`
+Not verified here: a full `docker compose up` (Docker wasn't available) and live Claude/OpenAI calls
+(all AI calls are mocked in tests). Do those first — see "Your first run" in `docs/PROJECT_GUIDE.md`.
 
-### Skills locations
-| Skill set | Path |
-|-----------|------|
-| Spec Kit (`speckit-*`) | `coopradar/coopradar/.claude/skills/` |
-| Project skills (`api-conventions`, `frontend-tables`, `agent-tools`, `db-migration`, `log-agentic-work`) | `coopradar/coopradar/skills/` |
-| `SPECKIT_PROMPTS.md` | `coopradar/coopradar/.claude/skills/SPECKIT_PROMPTS.md` |
+## Open work
 
-### Open issues from Phase 0
-- Repo path mismatch: ground rules say `C:\dev\COOP-Radar`; actual is `C:\Users\myfun\OneDrive\Documents\GitHub\COOP-Radar`. Confirm correct path with user.
+1. Merge `004-ai-resume-matcher` → `main` (PR), so CI and the GitHub contributors graph reflect the real code.
+2. First live run with real API keys; run `python -m app.ingest.embed` so matching has vectors to search.
+3. Add a real public job-board source (check its terms + robots.txt; document it in the plan).
+4. Remaining spec-004 scope: agent tools + MCP server + `agent_runs` + YAML eval runner (see the agent-tools skill).
+5. Optional Feature 005: deploy + observability (see `docs/speckit-prompts.md`).
 
----
+## History
 
-## Pre-existing implementation (built in earlier sessions)
-
-Features 001 and 002 were substantially implemented before this structured workflow began.
-At Gate 0 the user will decide: validate and continue from Phase 3, or re-run the loop from Phase 1.
-
-### Feature 001 — Browse & Search Postings
-**Status**: Code exists, not yet validated against spec success criteria in this session.
-
-Files present:
-- `backend/app/models/posting.py` — `Posting` ORM, `WorkMode` enum
-- `backend/alembic/versions/0001_create_postings.py` — tsvector GIN index, all B-tree indexes
-- `backend/seed/` — ~62 seeded postings
-- `backend/app/services/postings.py` — list/search/filter/sort/paginate, `get_filter_meta`
-- `backend/app/api/postings.py` — `GET /api/postings`, `GET /api/postings/{id}`, `GET /api/postings/meta/filters`
-- `backend/tests/api/test_postings.py` — 16 tests + perf test
-- `frontend/src/api/postings.ts` — TanStack Query hooks
-- `frontend/src/components/PostingsTable.tsx`, `PostingCard.tsx`, `FilterBar.tsx`, `SearchBox.tsx`
-- `frontend/src/pages/PostingsListPage.tsx`, `PostingDetailPage.tsx`
-- `docker-compose.yml`, `backend/Dockerfile`, `frontend/Dockerfile`
-- `.github/workflows/ci.yml`
-
-### Feature 002 — Accounts & Application Tracker
-**Status**: Code exists, not yet validated against spec success criteria in this session.
-
-Files present:
-- `backend/app/models/user.py`, `saved_posting.py`
-- `backend/alembic/versions/0002_add_auth.py`
-- `backend/app/services/auth.py`, `saved_postings.py`
-- `backend/app/api/auth.py`, `me.py`, `saved.py`
-- `backend/app/deps.py`, `redis.py`
-- `backend/tests/api/test_auth.py`, `test_me.py`, `test_saved.py`
-- `frontend/src/api/auth.ts`, `saved.ts`
-- `frontend/src/components/AuthModal.tsx`, `BookmarkButton.tsx`, `StatusBadge.tsx`
-- `frontend/src/pages/SavedPostingsPage.tsx`, `AccountSettingsPage.tsx`
-- `frontend/src/App.tsx` — header with auth slot, all routes
-
----
-
-## Phase 1 — Feature 001: Browse & Search (pending)
-
-Branch: `001-browse-search`
-Status: **Pending Gate 0 decision** (code may already exist; needs spec loop validation)
-
----
-
-## Phase 2 — Feature 002: Accounts & Application Tracker (pending)
-
-Branch: `002-accounts-tracker`
-Status: **Pending Gate 0 decision**
-
----
-
-## Phase 3 — Feature 003: Real Postings & Semantic Search (not started)
-
-Branch: `003-ingestion-search`
-Status: Not started
-
----
-
-## Phase 4 — Feature 004: AI Resume Matcher & Assistant (not started)
-
-Branch: `004-ai-matcher`
-Status: Not started
+- Phase 0 (2026-10-10): repo skeleton, CLAUDE.md, constitution.
+- Features 001–004 implemented with the Spec Kit loop (specs in `specs/`).
+- 2026-10-10 review: see the latest entry in `docs/agentic-workflow.md` for the full list of fixes.

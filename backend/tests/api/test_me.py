@@ -5,25 +5,10 @@ Tests for /api/me endpoints.
 import pytest
 from httpx import AsyncClient
 
-from app.redis import get_redis
-from tests.api.test_auth import MockRedis
-
 
 @pytest.fixture
-def mock_redis():
-    return MockRedis()
-
-
-@pytest.fixture
-async def me_client(client: AsyncClient, mock_redis: MockRedis) -> AsyncClient:
+async def me_client(client: AsyncClient) -> AsyncClient:
     """Client with a registered, logged-in user."""
-    app = client._transport.app  # type: ignore[attr-defined]
-
-    async def override_redis(request=None):
-        yield mock_redis
-
-    app.dependency_overrides[get_redis] = override_redis
-    app.state.redis = mock_redis
 
     await client.post(
         "/api/auth/register",
@@ -45,15 +30,8 @@ async def test_get_me_returns_user(me_client: AsyncClient):
     assert "hashed_password" not in data
 
 
-async def test_get_me_unauthenticated_returns_401(client: AsyncClient, mock_redis: MockRedis):
+async def test_get_me_unauthenticated_returns_401(client: AsyncClient):
     """GET /api/me without a session returns 401."""
-    app = client._transport.app  # type: ignore[attr-defined]
-
-    async def override_redis(request=None):
-        yield mock_redis
-
-    app.dependency_overrides[get_redis] = override_redis
-    app.state.redis = mock_redis
 
     res = await client.get("/api/me")
     assert res.status_code == 401
@@ -89,20 +67,20 @@ async def test_change_password_short_new_returns_422(me_client: AsyncClient):
 
 async def test_delete_account_returns_204(me_client: AsyncClient):
     """Deleting account with correct password returns 204."""
-    res = await me_client.delete("/api/me", json={"password": "password1234"})
+    res = await me_client.request("DELETE", "/api/me", json={"password": "password1234"})
     assert res.status_code == 204
 
 
 async def test_delete_account_wrong_password_returns_401(me_client: AsyncClient):
     """Wrong password on account delete returns 401."""
-    res = await me_client.delete("/api/me", json={"password": "wrongpassword"})
+    res = await me_client.request("DELETE", "/api/me", json={"password": "wrongpassword"})
     assert res.status_code == 401
     assert res.json()["code"] == "WRONG_PASSWORD"
 
 
 async def test_deleted_account_cannot_login(me_client: AsyncClient):
     """After deletion, login with old credentials returns 401."""
-    await me_client.delete("/api/me", json={"password": "password1234"})
+    await me_client.request("DELETE", "/api/me", json={"password": "password1234"})
     res = await me_client.post(
         "/api/auth/login",
         json={"email": "me_user@example.com", "password": "password1234"},

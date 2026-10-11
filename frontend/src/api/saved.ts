@@ -3,9 +3,8 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { API_BASE, ApiError, apiFetch } from './client'
 import type { PostingListItem } from './postings'
-
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -77,68 +76,48 @@ export interface SavedListParams {
 
 // ── Fetchers ──────────────────────────────────────────────────────────────────
 
-async function fetchSaved(params: SavedListParams): Promise<SavedPostingsPage> {
+function fetchSaved(params: SavedListParams): Promise<SavedPostingsPage> {
   const sp = new URLSearchParams()
   if (params.status) sp.set('status', params.status)
   if (params.page && params.page !== 1) sp.set('page', String(params.page))
   if (params.page_size && params.page_size !== 25) sp.set('page_size', String(params.page_size))
   const qs = sp.toString() ? `?${sp}` : ''
-
-  const res = await fetch(`${API_BASE}/api/saved${qs}`, { credentials: 'include' })
-  if (!res.ok) throw new Error(`GET /api/saved failed: ${res.status}`)
-  return res.json() as Promise<SavedPostingsPage>
+  return apiFetch<SavedPostingsPage>(`/api/saved${qs}`)
 }
 
-async function postSave(postingId: string): Promise<SavedPostingOut> {
-  const res = await fetch(`${API_BASE}/api/saved`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ posting_id: postingId }),
-  })
-  if (!res.ok) throw new Error(`POST /api/saved failed: ${res.status}`)
-  return res.json() as Promise<SavedPostingOut>
-}
+const postSave = (postingId: string) =>
+  apiFetch<SavedPostingOut>('/api/saved', { method: 'POST', json: { posting_id: postingId } })
 
 async function deleteSave(savedId: string): Promise<void> {
-  const res = await fetch(`${API_BASE}/api/saved/${savedId}`, {
-    method: 'DELETE',
-    credentials: 'include',
-  })
-  if (!res.ok && res.status !== 404) throw new Error(`DELETE /api/saved/${savedId} failed: ${res.status}`)
+  try {
+    await apiFetch<void>(`/api/saved/${savedId}`, { method: 'DELETE' })
+  } catch (err) {
+    // Already gone counts as success (e.g. unsaved in another tab)
+    if (!(err instanceof ApiError && err.status === 404)) throw err
+  }
 }
 
-async function patchStatus(
+const patchStatus = (
   savedId: string,
   statusVal: ApplicationStatus | null,
   notes?: string | null,
   eventDate?: string | null,
-): Promise<SavedPostingOut> {
-  const res = await fetch(`${API_BASE}/api/saved/${savedId}/status`, {
+) =>
+  apiFetch<SavedPostingOut>(`/api/saved/${savedId}/status`, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ status: statusVal, notes: notes ?? null, event_date: eventDate ?? null }),
+    json: { status: statusVal, notes: notes ?? null, event_date: eventDate ?? null },
   })
-  if (!res.ok) throw new Error(`PATCH /api/saved/${savedId}/status failed: ${res.status}`)
-  return res.json() as Promise<SavedPostingOut>
-}
 
-async function postEvent(
+const postEvent = (
   savedId: string,
   status: ApplicationStatus,
   notes: string | null,
   eventDate: string | null,
-): Promise<SavedPostingOut> {
-  const res = await fetch(`${API_BASE}/api/saved/${savedId}/events`, {
+) =>
+  apiFetch<SavedPostingOut>(`/api/saved/${savedId}/events`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    credentials: 'include',
-    body: JSON.stringify({ status, notes, event_date: eventDate }),
+    json: { status, notes, event_date: eventDate },
   })
-  if (!res.ok) throw new Error(`POST /api/saved/${savedId}/events failed: ${res.status}`)
-  return res.json() as Promise<SavedPostingOut>
-}
 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
 
@@ -208,7 +187,7 @@ export function useAddEvent() {
   })
 }
 
-/** Trigger a CSV download — opens the export URL in a new tab. */
+/** Trigger a CSV download — the browser sends the session cookie with the navigation. */
 export function downloadCsv(): void {
   window.open(`${API_BASE}/api/saved/export/csv`, '_blank')
 }

@@ -4,7 +4,7 @@
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { render, screen, fireEvent } from '@testing-library/react'
-import { MemoryRouter, Route, Routes, useSearchParams } from 'react-router-dom'
+import { MemoryRouter } from 'react-router-dom'
 import { describe, it, expect, vi } from 'vitest'
 import PostingsTable from '../src/components/PostingsTable'
 import type { PostingListItem } from '../src/api/postings'
@@ -25,6 +25,7 @@ function makePosting(overrides: Partial<PostingListItem> = {}): PostingListItem 
     posted_at: '2026-09-15T10:00:00Z',
     skills: ['Python', 'SQL'],
     source_url: null,
+    closed_at: null,
     ...overrides,
   }
 }
@@ -44,13 +45,11 @@ function renderTable(props: Partial<React.ComponentProps<typeof PostingsTable>> 
   }
 
   return render(
-    <QueryClient>
-      <MemoryRouter>
-        <QueryClientProvider client={qc}>
-          <PostingsTable {...defaults} />
-        </QueryClientProvider>
-      </MemoryRouter>
-    </QueryClient>
+    <MemoryRouter>
+      <QueryClientProvider client={qc}>
+        <PostingsTable {...defaults} />
+      </QueryClientProvider>
+    </MemoryRouter>
   )
 }
 
@@ -92,7 +91,8 @@ describe('PostingsTable', () => {
     const deadlineHeader = screen.getByRole('columnheader', { name: /deadline/i })
     fireEvent.click(deadlineHeader)
 
-    expect(onSortChange).toHaveBeenCalledWith('deadline', 'desc')
+    // First click on a new column sorts ascending (soonest deadline first)
+    expect(onSortChange).toHaveBeenCalledWith('deadline', 'asc')
   })
 
   it('toggles sort order on second click of the same column', () => {

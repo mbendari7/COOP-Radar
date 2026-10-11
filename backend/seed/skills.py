@@ -1,7 +1,9 @@
-"""Seed the skills taxonomy (~150 entries)."""
+"""Seed the skills taxonomy (~110 entries, editable here)."""
 
 import asyncio
+
 from sqlalchemy import text
+
 from app.db import AsyncSessionLocal
 
 SKILLS = [
@@ -123,7 +125,6 @@ SKILLS = [
     ("Solidworks", ["cad", "3d modeling", "mechanical design"], "Tool"),
     ("LabVIEW", ["national instruments", "labview"], "Tool"),
     ("OpenCV", ["computer vision library", "image processing"], "Tool"),
-    ("Selenium", ["test automation", "web scraping"], "Tool"),
 ]
 
 

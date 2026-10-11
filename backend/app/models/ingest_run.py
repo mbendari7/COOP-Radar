@@ -1,14 +1,18 @@
 """IngestRun ORM model — one row per ingestion attempt for one source."""
 
 from datetime import datetime
-from uuid import UUID, uuid4
+from typing import TYPE_CHECKING
+from uuid import UUID
 
-from sqlalchemy import ARRAY, CheckConstraint, Index, Integer, Text, text
+from sqlalchemy import TIMESTAMP, CheckConstraint, ForeignKey, Index, Integer, Text, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy import TIMESTAMP, ForeignKey
 
 from app.db import Base
+
+if TYPE_CHECKING:
+    from app.models.ingest_source import IngestSource
 
 
 class IngestRun(Base):
@@ -33,7 +37,7 @@ class IngestRun(Base):
         ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
     )
 
-    source: Mapped["IngestSource"] = relationship(back_populates="runs")  # noqa: F821
+    source: Mapped["IngestSource"] = relationship(back_populates="runs")
 
     __table_args__ = (
         CheckConstraint(

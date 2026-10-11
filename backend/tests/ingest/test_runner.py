@@ -1,10 +1,9 @@
 """Tests for run_source runner using a fixture-backed adapter mock."""
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
-from uuid import uuid4
 
 import pytest
 from sqlalchemy import select
@@ -158,3 +157,53 @@ async def test_three_consecutive_failures_auto_pause(db_session: AsyncSession):
     await db_session.refresh(source)
     assert source.auto_paused is True
     assert source.consecutive_failures >= 3
+
+
+@pytest.mark.asyncio
+async def test_rerun_updates_and_never_closes_unchanged_postings(db_session: AsyncSession):
+    """Re-running an unchanged feed used to skip every row as a duplicate, then close them all."""
+    source = await _create_source(db_session)
+    raw = _make_raw_postings()
+
+    for _ in range(2):
+        with patch("app.ingest.runner.adapter_for") as mock_af:
+            mock_a = AsyncMock()
+            mock_a.fetch = AsyncMock(return_value=raw)
+            mock_af.return_value = mock_a
+            await _execute_run(db_session, source.id)
+
+    runs = (
+        await db_session.execute(
+            select(IngestRun).where(IngestRun.source_id == source.id).order_by(IngestRun.started_at)
+        )
+    ).scalars().all()
+    assert (runs[1].added, runs[1].updated, runs[1].closed) == (0, 5, 0)
+    still_open = (
+        await db_session.execute(
+            select(Posting).where(Posting.source_id == source.id, Posting.closed_at.is_(None))
+        )
+    ).scalars().all()
+    assert len(still_open) == 5
+
+
+@pytest.mark.asyncio
+async def test_run_reuses_triggered_run_record(db_session: AsyncSession):
+    """Run now creates the run row; the worker must finish that row, not create a second one."""
+    source = await _create_source(db_session)
+    run = IngestRun(source_id=source.id, started_at=datetime.now(UTC), status="running")
+    db_session.add(run)
+    await db_session.flush()
+
+    with patch("app.ingest.runner.adapter_for") as mock_af:
+        mock_a = AsyncMock()
+        mock_a.fetch = AsyncMock(return_value=_make_raw_postings())
+        mock_af.return_value = mock_a
+        new_ids = await _execute_run(db_session, source.id, run.id)
+
+    runs = (
+        await db_session.execute(select(IngestRun).where(IngestRun.source_id == source.id))
+    ).scalars().all()
+    assert len(runs) == 1
+    assert runs[0].status == "success"
+    assert runs[0].added == 5
+    assert len(new_ids) == 5

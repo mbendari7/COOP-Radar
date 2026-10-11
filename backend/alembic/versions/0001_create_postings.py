@@ -5,8 +5,8 @@ Revises:
 Create Date: 2026-10-10
 """
 
-from alembic import op
 import sqlalchemy as sa
+from alembic import op
 from sqlalchemy.dialects import postgresql
 
 revision = "0001"
@@ -15,7 +15,17 @@ branch_labels = None
 depends_on = None
 
 
+# Generated columns may only call IMMUTABLE functions; array_to_string() is STABLE,
+# so wrap it. Must match SKILLS_TO_TEXT_DDL in app/models/posting.py.
+SKILLS_TO_TEXT_DDL = (
+    "CREATE OR REPLACE FUNCTION coopradar_skills_text(text[]) RETURNS text "
+    "LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT array_to_string($1, ' ') $$"
+)
+
+
 def upgrade() -> None:
+    op.execute(SKILLS_TO_TEXT_DDL)
+
     # Create the work_mode enum type first — the table references it below.
     # checkfirst=True prevents errors if this migration is re-run accidentally.
     work_mode_enum = postgresql.ENUM(
@@ -73,7 +83,7 @@ def upgrade() -> None:
                 """
                 setweight(to_tsvector('english', coalesce(title, '')), 'A') ||
                 setweight(to_tsvector('english', coalesce(company, '')), 'B') ||
-                setweight(to_tsvector('english', coalesce(array_to_string(skills, ' '), '')), 'B') ||
+                setweight(to_tsvector('english', coalesce(coopradar_skills_text(skills), '')), 'B') ||
                 setweight(to_tsvector('english', coalesce(description, '')), 'C')
                 """,
                 persisted=True,  # STORED — computed once on write, not on every read
@@ -119,3 +129,4 @@ def downgrade() -> None:
     op.drop_table("postings")
 
     postgresql.ENUM(name="work_mode_enum").drop(op.get_bind(), checkfirst=True)
+    op.execute("DROP FUNCTION IF EXISTS coopradar_skills_text(text[])")

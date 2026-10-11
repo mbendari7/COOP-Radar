@@ -14,13 +14,15 @@ const META: FilterMeta = {
   skills: ['Python', 'React', 'SQL'],
 }
 
-const EMPTY_FILTERS = {
-  city: '', province: '', term: '', work_mode: '' as const,
+type Filters = React.ComponentProps<typeof FilterBar>['filters']
+
+const EMPTY_FILTERS: Filters = {
+  city: '', province: '', term: '', work_mode: '',
   duration: [], skills: [],
 }
 
 function renderBar(
-  filters = EMPTY_FILTERS,
+  filters: Filters = EMPTY_FILTERS,
   onChange = vi.fn(),
   onClearAll = vi.fn(),
 ) {

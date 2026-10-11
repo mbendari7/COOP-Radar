@@ -3,10 +3,10 @@
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import ARRAY, Index, Text, text
+from sqlalchemy import TIMESTAMP, Index, Text, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import TIMESTAMP
 
 from app.db import Base
 

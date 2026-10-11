@@ -1,6 +1,11 @@
 from collections.abc import AsyncGenerator
 
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.ext.asyncio import (
+    AsyncEngine,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import get_settings
@@ -14,7 +19,7 @@ class Base(DeclarativeBase):
     pass
 
 
-def _make_engine() -> object:
+def _make_engine() -> AsyncEngine:
     """
     Build the async engine from settings.
     pool_pre_ping=True keeps connections fresh after a DB restart

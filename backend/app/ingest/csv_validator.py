@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass, field
 from datetime import date
+from typing import Any
 
 
 @dataclass
@@ -22,7 +23,7 @@ _REQUIRED_COLUMNS = {"title", "company", "city", "term", "deadline"}
 _VALID_WORK_MODES = {"onsite", "hybrid", "remote"}
 
 
-def validate_csv_row(row: dict, row_num: int) -> list[RowError]:
+def validate_csv_row(row: dict[str, Any], row_num: int) -> list[RowError]:
     """
     Validate a single CSV row (as a dict from pandas).
     Returns a list of RowErrors; empty list means the row is valid.
@@ -33,7 +34,9 @@ def validate_csv_row(row: dict, row_num: int) -> list[RowError]:
         val = row.get(col)
         if val is None or str(val).strip() == "" or str(val).lower() == "nan":
             errors.append(
-                RowError(row=row_num, column=col, message=f"Required field '{col}' is missing or empty.")
+                RowError(
+                    row=row_num, column=col, message=f"Required field '{col}' is missing or empty."
+                )
             )
 
     # Validate deadline format (only if the column was present)
@@ -52,14 +55,15 @@ def validate_csv_row(row: dict, row_num: int) -> list[RowError]:
 
     # Validate optional work_mode if present
     work_mode_val = row.get("work_mode")
-    if work_mode_val and str(work_mode_val).strip() and str(work_mode_val).lower() != "nan":
-        if str(work_mode_val).strip().lower() not in _VALID_WORK_MODES:
-            errors.append(
-                RowError(
-                    row=row_num,
-                    column="work_mode",
-                    message=f"Invalid work_mode. Must be one of: {', '.join(sorted(_VALID_WORK_MODES))}.",
-                )
+    work_mode = str(work_mode_val or "").strip().lower()
+    if work_mode and work_mode != "nan" and work_mode not in _VALID_WORK_MODES:
+        allowed = ", ".join(sorted(_VALID_WORK_MODES))
+        errors.append(
+            RowError(
+                row=row_num,
+                column="work_mode",
+                message=f"Invalid work_mode. Must be one of: {allowed}.",
             )
+        )
 
     return errors

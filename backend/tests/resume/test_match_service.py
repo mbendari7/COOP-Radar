@@ -3,13 +3,12 @@ Unit tests for text extraction and match service functions.
 No database or live API calls required.
 """
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 
 from app.services.resume import extract_docx_text, extract_pdf_text, extract_text
-
 
 # ---------------------------------------------------------------------------
 # Text extraction
@@ -57,6 +56,7 @@ def test_extract_text_no_extension_raises() -> None:
 @pytest.mark.asyncio
 async def test_embed_and_rank_returns_top20(monkeypatch: pytest.MonkeyPatch) -> None:
     import json
+
     from app.services.resume import embed_and_rank
 
     # Mock generate_embedding
@@ -131,3 +131,70 @@ async def test_embed_and_rank_empty_db(monkeypatch: pytest.MonkeyPatch) -> None:
 
     results = await embed_and_rank(mock_db, "some resume text")
     assert results == []
+
+
+def _db_with_rows(rows: list[dict]) -> AsyncMock:
+    mock_result = MagicMock()
+    mock_result.mappings.return_value.all.return_value = rows
+    mock_db = AsyncMock()
+    mock_db.execute = AsyncMock(return_value=mock_result)
+    return mock_db
+
+
+def _rows(n: int) -> list[dict]:
+    return [
+        {"id": uuid4(), "title": f"Role {i}", "company": "Co", "city": "Toronto",
+         "province": "ON", "term": "Summer 2027", "deadline": "2027-01-01",
+         "description": "Python", "similarity": 0.9 - i / 100}
+        for i in range(n)
+    ]
+
+
+@pytest.mark.asyncio
+async def test_rerank_garbage_falls_back_to_cosine(mock_embedding, mock_claude_create) -> None:
+    from app.services.resume import embed_and_rank
+
+    mock_claude_create("Sorry, no JSON today.")
+
+    results = await embed_and_rank(_db_with_rows(_rows(3)), "resume")
+
+    assert [r.score for r in results] == [90, 89, 88]
+    assert all("semantic similarity" in r.reason for r in results)
+
+
+@pytest.mark.asyncio
+async def test_rerank_accepts_fenced_json_and_drops_duplicates(
+    mock_embedding, mock_claude_create
+) -> None:
+    import json
+
+    from app.services.resume import embed_and_rank
+
+    rows = _rows(2)
+    pid = str(rows[0]["id"])
+    mock_claude_create(
+        "```json\n" + json.dumps([
+            {"posting_id": pid, "score": 70, "reason": "Good."},
+            {"posting_id": pid, "score": 99, "reason": "Duplicate."},
+            {"posting_id": str(uuid4()), "score": 100, "reason": "Invented id."},
+        ]) + "\n```"
+    )
+
+    results = await embed_and_rank(_db_with_rows(rows), "resume")
+
+    assert [(str(r.posting_id), r.score) for r in results] == [(pid, 70)]
+
+
+@pytest.mark.asyncio
+async def test_embedding_outage_returns_503(monkeypatch) -> None:
+    from fastapi import HTTPException
+
+    from app.services.resume import embed_and_rank
+
+    monkeypatch.setattr(
+        "app.ingest.embed.generate_embedding", AsyncMock(side_effect=RuntimeError("down"))
+    )
+
+    with pytest.raises(HTTPException) as exc:
+        await embed_and_rank(_db_with_rows([]), "resume")
+    assert exc.value.status_code == 503

@@ -1,50 +1,23 @@
+/**
+ * CsvUploadForm — bulk-import postings from a CSV (e.g. copied from a school co-op portal).
+ * Shows how many rows were added / skipped as duplicates, plus per-row validation errors.
+ */
+
 import { useRef, useState } from 'react'
-import { useMutation } from '@tanstack/react-query'
-
-const API_BASE = import.meta.env.VITE_API_URL ?? ''
-
-interface RowError {
-  row: number
-  column: string
-  message: string
-}
-
-interface CsvUploadResult {
-  added: number
-  skipped_duplicates: number
-  errors: RowError[]
-}
-
-async function uploadCsv(file: File): Promise<CsvUploadResult> {
-  const formData = new FormData()
-  formData.append('file', file)
-  const res = await fetch(`${API_BASE}/api/postings/upload`, {
-    method: 'POST',
-    credentials: 'include',
-    body: formData,
-  })
-  if (!res.ok) {
-    const body = await res.json().catch(() => ({}))
-    throw new Error(body?.detail?.message ?? `HTTP ${res.status}`)
-  }
-  return res.json() as Promise<CsvUploadResult>
-}
+import { useUploadCsv, type CsvUploadResult } from '../api/postings'
 
 export function CsvUploadForm() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [result, setResult] = useState<CsvUploadResult | null>(null)
 
-  const mutation = useMutation({
-    mutationFn: uploadCsv,
-    onSuccess: (data) => setResult(data),
-  })
+  const mutation = useUploadCsv()
 
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     const file = fileRef.current?.files?.[0]
     if (!file) return
     setResult(null)
-    mutation.mutate(file)
+    mutation.mutate(file, { onSuccess: (data) => setResult(data) })
   }
 
   return (
@@ -80,7 +53,7 @@ export function CsvUploadForm() {
 
       {mutation.isError && (
         <div role="alert" className="mt-4 p-3 rounded-md bg-red-50 text-sm text-red-700">
-          {mutation.error instanceof Error ? mutation.error.message : 'Upload failed.'}
+          {mutation.error?.message || 'Upload failed.'}
         </div>
       )}
 
@@ -96,7 +69,7 @@ export function CsvUploadForm() {
               <table className="w-full text-xs border-collapse">
                 <thead>
                   <tr className="bg-red-50">
-                    <th className="border border-red-200 px-2 py-1 text-left">Row</th>
+                    <th className="border border-red-200 px-2 py-1 text-left">Line</th>
                     <th className="border border-red-200 px-2 py-1 text-left">Column</th>
                     <th className="border border-red-200 px-2 py-1 text-left">Error</th>
                   </tr>

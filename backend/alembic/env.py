@@ -12,12 +12,12 @@ from alembic import context
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 
-# Import Base so Alembic can see all mapped tables for autogenerate
-from app.db import Base
-from app.config import get_settings
-
 # Import all models so their metadata is registered on Base before autogenerate runs
 import app.models  # noqa: F401
+from app.config import get_settings
+
+# Import Base so Alembic can see all mapped tables for autogenerate
+from app.db import Base
 
 config = context.config
 

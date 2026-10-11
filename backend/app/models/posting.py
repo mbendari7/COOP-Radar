@@ -3,8 +3,10 @@ from datetime import date, datetime
 from uuid import UUID, uuid4
 
 from sqlalchemy import (
-    ARRAY,
+    DDL,
+    TIMESTAMP,
     CheckConstraint,
+    Computed,
     Date,
     Enum,
     ForeignKey,
@@ -12,17 +14,26 @@ from sqlalchemy import (
     SmallInteger,
     String,
     Text,
+    event,
     text,
 )
-from sqlalchemy.dialects.postgresql import JSONB, TSVECTOR
+from sqlalchemy.dialects.postgresql import ARRAY, JSONB, TSVECTOR
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column
-from sqlalchemy import TIMESTAMP
 
 from app.db import Base
 
+# Postgres only allows IMMUTABLE functions in generated columns, and the built-in
+# array_to_string() is merely STABLE. This one-line SQL wrapper is safe to declare
+# IMMUTABLE for text[] input. Migration 0001 creates it too; the listener below makes
+# Base.metadata.create_all() (used by the tests) create it before the postings table.
+SKILLS_TO_TEXT_DDL = (
+    "CREATE OR REPLACE FUNCTION coopradar_skills_text(text[]) RETURNS text "
+    "LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT array_to_string($1, ' ') $$"
+)
 
-class WorkMode(str, enum.Enum):
+
+class WorkMode(enum.StrEnum):
     """
     Stored as a PostgreSQL ENUM type (work_mode_enum) so the DB enforces
     valid values without needing an application-layer check.
@@ -39,8 +50,9 @@ class Posting(Base):
 
     search_vector is a GENERATED ALWAYS AS STORED tsvector column — PostgreSQL
     keeps it in sync automatically whenever title/company/skills/description
-    change.  The actual GENERATED expression is in the migration (not here)
-    because SQLAlchemy doesn't write GENERATED columns via autogenerate.
+    change. The expression below mirrors migration 0001 exactly, so
+    Base.metadata.create_all() (used by the test suite) builds the same column,
+    and SQLAlchemy never tries to INSERT/UPDATE it.
     """
 
     __tablename__ = "postings"
@@ -62,6 +74,7 @@ class Posting(Base):
 
     deadline: Mapped[date] = mapped_column(Date, nullable=False)
     posted_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True),
         # server_default lets the DB fill this in; we don't have to set it manually
         server_default=text("NOW()"),
         nullable=False,
@@ -74,9 +87,19 @@ class Posting(Base):
         ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
     )
 
-    # Populated by the GENERATED expression in the migration.
-    # Mapped as nullable so SQLAlchemy doesn't try to INSERT it.
-    search_vector: Mapped[str | None] = mapped_column(TSVECTOR, nullable=True)
+    # Weights: A = title, B = company + skills, C = description (title matches rank highest)
+    search_vector: Mapped[str | None] = mapped_column(
+        TSVECTOR,
+        Computed(
+            "setweight(to_tsvector('english', coalesce(title, '')), 'A') || "
+            "setweight(to_tsvector('english', coalesce(company, '')), 'B') || "
+            "setweight(to_tsvector('english', "
+            "coalesce(coopradar_skills_text(skills), '')), 'B') || "
+            "setweight(to_tsvector('english', coalesce(description, '')), 'C')",
+            persisted=True,
+        ),
+        nullable=True,
+    )
 
     # Feature 003 — ingestion source tracking
     source_id: Mapped[UUID | None] = mapped_column(
@@ -86,7 +109,7 @@ class Posting(Base):
     )
     source_ref: Mapped[str | None] = mapped_column(Text, nullable=True)
     closed_at: Mapped[datetime | None] = mapped_column(TIMESTAMP(timezone=True), nullable=True)
-    low_confidence_fields: Mapped[dict] = mapped_column(
+    low_confidence_fields: Mapped[dict[str, float]] = mapped_column(
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
 
@@ -117,3 +140,10 @@ class Posting(Base):
             postgresql_where=text("source_ref IS NOT NULL"),
         ),
     )
+
+
+event.listen(
+    Posting.__table__,
+    "before_create",
+    DDL(SKILLS_TO_TEXT_DDL),  # type: ignore[no-untyped-call]
+)

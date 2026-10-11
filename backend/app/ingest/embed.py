@@ -1,29 +1,38 @@
 """
-Embedding generation and storage using OpenAI text-embedding-3-small.
+Embedding generation and storage (OpenAI text-embedding-3-small, 1536 dims).
 
-generate_embedding — calls OpenAI and returns a list[float] (1536 dims).
-store_embedding    — upserts the embedding into posting_embeddings.
-enqueue_embed_job  — pushes an embedding job to the RQ ingest queue.
+generate_embedding  — calls OpenAI and returns a list[float].
+store_embedding     — upserts the vector into posting_embeddings (no commit).
+embed_posting       — builds the text for one posting, embeds it, and stores it.
+enqueue_embed_job   — pushes an embedding job to the RQ queue (best effort).
+backfill            — embeds every posting that has no vector yet.
+
+Postings need embeddings for semantic search, "similar postings", and resume
+matching. After seeding or bulk-importing postings, run:
+
+    python -m app.ingest.embed            # embeds postings that are missing a vector
 """
 
-import os
+import asyncio
+import logging
 from uuid import UUID
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 async def generate_embedding(text: str) -> list[float]:
-    """
-    Generate a 1536-dimensional embedding vector for the given text.
-    Uses the model configured via EMBED_MODEL env var (default: text-embedding-3-small).
-    """
+    """Generate a 1536-dimensional embedding vector for the given text."""
     import openai
 
-    client = openai.AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY", ""))
-    model = os.getenv("EMBED_MODEL", "text-embedding-3-small")
-
-    response = await client.embeddings.create(model=model, input=text)
-    return response.data[0].embedding
+    settings = get_settings()
+    client = openai.AsyncOpenAI(api_key=settings.openai_api_key or None)
+    response = await client.embeddings.create(model=settings.embed_model, input=text)
+    return list(response.data[0].embedding)
 
 
 async def store_embedding(
@@ -33,52 +42,100 @@ async def store_embedding(
 ) -> None:
     """
     Upsert the embedding for a posting into posting_embeddings.
-    If an embedding already exists for this posting, it is replaced.
+    The caller owns the transaction (commit happens there).
     """
     from sqlalchemy.dialects.postgresql import insert as pg_insert
+
     from app.models.posting_embedding import PostingEmbedding
 
-    model_name = os.getenv("EMBED_MODEL", "text-embedding-3-small")
-
-    stmt = pg_insert(PostingEmbedding).values(
-        posting_id=posting_id,
-        embedding=embedding,
-        model=model_name,
-    ).on_conflict_do_update(
-        index_elements=["posting_id"],
-        set_={"embedding": embedding, "model": model_name},
+    model_name = get_settings().embed_model
+    stmt = (
+        pg_insert(PostingEmbedding)
+        .values(posting_id=posting_id, embedding=embedding, model=model_name)
+        .on_conflict_do_update(
+            index_elements=["posting_id"],
+            set_={"embedding": embedding, "model": model_name},
+        )
     )
     await db.execute(stmt)
-    await db.commit()
+
+
+def embedding_text(title: str, company: str, description: str | None, skills: list[str]) -> str:
+    """The text we embed for a posting — kept in one place so all callers agree."""
+    return f"{title} at {company}\nSkills: {', '.join(skills)}\n\n{description or ''}"[:8000]
+
+
+async def embed_posting(db: AsyncSession, posting_id: UUID) -> bool:
+    """Embed one posting and store the vector. Returns False if the posting is gone."""
+    from app.models.posting import Posting
+
+    posting = await db.get(Posting, posting_id)
+    if posting is None:
+        return False
+    vector = await generate_embedding(
+        embedding_text(posting.title, posting.company, posting.description, posting.skills or [])
+    )
+    await store_embedding(db, posting_id, vector)
+    return True
 
 
 def enqueue_embed_job(posting_id: UUID) -> None:
     """
-    Push an embedding generation job to the RQ ingest queue.
-    Called after a posting is inserted so embedding happens asynchronously.
+    Push an embedding job to the RQ queue so the request that created the posting
+    doesn't wait on OpenAI. Failures are logged, never raised: a posting without a
+    vector still works for keyword search and can be backfilled later.
     """
-    from app.worker import create_queue
+    try:
+        from app.worker import create_queue
 
-    queue = create_queue()
-    queue.enqueue("app.ingest.embed._run_embed_job", str(posting_id))
+        create_queue().enqueue("app.ingest.embed.run_embed_job", str(posting_id))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not enqueue embedding job for %s: %s", posting_id, exc)
 
 
-def _run_embed_job(posting_id_str: str) -> None:
-    """RQ job entry point (sync wrapper)."""
-    import asyncio
-
+def run_embed_job(posting_id_str: str) -> None:
+    """RQ job entry point (RQ workers are synchronous)."""
     asyncio.run(_run_embed_async(UUID(posting_id_str)))
 
 
 async def _run_embed_async(posting_id: UUID) -> None:
-    from sqlalchemy import select
     from app.db import AsyncSessionLocal
-    from app.models.posting import Posting
 
     async with AsyncSessionLocal() as db:
-        posting = (await db.execute(select(Posting).where(Posting.id == posting_id))).scalar_one_or_none()
-        if posting is None:
-            return
-        text = f"{posting.title} {posting.company} {posting.description or ''} {' '.join(posting.skills or [])}"
-        embedding = await generate_embedding(text)
-        await store_embedding(db, posting_id, embedding)
+        if await embed_posting(db, posting_id):
+            await db.commit()
+
+
+async def backfill(db: AsyncSession, batch_size: int = 50) -> int:
+    """Embed every posting that doesn't have a vector yet. Returns how many were embedded."""
+    from app.models.posting import Posting
+    from app.models.posting_embedding import PostingEmbedding
+
+    missing_stmt = (
+        select(Posting.id)
+        .outerjoin(PostingEmbedding, PostingEmbedding.posting_id == Posting.id)
+        .where(PostingEmbedding.posting_id.is_(None))
+    )
+    ids = list((await db.execute(missing_stmt)).scalars().all())
+
+    done = 0
+    for i, posting_id in enumerate(ids, start=1):
+        if await embed_posting(db, posting_id):
+            done += 1
+        if i % batch_size == 0:
+            await db.commit()  # commit in batches so a failure doesn't lose everything
+    await db.commit()
+    return done
+
+
+async def _main() -> None:
+    from app.db import AsyncSessionLocal, engine
+
+    async with AsyncSessionLocal() as db:
+        count = await backfill(db)
+    await engine.dispose()
+    print(f"Embedded {count} postings.")
+
+
+if __name__ == "__main__":
+    asyncio.run(_main())

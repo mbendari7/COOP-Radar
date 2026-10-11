@@ -20,6 +20,7 @@ from fastapi import HTTPException, Response, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import get_settings
 from app.models.user import User
 
 _ph = PasswordHasher()  # singleton — thread-safe, cheap to keep
@@ -33,7 +34,7 @@ _MAX_ATTEMPTS = 5
 _RATE_WINDOW = 60 * 15  # 15 minutes in seconds
 
 
-async def _check_login_rate_limit(redis: aioredis.Redis, email: str) -> None:  # type: ignore[type-arg]
+async def _check_login_rate_limit(redis: aioredis.Redis, email: str) -> None:
     """Increment the attempt counter for this email; raise 429 if over limit."""
     key = f"{_RATE_PREFIX}{email}"
     count = await redis.incr(key)
@@ -50,7 +51,7 @@ async def _check_login_rate_limit(redis: aioredis.Redis, email: str) -> None:  #
         )
 
 
-async def _clear_login_rate_limit(redis: aioredis.Redis, email: str) -> None:  # type: ignore[type-arg]
+async def _clear_login_rate_limit(redis: aioredis.Redis, email: str) -> None:
     """Remove the attempt counter after a successful login."""
     await redis.delete(f"{_RATE_PREFIX}{email}")
 
@@ -63,7 +64,9 @@ def set_session_cookie(response: Response, token: str) -> None:
         key="session",
         value=token,
         httponly=True,
-        secure=True,          # browsers only send over HTTPS; accepted over HTTP in dev
+        # Secure by default (browsers treat http://localhost as secure, so dev still works);
+        # COOKIE_SECURE=false is only for non-browser clients such as the test suite.
+        secure=get_settings().cookie_secure,
         samesite="lax",       # CSRF protection on same-origin navigations
         path="/",
         max_age=_SESSION_TTL,
@@ -76,7 +79,7 @@ def clear_session_cookie(response: Response) -> None:
         key="session",
         value="",
         httponly=True,
-        secure=True,
+        secure=get_settings().cookie_secure,
         samesite="lax",
         path="/",
         max_age=0,
@@ -85,7 +88,7 @@ def clear_session_cookie(response: Response) -> None:
 
 # ── Session helpers ───────────────────────────────────────────────────────────
 
-async def _create_session(redis: aioredis.Redis, user_id: UUID) -> str:  # type: ignore[type-arg]
+async def _create_session(redis: aioredis.Redis, user_id: UUID) -> str:
     """Create a new Redis session and return the token."""
     token = secrets.token_hex(32)  # 256 bits of entropy
     key = f"session:{token}"
@@ -98,7 +101,7 @@ async def _create_session(redis: aioredis.Redis, user_id: UUID) -> str:  # type:
 
 async def register(
     db: AsyncSession,
-    redis: aioredis.Redis,  # type: ignore[type-arg]
+    redis: aioredis.Redis,
     email: str,
     password: str,
 ) -> tuple[User, str]:
@@ -134,7 +137,7 @@ async def register(
 
 async def login(
     db: AsyncSession,
-    redis: aioredis.Redis,  # type: ignore[type-arg]
+    redis: aioredis.Redis,
     email: str,
     password: str,
 ) -> tuple[User, str]:
@@ -151,7 +154,7 @@ async def login(
     # Check rate limit before any DB work (prevents enumeration via timing too)
     await _check_login_rate_limit(redis, normalised)
 
-    _INVALID = HTTPException(
+    invalid = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail={"detail": "Invalid email or password", "code": "INVALID_CREDENTIALS"},
     )
@@ -163,12 +166,12 @@ async def login(
     if user is None:
         # Run a dummy hash to keep timing consistent (resist timing attacks)
         _ph.hash(password)
-        raise _INVALID
+        raise invalid
 
     try:
         _ph.verify(user.hashed_password, password)
     except VerifyMismatchError:
-        raise _INVALID
+        raise invalid from None
 
     # Successful login — clear the rate limit counter
     await _clear_login_rate_limit(redis, normalised)
@@ -182,7 +185,7 @@ async def login(
     return user, token
 
 
-async def logout(redis: aioredis.Redis, token: str) -> None:  # type: ignore[type-arg]
+async def logout(redis: aioredis.Redis, token: str) -> None:
     """Invalidate a session immediately — next request with this cookie gets 401."""
     await redis.delete(f"session:{token}")
 
@@ -199,11 +202,11 @@ async def change_password(
     """
     try:
         _ph.verify(user.hashed_password, current_password)
-    except VerifyMismatchError:
+    except VerifyMismatchError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"detail": "Current password is incorrect", "code": "WRONG_PASSWORD"},
-        )
+        ) from exc
 
     user.hashed_password = _ph.hash(new_password)
     await db.commit()
@@ -211,7 +214,7 @@ async def change_password(
 
 async def delete_account(
     db: AsyncSession,
-    redis: aioredis.Redis,  # type: ignore[type-arg]
+    redis: aioredis.Redis,
     user: User,
     token: str,
     password: str,
@@ -226,11 +229,11 @@ async def delete_account(
     """
     try:
         _ph.verify(user.hashed_password, password)
-    except VerifyMismatchError:
+    except VerifyMismatchError as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail={"detail": "Current password is incorrect", "code": "WRONG_PASSWORD"},
-        )
+        ) from exc
 
     # Invalidate session before deleting the row
     await redis.delete(f"session:{token}")

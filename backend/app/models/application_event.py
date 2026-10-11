@@ -7,13 +7,17 @@ new status, an optional free-text note, and an optional user-supplied date
 """
 
 from datetime import date, datetime
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
-from sqlalchemy import DATE, TIMESTAMP, Enum, ForeignKey, Text, text
+from sqlalchemy import DATE, TIMESTAMP, Enum, ForeignKey, Index, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db import Base
+
+if TYPE_CHECKING:
+    from app.models.saved_posting import SavedPosting
 from app.models.saved_posting import ApplicationStatus
 
 
@@ -37,4 +41,9 @@ class ApplicationEvent(Base):
         TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False
     )
 
-    saved_posting: Mapped["SavedPosting"] = relationship(back_populates="events")  # noqa: F821
+    saved_posting: Mapped["SavedPosting"] = relationship(back_populates="events")
+
+    __table_args__ = (
+        Index("idx_application_events_saved_posting_id", "saved_posting_id"),
+        Index("idx_application_events_created_at", text("created_at DESC")),
+    )

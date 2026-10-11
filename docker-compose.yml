@@ -1,7 +1,22 @@
+# CoopRadar local development stack.
+#
+#   docker compose up --build        # start everything (http://localhost:5173)
+#
+# Values come from .env (copy .env.example). The api container applies database
+# migrations on startup, so a fresh clone needs no manual migration step.
+
+# Settings shared by the API and the background worker
+x-backend-env: &backend-env
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-coopradar}:${POSTGRES_PASSWORD:-coopradar}@db:5432/${POSTGRES_DB:-coopradar}
+  REDIS_URL: redis://redis:6379/0
+  ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+  OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+  AGENT_MODEL: ${AGENT_MODEL:-claude-opus-5-5}
+  FAST_MODEL: ${FAST_MODEL:-claude-haiku-5-5}
+  EMBED_MODEL: ${EMBED_MODEL:-text-embedding-3-small}
+
 services:
-  # PostgreSQL 16 with the pgvector extension pre-installed.
-  # pgvector is unused in Feature 001 but must be present so Feature 003
-  # can add vector columns without a stack change.
+  # PostgreSQL 16 with pgvector (embeddings) and fuzzystrmatch (dedup) available.
   db:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
@@ -19,8 +34,7 @@ services:
       timeout: 5s
       retries: 10
 
-  # Redis for sessions (Feature 002) and the RQ job queue (Feature 003+).
-  # Not used in Feature 001 — it's here so the stack doesn't change later.
+  # Redis: login sessions, rate-limit counters, and the RQ job queue.
   redis:
     image: redis:7-alpine
     restart: unless-stopped
@@ -32,11 +46,12 @@ services:
       timeout: 5s
       retries: 5
 
-  # FastAPI backend. Uvicorn runs with --reload so code changes apply live.
+  # FastAPI backend. Migrates the DB, then serves with --reload so code changes apply live.
   api:
     build:
       context: ./backend
       dockerfile: Dockerfile
+    image: coopradar-api
     restart: unless-stopped
     depends_on:
       db:
@@ -44,38 +59,32 @@ services:
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-coopradar}:${POSTGRES_PASSWORD:-coopradar}@db:5432/${POSTGRES_DB:-coopradar}
-      REDIS_URL: redis://redis:6379/0
+      <<: *backend-env
       CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
     volumes:
       - ./backend:/app
     ports:
       - "8000:8000"
-    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    command: sh -c "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
 
-  # RQ worker for ingest jobs and rq-scheduler for 6-hour scheduled runs.
+  # RQ worker: runs ingestion + embedding jobs and the 6-hourly ingest scheduler.
   worker:
     image: coopradar-api
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
     restart: unless-stopped
     depends_on:
-      db:
-        condition: service_healthy
+      api:
+        condition: service_started
       redis:
         condition: service_healthy
     environment:
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-coopradar}:${POSTGRES_PASSWORD:-coopradar}@db:5432/${POSTGRES_DB:-coopradar}
-      REDIS_URL: redis://redis:6379/0
-      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
-      EMBED_MODEL: ${EMBED_MODEL:-text-embedding-3-small}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      <<: *backend-env
+      INGEST_INTERVAL_HOURS: ${INGEST_INTERVAL_HOURS:-6}
     volumes:
       - ./backend:/app
     command: python -m app.worker
 
-  # Vite dev server with HMR. VITE_API_URL tells the frontend where the API lives.
+  # Vite dev server with HMR. The browser calls /api on the same origin and Vite
+  # proxies it to the api container, so session cookies stay first-party (no CORS).
   web:
     build:
       context: ./frontend
@@ -85,7 +94,7 @@ services:
     depends_on:
       - api
     environment:
-      VITE_API_URL: ${VITE_API_URL:-http://localhost:8000}
+      API_PROXY_TARGET: http://api:8000
     volumes:
       - ./frontend:/app
       - /app/node_modules   # keep container node_modules isolated from host
