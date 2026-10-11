@@ -136,12 +136,14 @@ jobs:
           done
           exit 1
 
-      - name: Smoke test website, API, and demo account
+      - name: Smoke test website, API, demo and guest accounts
         run: |
           curl -fsS http://localhost:8080/ | grep -q '<div id="root">'
-          curl -fsS http://localhost:8080/saved | grep -q '<div id="root">'
+          curl -fsS http://localhost:8080/resume | grep -q '<div id="root">'
           curl -fsS http://localhost:8080/api/postings | grep -q '"total"'
+          curl -fsS "http://localhost:8080/api/postings?students_only=true" | grep -q '"total"'
           curl -fsS -X POST http://localhost:8080/api/auth/demo | grep -q '"is_demo":true'
+          curl -fsS -X POST http://localhost:8080/api/auth/guest | grep -q '"is_demo":true'
 
       - name: Show logs on failure
         if: failure()

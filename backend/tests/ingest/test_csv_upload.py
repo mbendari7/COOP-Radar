@@ -168,9 +168,12 @@ async def test_manual_duplicate_returns_409(client: AsyncClient, db_session: Asy
 
 @pytest.mark.asyncio
 async def test_manual_entry_is_committed_and_queued_for_embedding(
-    client: AsyncClient, db_session: AsyncSession, fake_queue
+    client: AsyncClient, db_session: AsyncSession, fake_queue, monkeypatch
 ):
     """create_manual used to flush without committing, so postings vanished."""
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "openai_api_key", "sk-owner")  # smart search on
     session_token = await _login(client, db_session)
 
     resp = await client.post(
@@ -184,3 +187,22 @@ async def test_manual_entry_is_committed_and_queued_for_embedding(
     detail = await client.get(f"/api/postings/{posting_id}")
     assert detail.status_code == 200
     fake_queue.enqueue.assert_called_with("app.ingest.embed.run_embed_job", posting_id)
+
+
+@pytest.mark.asyncio
+async def test_no_embedding_jobs_without_openai_key(
+    client: AsyncClient, db_session: AsyncSession, fake_queue, monkeypatch
+):
+    """With smart search off, nothing is queued (failing jobs would pile up in Redis)."""
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "openai_api_key", "")
+    session_token = await _login(client, db_session)
+    resp = await client.post(
+        "/api/postings",
+        json={"title": "No Vector Co-op", "company": "PlainCo", "city": "Guelph",
+              "term": "Fall 2027", "deadline": "2027-07-01"},
+        cookies={"session": session_token},
+    )
+    assert resp.status_code == 201
+    fake_queue.enqueue.assert_not_called()

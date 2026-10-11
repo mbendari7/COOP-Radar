@@ -84,7 +84,13 @@ def enqueue_embed_job(posting_id: UUID) -> None:
     Push an embedding job to the RQ queue so the request that created the posting
     doesn't wait on OpenAI. Failures are logged, never raised: a posting without a
     vector still works for keyword search and can be backfilled later.
+    Skipped when the site has no OPENAI_API_KEY (smart search off), so failing jobs never
+    pile up in Redis.
     """
+    from app.config import get_settings
+
+    if not get_settings().openai_api_key:
+        return
     try:
         from app.worker import create_queue
 
