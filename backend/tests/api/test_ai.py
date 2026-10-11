@@ -101,7 +101,7 @@ async def test_upload_without_any_key_gives_free_skill_matches(
     assert res.status_code == 200
     top = res.json()["matches"][0]
     assert top["title"] == "Backend Co-op"
-    assert top["score"] == 67
+    assert top["score"] == 92  # 2 of 3 skills (67) + 25 for a co-op title
     assert top["reason"] == "You have Python, SQL; it also asks for Go."
 
 
@@ -312,14 +312,45 @@ async def test_skill_shortlist_ranks_by_overlap(db_session: AsyncSession) -> Non
         )
 
     db_session.add_all([
-        posting("Full match", ["Python", "SQL"]),
-        posting("Half match", ["Python", "Rust"]),
+        posting("Full match", ["Python", "SQL", "Docker"]),
+        posting("Half match", ["Python", "Rust", "Go", "SQL"]),
+        posting("One-skill posting", ["Python"]),
         posting("No match", ["Haskell"]),
     ])
     await db_session.flush()
 
     rows = await find_candidates(db_session, "Skills: Python, SQL, Docker")
-    order = [r["title"] for r in rows if r["title"] in {"Full match", "Half match", "No match"}]
+    sim = {r["title"]: round(float(r["similarity"]), 2) for r in rows}
 
-    assert order == ["Full match", "Half match", "No match"]
-    assert [round(r["similarity"], 2) for r in rows if r["title"] == "Half match"] == [0.5]
+    assert sim["Full match"] == 1.0
+    assert sim["Half match"] == 0.5
+    # Listing a single skill can't earn full marks from one match (counts as 1 of 3)
+    assert sim["One-skill posting"] == 0.33
+    assert sim["No match"] == 0.0
+
+
+async def test_skill_shortlist_prefers_student_roles_over_senior_ones(
+    db_session: AsyncSession,
+) -> None:
+    def posting(title: str) -> Posting:
+        return Posting(
+            title=title, company="Acme", city="Toronto", province="ON", work_mode=WorkMode.hybrid,
+            term="Summer 2027", duration_months=4, deadline=date.today() + timedelta(days=30),
+            description="d", skills=["Python", "SQL", "React", "Go"],
+        )
+
+    db_session.add_all([
+        posting("Senior Software Engineer"),
+        posting("Software Engineer"),
+        posting("Software Engineering Intern"),
+        posting("Staff Engineer II"),
+    ])
+    await db_session.flush()
+
+    rows = await find_candidates(db_session, "Skills: Python, SQL")
+    sim = {r["title"]: round(float(r["similarity"]), 2) for r in rows}
+
+    assert sim["Software Engineering Intern"] == 0.75  # 2 of 4 skills + student boost
+    assert sim["Software Engineer"] == 0.5
+    assert sim["Senior Software Engineer"] == 0.25      # senior titles count half
+    assert sim["Staff Engineer II"] == 0.25
