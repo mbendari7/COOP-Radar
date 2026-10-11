@@ -31,6 +31,9 @@ from app.schemas.posting import (
 # Maps the whitelisted sort param values to their ORM column.
 # Using a dict means we never interpolate user input into SQL —
 # unknown values are already rejected by Pydantic before we get here.
+# Postgres regex: \m = start of word, \M = end of word
+STUDENT_TITLE_PATTERN = r"\m(intern|interns|internship|co-?op|student|new grad(uate)?|apprentice)\M"
+
 _SORT_MAP = {
     "posted_at": Posting.posted_at,
     "deadline": Posting.deadline,
@@ -100,6 +103,10 @@ async def list_postings(
                 Posting.work_mode == WorkMode.remote,
             )
         )
+
+    if params.students_only:
+        # Constant pattern (no user input): whole-word intern / co-op / student / new grad
+        stmt = stmt.where(Posting.title.op("~*")(STUDENT_TITLE_PATTERN))
 
     if params.province:
         stmt = stmt.where(Posting.province.ilike(params.province))

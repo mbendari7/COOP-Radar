@@ -43,6 +43,8 @@ class PostingListItem(BaseModel):
     skills: list[str]
     source_url: str | None
     closed_at: datetime | None = None
+    # Set for postings imported from a live employer career board (None = sample/manual/CSV)
+    source_id: UUID | None = None
     # Populated for authenticated requests only; None means unauthenticated
     is_saved: bool | None = None
 
@@ -162,6 +164,8 @@ class PostingListParams(BaseModel):
     skills: list[str] | None = None
     show_expired: bool = False
     show_closed: bool = False
+    # Only internships, co-ops, student and new-grad roles (matched on the job title)
+    students_only: bool = False
     search_mode: Literal["keyword", "semantic"] = "keyword"
 
     # Whitelisted sort columns — anything else is a 422 before service is called
