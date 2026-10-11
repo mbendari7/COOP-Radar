@@ -27,7 +27,7 @@ describe('DemoButton', () => {
   afterEach(() => vi.unstubAllGlobals())
 
   it('renders nothing when the server has demo accounts off', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(json({ demo_enabled: false, ai_enabled: false, ai_daily_limit: 20 }))
+    const fetchMock = vi.fn().mockResolvedValue(json({ demo_enabled: false, server_ai_enabled: false, semantic_search_enabled: false, ai_daily_limit: 20 }))
     vi.stubGlobal('fetch', fetchMock)
     renderButton()
     await waitFor(() => expect(fetchMock).toHaveBeenCalled())
@@ -38,7 +38,7 @@ describe('DemoButton', () => {
     const fetchMock = vi.fn((url: string) =>
       Promise.resolve(
         url === '/api/config'
-          ? json({ demo_enabled: true, ai_enabled: true, ai_daily_limit: 20 })
+          ? json({ demo_enabled: true, server_ai_enabled: false, semantic_search_enabled: false, ai_daily_limit: 20 })
           : json({ id: '1', email: 'demo-1@demo.coopradar', created_at: '', is_admin: false, is_demo: true }, 201),
       ),
     )

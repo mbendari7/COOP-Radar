@@ -9,6 +9,9 @@
 
 import ConversationPanel from '../components/ConversationPanel'
 import ResumeUploadForm from '../components/ResumeUploadForm'
+import { Link } from 'react-router-dom'
+import { providerName, useAiKey } from '../api/aiKey'
+import { usePublicConfig } from '../api/meta'
 import { useMatches, type MatchResultOut } from '../api/resume'
 
 function scoreBadgeClass(score: number): string {
@@ -84,6 +87,36 @@ function SkeletonCard() {
   )
 }
 
+function AiKeyNotice() {
+  const aiKey = useAiKey()
+  const { data: config } = usePublicConfig()
+
+  if (aiKey) {
+    return (
+      <p className="text-sm text-gray-500">
+        AI: your {providerName(aiKey.provider)} key · <code>{aiKey.model}</code> ·{' '}
+        <Link to="/ai-key" className="text-blue-700 hover:underline">change</Link>
+      </p>
+    )
+  }
+  if (config?.server_ai_enabled) return null
+  return (
+    <div role="note" className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+      <p className="font-semibold">Add your AI key to match your resume and ask questions.</p>
+      <p className="mt-1">
+        CoopRadar uses your own Claude, ChatGPT, or Gemini key — Gemini has a free tier, and it takes about two
+        minutes to set up.
+      </p>
+      <Link
+        to="/ai-key"
+        className="mt-3 inline-block px-4 py-2 rounded-lg bg-blue-600 text-white font-medium hover:bg-blue-700"
+      >
+        Add my AI key
+      </Link>
+    </div>
+  )
+}
+
 export default function MatchResultsPage() {
   const { data, isLoading } = useMatches()
 
@@ -101,6 +134,8 @@ export default function MatchResultsPage() {
           </p>
         )}
       </div>
+
+      <AiKeyNotice />
 
       {/* Upload / replace section */}
       <section aria-label="Resume upload">

@@ -17,8 +17,8 @@ const FEATURES = [
     body: 'Save postings, move them from Applying to Offer on a board, and never miss a deadline.',
   },
   {
-    title: 'Match your resume with AI',
-    body: 'Upload a resume to get your best-fit postings scored and explained, then ask follow-up questions.',
+    title: 'Match your resume with your own AI',
+    body: 'Bring a Claude, ChatGPT, or Gemini key: get your best-fit postings scored and explained, then ask follow-up questions.',
   },
 ]
 

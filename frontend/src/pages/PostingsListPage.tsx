@@ -18,6 +18,7 @@ import { useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useFilterMeta, usePostings, type SearchMode, type SortField, type SortOrder, type WorkMode, type PageSize } from '../api/postings'
 import { useMe } from '../api/auth'
+import { usePublicConfig } from '../api/meta'
 import FilterBar from '../components/FilterBar'
 import PostingsTable from '../components/PostingsTable'
 import SearchBox from '../components/SearchBox'
@@ -38,6 +39,7 @@ const PAGE_SIZES: PageSize[] = [10, 25, 50]
 export default function PostingsListPage() {
   const [sp, setSp] = useSearchParams()
   const { data: me, isLoading: meLoading } = useMe()
+  const { data: config } = usePublicConfig()
 
   // --- Read params from URL (with sensible defaults) -------------------------
   const q            = sp.get(P.q) ?? ''
@@ -132,10 +134,12 @@ export default function PostingsListPage() {
             onSearch={(v) => update({ [P.q]: v || null })}
           />
         </div>
-        <SearchModeToggle
-          value={search_mode}
-          onChange={(mode) => update({ [P.search_mode]: mode === 'keyword' ? null : mode })}
-        />
+        {config?.semantic_search_enabled && (
+          <SearchModeToggle
+            value={search_mode}
+            onChange={(mode) => update({ [P.search_mode]: mode === 'keyword' ? null : mode })}
+          />
+        )}
       </div>
 
       {/* Filters */}

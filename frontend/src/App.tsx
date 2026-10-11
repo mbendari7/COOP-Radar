@@ -10,6 +10,7 @@
 
 import { lazy, Suspense, useState } from 'react'
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
+import { useAiKey } from './api/aiKey'
 import { useMe, useLogout } from './api/auth'
 import AuthModal from './components/AuthModal'
 import DemoBanner from './components/DemoBanner'
@@ -19,6 +20,7 @@ import PostingsListPage from './pages/PostingsListPage'
 
 // Lazy-load heavy pages so the initial bundle stays small
 const MatchResultsPage = lazy(() => import('./pages/MatchResultsPage'))
+const AiKeyPage = lazy(() => import('./pages/AiKeyPage'))
 const SavedPostingsPage = lazy(() => import('./pages/SavedPostingsPage'))
 const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage'))
 const AdminSourcesPage = lazy(() =>
@@ -43,6 +45,7 @@ function AddPostingsPage() {
 
 function Header() {
   const { data: me, isLoading } = useMe()
+  const aiKey = useAiKey()
   const logout = useLogout()
   const [authOpen, setAuthOpen] = useState(false)
   const [authTab, setAuthTab] = useState<'register' | 'login'>('register')
@@ -61,6 +64,13 @@ function Header() {
 
         {/* Scrolls sideways on narrow phones instead of overflowing the page */}
         <nav className="flex items-center gap-3 overflow-x-auto whitespace-nowrap" aria-label="Main">
+          <Link
+            to="/ai-key"
+            className={`text-sm font-medium ${aiKey ? 'text-green-700 hover:text-green-900' : 'text-gray-600 hover:text-gray-900'}`}
+            title={aiKey ? 'Your AI key is set' : 'Add your own AI key'}
+          >
+            {aiKey ? '✓ AI key' : 'AI key'}
+          </Link>
           {isLoading ? (
             <div className="h-8 w-32 bg-gray-100 rounded animate-pulse" />
           ) : me ? (
@@ -145,6 +155,7 @@ export default function App() {
             <Route path="/postings/:id" element={<PostingDetailPage />} />
             <Route path="/saved" element={<SavedPostingsPage />} />
             <Route path="/matches" element={<MatchResultsPage />} />
+            <Route path="/ai-key" element={<AiKeyPage />} />
             <Route path="/account" element={<AccountSettingsPage />} />
             <Route path="/add" element={<AddPostingsPage />} />
             {/* Older links */}

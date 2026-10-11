@@ -3,6 +3,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { aiHeaders } from './aiKey'
 import { API_BASE, apiFetch, toApiError } from './client'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -43,7 +44,7 @@ const fetchMatches = () => apiFetch<MatchesResponse>('/api/resume/matches')
 function uploadResumeFile(file: File): Promise<UploadResponse> {
   const form = new FormData()
   form.append('file', file)
-  return apiFetch<UploadResponse>('/api/resume', { method: 'POST', body: form })
+  return apiFetch<UploadResponse>('/api/resume', { method: 'POST', body: form, headers: aiHeaders() })
 }
 
 const deleteResumeFile = () => apiFetch<void>('/api/resume', { method: 'DELETE' })
@@ -98,7 +99,7 @@ export async function askAboutPosting(
   try {
     const res = await fetch(`${API_BASE}/api/resume/matches/${postingId}/ask`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...aiHeaders() },
       body: JSON.stringify({ question }),
       credentials: 'include',
     })
