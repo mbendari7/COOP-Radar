@@ -17,10 +17,12 @@
 import { useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useFilterMeta, usePostings, type SearchMode, type SortField, type SortOrder, type WorkMode, type PageSize } from '../api/postings'
+import { useMe } from '../api/auth'
 import FilterBar from '../components/FilterBar'
 import PostingsTable from '../components/PostingsTable'
 import SearchBox from '../components/SearchBox'
 import { SearchModeToggle } from '../components/SearchModeToggle'
+import WelcomeHero from '../components/WelcomeHero'
 
 // URL param names — keep in one place so there's no typo drift
 const P = {
@@ -35,6 +37,7 @@ const PAGE_SIZES: PageSize[] = [10, 25, 50]
 
 export default function PostingsListPage() {
   const [sp, setSp] = useSearchParams()
+  const { data: me, isLoading: meLoading } = useMe()
 
   // --- Read params from URL (with sensible defaults) -------------------------
   const q            = sp.get(P.q) ?? ''
@@ -97,10 +100,13 @@ export default function PostingsListPage() {
 
   return (
     <div className="max-w-7xl mx-auto px-4 py-8 space-y-6">
+      {/* First-visit introduction for signed-out visitors */}
+      {!meLoading && !me && <WelcomeHero />}
+
       {/* Header */}
       <div className="flex items-baseline justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">CoopRadar</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Co-op postings</h1>
           <p className="text-sm text-gray-500 mt-0.5">
             {data ? `${data.total} posting${data.total !== 1 ? 's' : ''}` : 'Loading…'}
           </p>

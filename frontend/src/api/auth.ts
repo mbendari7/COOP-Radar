@@ -15,6 +15,8 @@ export interface UserOut {
   email: string
   created_at: string
   is_admin: boolean
+  /** Throwaway "Try the demo" account (deleted after 24 hours) */
+  is_demo: boolean
 }
 
 interface Credentials {
@@ -71,6 +73,18 @@ export function useLogin() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: (body: Credentials) => apiFetch<UserOut>('/api/auth/login', { method: 'POST', json: body }),
+    onSuccess: () => qc.invalidateQueries(),
+  })
+}
+
+/**
+ * "Try the demo": the server creates a private, pre-filled demo account and logs into it.
+ * Refreshes all cached data so every page reflects the new account.
+ */
+export function useDemoLogin() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: () => apiFetch<UserOut>('/api/auth/demo', { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries(),
   })
 }

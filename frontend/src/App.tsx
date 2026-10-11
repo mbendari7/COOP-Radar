@@ -4,13 +4,16 @@
  * The header shows:
  * - Loading: skeleton placeholder
  * - Authenticated: Saved / Matches / Add postings (+ Admin) links, account link, "Sign out"
- * - Unauthenticated: "Sign in / Register" button that opens AuthModal
+ * - Unauthenticated: "Try the demo", "Sign in", and "Register"
+ * Demo accounts show a "Demo account" label and a banner under the header.
  */
 
 import { lazy, Suspense, useState } from 'react'
 import { Link, Navigate, Route, Routes } from 'react-router-dom'
 import { useMe, useLogout } from './api/auth'
 import AuthModal from './components/AuthModal'
+import DemoBanner from './components/DemoBanner'
+import DemoButton from './components/DemoButton'
 import PostingDetailPage from './pages/PostingDetailPage'
 import PostingsListPage from './pages/PostingsListPage'
 
@@ -56,7 +59,8 @@ function Header() {
           CoopRadar
         </Link>
 
-        <nav className="flex items-center gap-3">
+        {/* Scrolls sideways on narrow phones instead of overflowing the page */}
+        <nav className="flex items-center gap-3 overflow-x-auto whitespace-nowrap" aria-label="Main">
           {isLoading ? (
             <div className="h-8 w-32 bg-gray-100 rounded animate-pulse" />
           ) : me ? (
@@ -91,7 +95,7 @@ function Header() {
                 to="/account"
                 className="text-sm text-gray-500 hover:text-gray-900"
               >
-                {me.email}
+                {me.is_demo ? 'Demo account' : me.email}
               </Link>
               <button
                 onClick={() => logout.mutate()}
@@ -102,6 +106,7 @@ function Header() {
             </>
           ) : (
             <>
+              <DemoButton variant="header" />
               <button
                 onClick={() => openAuth('login')}
                 className="text-sm text-gray-600 hover:text-gray-900 font-medium"
@@ -124,6 +129,7 @@ function Header() {
         onClose={() => setAuthOpen(false)}
         initialTab={authTab}
       />
+      <DemoBanner />
     </header>
   )
 }
