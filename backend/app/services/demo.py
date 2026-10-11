@@ -1,13 +1,19 @@
 """
-Demo accounts — one click, no sign-up, for people trying the hosted site.
+Temporary accounts — no sign-up needed.
+
+- Demo account ("Try the demo"): pre-filled with sample tracker history and matches.
+- Guest account ("Upload your resume" without an account): empty, ready for the visitor's own
+  resume. A guest can keep everything by adding an email + password (claim_account).
+
+Original notes on demo accounts — one click, no sign-up, for people trying the hosted site.
 
 Every visitor gets their *own* throwaway account (so visitors never see or overwrite each
 other's changes), pre-filled with:
   - six saved postings spread across tracker statuses, with notes and dates
   - a sample resume and up to 20 matches scored by skill overlap (no AI cost)
 
-Demo accounts are deleted 24 hours after creation; cleanup runs whenever a new demo
-account is created. Creation is rate-limited per IP address.
+Temporary accounts are deleted 7 days after creation unless claimed; cleanup runs whenever a
+new one is created. Creation is rate-limited per IP address.
 """
 
 import secrets
@@ -28,7 +34,7 @@ from app.models.user import User
 from app.services.auth import _create_session, _ph
 
 DEMO_EMAIL_DOMAIN = "demo.coopradar"
-DEMO_TTL = timedelta(hours=24)
+DEMO_TTL = timedelta(days=7)  # temporary accounts are deleted after this
 _RATE_LIMIT = 10          # demo accounts per IP per hour
 _RATE_WINDOW = 60 * 60
 
@@ -150,8 +156,9 @@ async def create_demo_user(
     redis: aioredis.Redis,
     forwarded_for: str | None,
     peer: str | None,
+    prefill: bool = True,
 ) -> tuple[User, str]:
-    """Create a fresh, pre-filled demo account and start a session for it."""
+    """Create a fresh temporary account (pre-filled demo, or an empty guest) and log into it."""
     await _check_rate_limit(redis, _client_ip(forwarded_for, peer))
     await cleanup_expired_demo_users(db)
 
@@ -163,9 +170,32 @@ async def create_demo_user(
     )
     db.add(user)
     await db.flush()
-    await _fill_demo_data(db, user.id)
+    if prefill:
+        await _fill_demo_data(db, user.id)
     await db.commit()
     await db.refresh(user)
 
     token = await _create_session(redis, user.id)
     return user, token
+
+
+async def claim_account(db: AsyncSession, user: User, email: str, password: str) -> User:
+    """Turn a temporary (demo/guest) account into a normal one, keeping all its data."""
+    if not user.is_demo:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={"detail": "This account is already saved.", "code": "ALREADY_CLAIMED"},
+        )
+    normalised = email.lower().strip()
+    taken = (await db.execute(select(User.id).where(User.email == normalised))).first()
+    if taken:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={"detail": "An account with this email already exists", "code": "EMAIL_TAKEN"},
+        )
+    user.email = normalised
+    user.hashed_password = _ph.hash(password)
+    user.is_demo = False
+    await db.commit()
+    await db.refresh(user)
+    return user

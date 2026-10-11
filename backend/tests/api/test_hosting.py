@@ -17,7 +17,7 @@ from app.config import Settings, get_settings
 from app.main import create_app, mount_frontend
 from app.models.posting import Posting, WorkMode
 from app.models.user import User
-from app.services.demo import cleanup_expired_demo_users, skill_overlap_match
+from app.services.demo import DEMO_TTL, cleanup_expired_demo_users, skill_overlap_match
 
 
 def _posting(title: str, skills: list[str]) -> Posting:
@@ -78,7 +78,7 @@ async def test_demo_disabled_returns_404(client: AsyncClient, monkeypatch: pytes
 
 
 async def test_cleanup_removes_only_expired_demo_users(db_session: AsyncSession) -> None:
-    old = datetime.now(UTC) - timedelta(hours=25)
+    old = datetime.now(UTC) - DEMO_TTL - timedelta(hours=1)
     db_session.add_all([
         User(email="old@demo.coopradar", hashed_password="x", is_demo=True, created_at=old),
         User(email="new@demo.coopradar", hashed_password="x", is_demo=True),

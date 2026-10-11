@@ -20,9 +20,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai import AICredentials, ai_credentials
 from app.db import get_db
 from app.deps import get_current_user
+from app.models.resume import Resume
 from app.models.user import User
 from app.redis import get_redis
+from app.schemas.insights import ResumeInsights
 from app.schemas.resume import AskRequest, MatchesResponse, ResumeOut, UploadResponse
+from app.services.insights import generate_ai_insights, get_insights
 from app.services.resume import delete_resume, get_matches, get_resume, upload_resume
 from app.services.usage import consume_ai_quota
 
@@ -138,7 +141,40 @@ async def ask_about_posting(
     )
 
     return StreamingResponse(
-        stream_answer(creds, posting_text, resume.extracted_text, body.question),
+        stream_answer(creds, posting_text, resume.extracted_text, body.question, body.mode),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
+
+
+async def _require_resume(db: AsyncSession, user: User) -> Resume:
+    resume = await get_resume(db, user.id)
+    if resume is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"detail": "Upload a resume first.", "code": "RESUME_NOT_FOUND"},
+        )
+    return resume
+
+
+@router.get("/insights", response_model=ResumeInsights)
+async def resume_insights(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ResumeInsights:
+    """Skills found + in-demand skills you're missing (free), plus the cached AI review if any."""
+    return await get_insights(db, await _require_resume(db, current_user))
+
+
+@router.post("/insights", response_model=ResumeInsights)
+async def generate_resume_insights(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
+    creds: AICredentials = Depends(ai_credentials("chat")),
+) -> ResumeInsights:
+    """Run the AI resume review on the visitor's key (strengths, tips, roles) and cache it."""
+    resume = await _require_resume(db, current_user)
+    if creds.source == "server":
+        await consume_ai_quota(redis, current_user.id)
+    return await generate_ai_insights(db, resume, creds)

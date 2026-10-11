@@ -1,7 +1,8 @@
 from datetime import datetime
+from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 class ResumeOut(BaseModel):
@@ -50,11 +51,17 @@ class MatchesResponse(BaseModel):
 
 
 class AskRequest(BaseModel):
-    question: str
+    """
+    mode "question": answer `question` with citations (question required)
+    mode "tailor":   how to tailor this resume for the posting (question optional)
+    mode "cover_letter": a short cover-letter opening for the posting (question optional)
+    """
 
-    @field_validator("question")
-    @classmethod
-    def question_not_empty(cls, v: str) -> str:
-        if not v.strip():
+    question: str = Field(default="", max_length=2000)
+    mode: Literal["question", "tailor", "cover_letter"] = "question"
+
+    @model_validator(mode="after")
+    def question_required_for_questions(self) -> "AskRequest":
+        if self.mode == "question" and not self.question.strip():
             raise ValueError("question must not be empty or whitespace-only")
-        return v
+        return self

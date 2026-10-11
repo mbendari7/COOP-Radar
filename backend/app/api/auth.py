@@ -87,3 +87,26 @@ async def demo_login(
     user, token = await create_demo_user(db, redis, x_forwarded_for, peer)
     auth_service.set_session_cookie(response, token)
     return UserOut.model_validate(user)
+
+
+@router.post("/guest", response_model=UserOut, status_code=status.HTTP_201_CREATED)
+async def guest_login(
+    request: Request,
+    response: Response,
+    x_forwarded_for: str | None = Header(default=None),
+    db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
+) -> UserOut:
+    """
+    Start using CoopRadar without signing up: an empty temporary account (kept 7 days).
+    Save it permanently later with POST /api/me/claim.
+    """
+    if not get_settings().demo_enabled:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={"detail": "Guest accounts are turned off.", "code": "DEMO_DISABLED"},
+        )
+    peer = request.client.host if request.client else None
+    user, token = await create_demo_user(db, redis, x_forwarded_for, peer, prefill=False)
+    auth_service.set_session_cookie(response, token)
+    return UserOut.model_validate(user)

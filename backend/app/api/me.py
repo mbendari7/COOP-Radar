@@ -12,8 +12,9 @@ from app.db import get_db
 from app.deps import get_current_user
 from app.models.user import User
 from app.redis import get_redis
-from app.schemas.auth import ChangePasswordIn, DeleteAccountIn, UserOut
+from app.schemas.auth import ChangePasswordIn, DeleteAccountIn, RegisterIn, UserOut
 from app.services import auth as auth_service
+from app.services.demo import claim_account
 
 router = APIRouter(prefix="/me", tags=["account"])
 
@@ -56,3 +57,16 @@ async def delete_account(
         db, redis, current_user, session or "", body.password
     )
     auth_service.clear_session_cookie(response)
+
+
+@router.post("/claim", response_model=UserOut)
+async def claim(
+    body: RegisterIn,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+) -> UserOut:
+    """
+    Keep a temporary (guest/demo) account: add an email + password. All saved jobs, the resume,
+    and matches stay. 400 ALREADY_CLAIMED for normal accounts, 409 EMAIL_TAKEN if in use.
+    """
+    return UserOut.model_validate(await claim_account(db, current_user, body.email, body.password))
