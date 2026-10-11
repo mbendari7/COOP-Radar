@@ -1,6 +1,6 @@
 ---
 name: agent-tools
-description: How CoopRadar uses AI — bring-your-own-key across Claude, ChatGPT (OpenAI), and Gemini (app/ai.py), resume match ranking, the streaming resume Q&A, key handling and safety, prompt-injection and hallucination guards, and the (planned) tool-use agent, MCP server, and evals. Use when working in backend/app/ai.py, backend/app/agent, backend/app/llm.py, backend/app/services/resume.py, backend/app/api/ai.py, frontend/src/api/aiKey.ts, backend/app/mcp, or backend/evals.
+description: How CoopRadar uses AI — bring-your-own-key across Claude, ChatGPT (OpenAI), and Gemini (app/ai.py), the free no-AI matching it builds on, resume match ranking, the AI resume review (insights), the streaming tailor / cover-letter / Q&A assistant, key handling and safety, prompt-injection and hallucination guards, and the (planned) tool-use agent, MCP server, and evals. Use when working in backend/app/ai.py, backend/app/agent, backend/app/llm.py, backend/app/services/resume.py, backend/app/services/insights.py, backend/app/api/ai.py, frontend/src/api/aiKey.ts, backend/app/mcp, or backend/evals.
 ---
 
 # Working with AI in CoopRadar
@@ -13,14 +13,17 @@ headers on AI routes only, forwarded per request, and never stored or logged.
 | Feature | Code | Model | Notes |
 |---|---|---|---|
 | Provider layer | `app/ai.py` | visitor's choice | `complete()`, `stream()`, `list_models()`, `credentials_from_headers()`, error translation |
-| Resume Q&A (streaming SSE) | `app/agent/resume_qa.py` | visitor's model | cites `Resume:` / `Posting:`; errors in-band |
-| Match ranking (top 40 → top 20) | `app/services/resume.py` | visitor's model | stage 1 is SQL skill overlap (no AI); unusable output falls back to stage-1 order; bad key is raised |
+| Free matching (no AI) | `app/services/resume.py` | — | SQL skill coverage (÷ max(n, 3)) × `_student_fit`; used whenever no key is sent (upload uses `ai_credentials("rank", optional=True)`) |
+| Assistant (streaming SSE) | `app/agent/resume_qa.py` | visitor's model | `mode`: `question` (cites `Resume:`/`Posting:`), `tailor`, `cover_letter`; never invent experience; errors in-band |
+| Match re-rank (top 40 → top 20) | `app/services/resume.py` → `POST /api/resume/rematch` | visitor's model | prompt scores senior roles low for students; unusable output falls back to free order; bad key is raised |
+| Resume review (insights) | `app/services/insights.py` → `POST /api/resume/insights` | visitor's model | strict JSON, every field validated + truncated, cached in `resumes.insights`; 502 `AI_BAD_RESPONSE` if unparseable |
 | Key check | `app/api/ai.py` → `POST /api/ai/check` | — | lists models the key can use; rate-limited per IP |
 | Owner fallback (optional) | `ANTHROPIC_API_KEY` + `AGENT_MODEL`/`FAST_MODEL` | `claude-opus-5-5` / `claude-haiku-5-5` | used only when the visitor sent no key; `AI_DAILY_LIMIT` applies |
 | Field extraction (ingest) | `app/ingest/extract.py` | owner's `FAST_MODEL` | background job; skipped without an owner key |
 | Embeddings (optional) | `app/ingest/embed.py` | owner's `EMBED_MODEL` | smart search + similar postings only |
 
 ## Rules
+- AI is an add-on: every core flow (upload, insights' free part, matches) must keep working with no key at all.
 - Every new AI call goes through `app/ai.py` (`complete`/`stream`) with `AICredentials` — never construct a provider
   SDK client elsewhere, never log `creds.api_key`, never put it in an error message or response.
 - New AI-backed routes take `creds: AICredentials = Depends(ai_credentials("rank" | "chat"))` and call

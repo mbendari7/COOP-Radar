@@ -1,215 +1,137 @@
-# How CoopRadar Works
+# How CoopRadar Works (and how to explain it)
 
-This file explains the whole program in plain language, step by step: what each part is, where it lives in the
-repo, what happens when you click something, and how to explain it to someone else (like in an interview).
+Plain language, step by step: what each part is, where it lives, what happens when someone uses the site, and how
+to explain it in a pitch or an interview.
 
-> To install and run it, see **[GETTING_STARTED.md](GETTING_STARTED.md)**.
-> To put it online, see **[DEPLOY.md](DEPLOY.md)**. For the deepest technical detail (every module, test strategy,
-> recipes), see **[PROJECT_GUIDE.md](PROJECT_GUIDE.md)**.
+> Using or sharing the site: [USER_GUIDE.md](USER_GUIDE.md) · Hosting it: [DEPLOY.md](DEPLOY.md) ·
+> Every module in depth: [PROJECT_GUIDE.md](PROJECT_GUIDE.md)
 
 ---
 
 ## 1. The one-paragraph version
 
-CoopRadar is a web app for co-op students. It **collects job postings** (from public job feeds, CSV files, or a
-form) into one **PostgreSQL database**. Students **search and filter** them through a **React** website that talks
-to a **FastAPI** (Python) server, **save** the ones they like, and **track** each application's status. When a student
-**uploads a resume**, the app turns it into a "meaning vector," finds the 40 most similar postings in the database,
-and asks **Claude** to score and explain the best 20. The student can then **ask questions** about any match and
-get streamed answers that cite the resume or the posting.
+CoopRadar is a website for co-op students. A background worker **imports real jobs** from Canadian employers' own
+career pages (the public Greenhouse, Lever, and Ashby job-board APIs) into a **PostgreSQL** database. A student
+**drops in their resume**, with no sign-up needed. In SQL, the app finds which in-demand skills the resume shows and
+which it's missing, and ranks the open jobs that fit a *student* best. With the student's **own AI key** (Claude,
+ChatGPT, or Gemini), it adds a full resume review, per-job tailoring plans, and cover letter openers. Students can
+also search every job and track applications on a board.
 
 ---
 
-## 2. The building blocks (and where they live)
-
-Think of it as five programs working together. Docker Compose (`docker-compose.yml`) starts all five with one command.
+## 2. The building blocks
 
 ```
- You (browser)
-     │  http://localhost:5173
-     ▼
-┌──────────────┐   /api/* requests   ┌──────────────┐  SQL   ┌──────────────────────┐
-│  web         │ ──────────────────▶ │  api         │ ─────▶ │  db  (PostgreSQL)     │
-│  React site  │                     │  FastAPI     │        │  postings, users,     │
-│  frontend/   │ ◀────── JSON ────── │  backend/app │ ◀───── │  tracker, vectors     │
-└──────────────┘                     └──────┬───────┘        └──────────▲───────────┘
-                                            │ sessions, job queue        │
-                                            ▼                            │
-                                     ┌──────────────┐  takes jobs  ┌─────┴────────┐
-                                     │  redis       │ ◀─────────── │  worker      │
-                                     │  fast memory │              │  background  │
-                                     └──────────────┘              │  jobs        │
-                                                                   └──────────────┘
-       Outside services: the visitor's own AI (Claude, ChatGPT, or Gemini), optional OpenAI embeddings, public job feeds
+ Student's browser ──▶  one website (FastAPI serves the React app + the /api)
+                              │            │                 │
+                         PostgreSQL      Redis          the student's AI
+                     (jobs, users,   (sessions, rate   (Claude / ChatGPT / Gemini,
+                      resumes, search) limits, job queue)  their own key, per request)
+                              ▲
+                         worker ── every 6 h ──▶ employers' public career-board APIs
 ```
 
-| Part | What it does | Where in the repo |
+| Part | What it does | Where |
 |---|---|---|
-| **web** (frontend) | The pages you see. Built with React + TypeScript. Asks the API for data and displays it. | `frontend/src/` |
-| **api** (backend) | The "brain." Receives requests, checks who you are, runs the logic, reads/writes the database. | `backend/app/` |
-| **db** (PostgreSQL) | Stores everything. Also does the searching itself (keyword search, vector search, fuzzy matching). | tables defined in `backend/app/models/`, created by `backend/alembic/versions/` |
-| **redis** | Very fast memory for login sessions, rate limits, and the to-do list of background jobs. | configured in `backend/app/redis.py` |
-| **worker** | Does slow work in the background: fetching job feeds, creating embeddings, running every 6 hours. | `backend/app/worker.py`, `backend/app/ingest/` |
+| **Website** (frontend) | Pages: Jobs, My resume, Tracker, AI key. React + TypeScript. | `frontend/src/` |
+| **API** (backend) | Checks who you are, runs the logic, talks to the database. FastAPI (Python). | `backend/app/` |
+| **Database** | Stores everything **and** does the searching (full-text, skill overlap, optional vectors). | `backend/app/models/`, migrations in `backend/alembic/versions/` |
+| **Redis** | Fast memory for login sessions, rate limits, and the background job queue. | `backend/app/redis.py` |
+| **Worker** | Imports jobs from career boards every 6 hours (and creates search vectors if enabled). | `backend/app/worker.py`, `backend/app/ingest/` |
 
-### Inside the backend: four layers
-Every feature in `backend/app/` is split the same way. If you understand one, you understand them all:
+In production all of this is **one container** (`Dockerfile`) plus a database and Redis, which Render creates from
+`render.yaml` with one click.
 
-| Layer | Folder | Job | Example (postings) |
+### Inside the backend: four layers (same for every feature)
+| Layer | Folder | Job | Example |
 |---|---|---|---|
-| **Router** | `api/` | Defines the URL, checks login, hands off to the service | `api/postings.py` → `GET /api/postings` |
-| **Schema** | `schemas/` | Describes and validates the data going in and out | `schemas/posting.py` → `PostingListParams`, `PostingListItem` |
-| **Service** | `services/` | The actual logic and database queries | `services/postings.py` → `list_postings()` |
-| **Model** | `models/` | Python description of a database table | `models/posting.py` → `Posting` |
-
-Other important backend files:
-- `main.py` builds the app and plugs in all routers. `config.py` reads settings from `.env`.
-- `deps.py` works out who is logged in. `llm.py` holds the shared code for talking to Claude.
-- `agent/resume_qa.py` runs the resume Q&A. `seed/` holds the sample data.
-
-### Inside the frontend
-| Folder | Job |
-|---|---|
-| `src/pages/` | One file per screen: postings list, posting detail, Saved, Matches, Account, Admin |
-| `src/components/` | Reusable pieces: table, filter bar, tracker board, login popup, resume upload, Q&A panel |
-| `src/api/` | Every call to the backend. `client.ts` is the single fetch helper; the other files are "hooks" pages use to get data |
-| `src/App.tsx` | The header and which URL shows which page |
+| Router | `api/` | URL, login check, hand off | `api/resume.py` → `GET /api/resume/insights` |
+| Schema | `schemas/` | Validate data in and out | `schemas/insights.py` → `ResumeInsights` |
+| Service | `services/` | Logic + SQL | `services/insights.py` → `free_insights()` |
+| Model | `models/` | A database table | `models/resume.py` → `Resume` |
 
 ---
 
-## 3. Step by step: what happens when you use it
+## 3. What happens, step by step
 
-### 3.1 Starting up (`docker compose up --build`)
-1. Docker starts **db** and **redis** and waits until both are healthy.
-2. **api** starts and runs `alembic upgrade head`. That runs the 6 migration files in order, creating any missing
-   tables (`0001` postings → `0002` users and saved → `0003` tracker history → `0004` ingestion and vectors →
-   `0005` resumes and matches → `0006` demo accounts). Then the web server starts on port 8000.
-3. **worker** starts. It waits for jobs and, every 10 minutes, checks whether any job source is due for its
-   6-hourly refresh.
-4. **web** starts the website on port 5173. Any request to `/api/...` is forwarded to the api container.
+### 3.1 Jobs arrive (the importer)
+`backend/app/ingest/` · sources listed in `backend/seed/job_boards.py`
+1. On start-up and every 6 hours, the worker queues one import per employer (`worker.py`).
+2. The **adapter** for that employer's job board (`boards.py`: Greenhouse, Lever, or Ashby) downloads the
+   company's public job list as JSON. These APIs exist so companies can show their jobs on other sites. No keys,
+   no scraping, and every job links back to the employer.
+3. **Location filter**: only jobs in Canada are kept (`INGEST_LOCATION_FILTER`). A job listed as
+   "London" + "Remote, Canada" is shown as the Canadian option, never mistaken for London, Ontario.
+4. **Location parsing**: free text like "SEA, SF, NY, Toronto" becomes `Toronto, ON` (`parse_location`).
+5. For each job (`runner.py`):
+   - **Seen before?** Update it (re-open it if it came back).
+   - **Near-duplicate** of another posting (same company and city, title more than 85% similar)? Skip it (`dedup.py`).
+   - **New?** Detect skills from a 106-skill list (`skill_match.py`), which knows "Spring 2027" is a season and
+     "Go to market" is not the Go language. It also guesses the term ("Winter 2027"). Most boards publish no
+     deadline, so an **estimated apply-by date** is set and marked as estimated.
+6. Jobs that **disappeared** from a board are marked closed. A board that fails 3 times in a row is auto-paused.
 
-### 3.2 Searching postings
-You type `python` and pick the skill `Docker`:
-1. The page (`pages/PostingsListPage.tsx`) writes your choices into the URL (`?q=python&skills=Docker`). That's why
-   links are shareable.
-2. A data hook (`api/postings.ts → usePostings`) requests `GET /api/postings?q=python&skills=Docker`.
-3. The router (`api/postings.py`) validates the parameters. An unknown sort column is rejected with error 422.
-4. The service (`services/postings.py → list_postings`) builds **one SQL query**:
-   - keyword search uses a pre-built search index (`search_vector`) where title matches count more than description matches
-   - `skills @> ['Docker']` means "must contain all these skills"
-   - expired and closed postings are hidden; sorting and paging also happen in SQL
-5. Postgres returns the 25 rows for that page plus the total count. If you're logged in, the service also marks
-   which ones you saved.
-6. JSON comes back, the table re-renders, and the counter updates.
+### 3.2 Browsing jobs
+`GET /api/postings` → `services/postings.py`. Every filter, the sort, and the page live in the URL (shareable), and
+the database does all filtering, sorting, and paging in **one SQL query**. **Co-op & intern roles only** adds a
+title regex (`intern | co-op | student | new grad | apprentice`, whole words, so "Internal" doesn't match). The city
+filter always includes remote jobs.
 
-> Key idea: **the database does the filtering, sorting, and paging, not the browser.** That's why it stays fast
-> with 10,000+ postings (measured: 95% of requests under ~55 ms).
+### 3.3 Uploading a resume, with no account needed
+1. The student drops a file on **My resume** (`pages/ResumePage.tsx`).
+2. Not signed in? The page first calls `POST /api/auth/guest`, which creates a **private temporary account**
+   (`services/demo.py`, `is_demo = true`, kept 7 days, rate-limited per network) and sets a session cookie.
+3. `POST /api/resume` → `services/resume.py`: check the type and size, extract the text (pypdf / python-docx). Only
+   the text is stored.
 
-### 3.3 Smart search
-Same flow, but in step 4 the service first sends your text to **OpenAI**, which turns it into a list of 1,536
-numbers (an **embedding**) representing its meaning. Every posting has one too (table `posting_embeddings`).
-Postgres's **pgvector** extension sorts postings by how close their vectors are (cosine distance). Similar meaning
-gives close vectors, so "hardware programming" finds "embedded firmware" roles.
+### 3.4 Matching, free and without AI
+1. **Which skills does the resume show?** Every skill that appears in a posting is checked against the resume text
+   (whole words, with the same rules for C, R, Go, and Spring).
+2. **Shortlist in SQL** (`_candidates_by_skills`): for each open job, *coverage* = matched skills ÷ the job's
+   listed skills, with at least 3 in the denominator so a one-skill posting can't score 100.
+3. **Student fit** (`_student_fit`): senior, staff, lead, or manager titles count **half**, and co-op, intern, or
+   new-grad titles get **+25**.
+4. The top 20 are saved, each with a reason built from the data: *"You have Python, SQL; it also asks for Go."*
 
-### 3.4 Registering and logging in
-1. `POST /api/auth/register` → `services/auth.py` hashes the password with **argon2** (the plain password is never
-   stored) and saves the user.
-2. It creates a random 64-character **session token** and stores `session:<token> → your user id` in **Redis**
-   with a 7-day expiry.
-3. The token goes back as an **HTTP-only cookie**. Your browser sends it automatically on every request, and
-   JavaScript can't read it (protection against XSS).
-4. On each request, `deps.py → get_current_user` reads the cookie, looks up Redis, loads you from the database,
-   and resets the 7-day timer.
-5. **Log out** deletes the Redis entry, so the token stops working instantly. 5 wrong passwords in 15 minutes → locked out (429).
+### 3.5 Insights: what the resume says
+`GET /api/resume/insights` → `services/insights.py`
+- **Skills found** (free): the resume's skills that real postings ask for.
+- **In demand, missing** (free): the most-requested skills across open postings, counted in SQL with
+  `unnest(skills)` and `GROUP BY`, minus the ones the resume has.
+- **AI review** (`POST`, the student's key): the resume plus those market numbers go to their AI. A strict prompt
+  asks for JSON (summary, strengths, fixes, tailoring tips, roles to search, keywords) and forbids inventing
+  experience. The reply is validated, then **cached on the resume row** so it's generated once per upload.
 
-### 3.5 Saving and tracking an application
-1. Bookmark → `POST /api/saved` creates a row in `saved_postings` (saving twice is harmless).
-2. Changing the status → `PATCH /api/saved/{id}/status` updates the status **and** adds a row to
-   `application_events` (the history: status, note, date).
-3. The Saved page gets your saves plus counts per status, stats, and deadlines due this week, all computed in SQL.
-4. Every query includes `WHERE user_id = you`, so nobody can ever see someone else's tracker.
+### 3.6 Smarter ranking with AI (optional)
+**Re-rank with my AI** (`POST /api/resume/rematch`) sends the resume plus the ~40 shortlisted jobs to the student's
+AI in one request: "score each 0–100 with a one-sentence reason, as JSON; score senior roles low for students."
+The app drops any job ID the AI invented, removes duplicates, and clamps scores. A rejected key is reported clearly.
+If the reply is garbage, it falls back to the free ranking.
 
-### 3.6 How postings get into the database
-| Source | How |
-|---|---|
-| Sample data | `python -m seed` (`backend/seed/`) |
-| CSV upload | `POST /api/postings/upload` → each row validated → duplicates skipped → saved |
-| Manual form | `POST /api/postings` |
-| Job feeds (automatic) | the **worker** runs `ingest/runner.py` for each source every 6 hours, or when an admin clicks **Run now** |
+### 3.7 Tailor, cover letter, ask
+`POST /api/resume/matches/{id}/ask` with `mode` = `tailor`, `cover_letter`, or `question` → `agent/resume_qa.py`.
+- Each mode has its own prompt. **Tailor** returns Fit / Lead with / Rewrite these bullets / Keywords / Gaps.
+  **Cover letter** returns a 4–5 sentence opener. **Question** answers with `Resume:` / `Posting:` citations, or
+  says exactly "I don't have enough information to answer that."
+- Every prompt says the resume and posting are **data, not instructions** (prompt-injection protection) and never
+  to invent experience.
+- Answers **stream** word by word (Server-Sent Events). If the provider fails mid-answer, an in-band error event
+  explains why.
 
-The automatic ingestion, step by step (`backend/app/ingest/`):
-1. The **adapter** fetches the feed: `json_api.py` for JSON job APIs, `rss.py` for RSS feeds.
-2. For each posting found:
-   - **Seen before from this source?** Update it.
-   - **Near-duplicate** of an existing posting? Skip it. Same company and city plus ≥ 85% similar title, using
-     Postgres's Levenshtein distance (`dedup.py`).
-   - **New?** Fill in missing fields (work mode, term, skills) by keyword matching against a 106-skill list, and
-     if that's not confident, by asking Claude (`extract.py`). Guessed fields are flagged "low confidence."
-3. Postings from this source that **disappeared** from the feed get marked closed.
-4. The run's stats are saved (`ingest_runs`); 3 failures in a row → the source is auto-paused.
-5. Each new posting gets a background job to create its embedding (`embed.py`).
+### 3.8 Bring your own AI key
+- The **AI key** page (`pages/AiKeyPage.tsx`) explains how to get a key, then calls `POST /api/ai/check`, which asks
+  the provider which models the key can use.
+- The key is kept **only in the browser** (`api/aiKey.ts`) and sent as `X-AI-*` headers on AI requests only.
+- `app/ai.py` exposes `complete()` and `stream()`. Inside, it uses each official SDK (`anthropic`, `openai`,
+  `google-genai`) and maps their errors to clear messages. The key is never stored, logged, or echoed.
 
-### 3.7 Resume matching: the AI part
-`POST /api/resume` → `services/resume.py`:
-1. **Check the file**: PDF or DOCX, max 5 MB.
-2. **Extract the text** (pypdf / python-docx). Only the text is stored, never the file.
-3. **Work out whose AI to use** (`app/ai.py`): the visitor's key arrives in the `X-AI-Provider`, `X-AI-Key`, and
-   `X-AI-Model` headers. No key → error `AI_KEY_REQUIRED` ("add your own AI key"), unless the site owner set their
-   own key as a fallback.
-4. **Stage 1, fast and free (no AI)**: find which skills from the postings appear in the resume (whole-word match,
-   so "C" doesn't match "C++"), then ask Postgres for the **40 open postings whose required skills overlap most**.
-   If the site owner turned on embeddings, it uses meaning-vector similarity instead.
-5. **Stage 2, smart and precise**: send the resume plus those 40 postings to **the visitor's AI** (Claude,
-   ChatGPT, or Gemini, with the model they picked) in one request: "score each 0–100 with a one-sentence reason,
-   reply as JSON."
-6. **Check the answer**: drop any posting ID the AI made up, remove duplicates, keep scores within 0–100, and keep
-   the top 20.
-7. **Backup plan**: if the AI replies with nonsense, the stage-1 overlap becomes the score so the upload still
-   works. A *rejected key* is reported ("Gemini rejected the API key"), never hidden.
-8. Save the results in `match_results` and show them on the Matches page.
-
-> Why two stages? The database can compare skills across every posting instantly and for free. An AI model is
-> precise but slow and costs the visitor money per posting. So the database narrows everything to 40, and the AI
-> carefully ranks just those 40.
-
-### 3.8 Asking questions about a match
-`POST /api/resume/matches/{posting_id}/ask` → `agent/resume_qa.py`:
-1. Checks the posting is one of **your** matches.
-2. Sends the visitor's AI (their key, their model) a strict instruction: answer **only** from the provided posting and resume,
-   start each claim with `Resume:` or `Posting:`, and if the answer isn't there, reply exactly
-   *"I don't have enough information to answer that."*
-3. The posting and resume are wrapped in tags and labelled "data, not instructions." That way, a posting that
-   says "ignore your rules" can't hijack the assistant (**prompt-injection protection**).
-4. The answer is **streamed** back with Server-Sent Events, so words appear as the AI writes them. If the
-   provider fails mid-answer, an `{"error": …}` event explains why (e.g. out of credit).
-
-### 3.8b Bringing your own key: how the three providers fit in
-- The **AI key page** (`frontend/src/pages/AiKeyPage.tsx`) shows how to get a key from each provider, then calls
-  `POST /api/ai/check`. The server asks that provider "which models can this key use?" and suggests a default.
-- The key is saved **only in the browser** (`frontend/src/api/aiKey.ts`: tab-only by default, or "remember on this
-  device"). It's attached as headers to AI requests only.
-- `backend/app/ai.py` gives the rest of the app just two functions, `complete()` and `stream()`. Inside, it uses each
-  company's official SDK (`anthropic`, `openai`, `google-genai`) and turns their different errors into the same
-  three messages: key rejected, out of credit / rate limited, or provider error. The key is never stored, logged, or
-  put in an error message.
-
-### 3.9 "Try the demo"
-`POST /api/auth/demo` → `services/demo.py`:
-1. Rate-limits by network (10 demo accounts per hour) and deletes demo accounts older than 24 hours.
-2. Creates a brand-new private user (`is_demo = true`), so visitors never see each other's changes.
-3. Saves six upcoming postings across tracker statuses, with notes and dates.
-4. Adds a sample resume and scores postings by **skill overlap** (what share of a posting's skills the resume
-   has). This needs no AI call, so the demo is free and works even without API keys.
-5. Logs the visitor in with a normal session cookie and opens the tracker.
-
-### 3.10 Running as one website (production)
-In development the site and API are separate containers. In production the root `Dockerfile` builds the React site
-and copies it into the API image, so **one container serves everything on one URL**:
-- `/api/...` goes to FastAPI routes; anything else returns the built site (`main.py → mount_frontend`). That's
-  why refreshing on `/saved` still works.
-- On start, `backend/scripts/start.sh` runs the migrations, loads sample data, starts the worker, and launches the
-  web server.
-- `docker-compose.prod.yml` adds Postgres, Redis, and optional automatic HTTPS (Caddy). `render.yaml` does the same
-  on Render. A per-user daily AI limit (`services/usage.py`) protects the owner's API bill.
+### 3.9 Accounts, keeping a temporary account, and the tracker
+- Passwords are hashed with **argon2id**. Sessions are random tokens in Redis (7-day rolling expiry), sent as
+  **HTTP-only cookies**.
+- **Keep my account** → `POST /api/me/claim` adds an email and password to a temporary account and clears
+  `is_demo`. Everything stays.
+- **Tracker**: save a job, then move it through statuses with dated notes. Every query is scoped to `user_id`, so
+  nobody sees anyone else's data.
 
 ---
 
@@ -217,87 +139,84 @@ and copies it into the API image, so **one container serves everything on one UR
 
 | Table | Holds |
 |---|---|
-| `postings` | every job posting (+ a built-in search index) |
-| `posting_embeddings` | one meaning-vector per posting |
-| `users` | accounts (email, hashed password, admin flag, demo flag) |
-| `saved_postings` | which user saved which posting, and its current status |
-| `application_events` | history of status changes with notes and dates |
-| `resumes` | one resume's text per user |
+| `postings` | every job (+ a weighted full-text index) and its source |
+| `ingest_sources` / `ingest_runs` | the 27 career boards and a log of each import |
+| `skills` | the skill list (names and aliases) used to tag postings and read resumes |
+| `users` | accounts (argon2 hash, admin flag, temporary flag) |
+| `resumes` | one resume's text per user + the cached AI review (`insights`, JSONB) |
 | `match_results` | the scored matches for a resume |
-| `ingest_sources` / `ingest_runs` | job feeds and the log of each fetch |
-| `skills` | the skill list used to tag postings |
+| `saved_postings` / `application_events` | the tracker and its history |
+| `posting_embeddings` | optional meaning-vectors (only when the owner sets an OpenAI key) |
 
 ---
 
 ## 5. How quality is guaranteed
 
-- **200 automated tests**: 177 backend (`backend/tests/`) and 23 frontend (`frontend/tests/`). AI calls are faked
-  in tests, so they're free and repeatable.
-- **GitHub Actions** (`.github/workflows/ci.yml`) runs on every push: linting, strict type checks, database
-  migrations forwards and backwards, all tests, a 10,000-posting speed test, and a production build.
-- **The constitution** (`.specify/memory/constitution.md`): 9 rules the project follows, e.g. "filtering happens in
-  SQL," "AI must cite sources," "users can delete their data."
-
-### How it was built: AI-assisted, spec-first
-Each feature was written as a specification first (`specs/001…004/`), using **Spec Kit** inside **Claude Code**:
-spec → clarify → plan → tasks → implement → check what's missing. The project's conventions are written down as
-**skills** (`.claude/skills/`) so the AI follows them, and `docs/agentic-workflow.md` logs what the AI did and what
-was reviewed by a human.
+- **261 automated tests**: 234 backend (`backend/tests/`) and 27 frontend (`frontend/tests/`). AI providers and job
+  boards are mocked, so tests are free and offline.
+- **CI** (`.github/workflows/ci.yml`) on every push: ruff, mypy `--strict`, eslint, tsc, migrations up, down, and
+  up again plus a drift check, all tests, a 10,000-posting latency budget, and a **production-image smoke test**
+  (build, boot, hit the pages, create demo and guest accounts).
+- **Constitution** (`.specify/memory/constitution.md`): rules like "filter in SQL," "AI must cite or say it doesn't
+  know," and "users can delete their data."
+- Built spec-first with **Spec Kit + Claude Code**. The log is in `docs/agentic-workflow.md`.
 
 ---
 
 ## 6. How to explain it
 
-### 30-second version
-> "CoopRadar is a full-stack app that puts co-op postings from different sources into one searchable place, lets
-> students track their applications on a board, and matches their resume to postings with AI. It's a React and
-> TypeScript frontend on a FastAPI backend with PostgreSQL. Postgres does keyword search, vector search with
-> pgvector, and fuzzy de-duplication itself, so I don't need a separate search engine. Redis and a background worker
-> handle sessions and ingestion. The AI is bring-your-own-key: users plug in a Claude, ChatGPT, or Gemini key,
-> the database shortlists 40 postings by skill overlap, and their model ranks the top 20 and explains each one."
+### 30-second pitch (to students)
+> "Drop in your resume and CoopRadar tells you what it's good at, which in-demand skills you're missing, and which
+> real co-op and intern jobs from Canadian companies you should apply to. With a free Gemini key it'll also review
+> your resume and write a tailoring plan and cover letter opener for any job. No sign-up needed."
+
+### 30-second version (to an engineer or employer)
+> "It's a full-stack app: React and TypeScript on FastAPI with PostgreSQL. A worker imports real jobs from
+> employers' public Greenhouse, Lever, and Ashby APIs every six hours, with location parsing and de-duplication. Resume
+> matching runs in SQL first. Skill coverage plus a student-fit adjustment ranks jobs for free. Then an optional
+> bring-your-own-key layer uses Claude, ChatGPT, or Gemini for reviews, re-ranking, and streamed tailoring. One
+> container on Render, 261 tests, CI with a production smoke test."
 
 ### 2-minute walkthrough (follow the data)
-1. **Data in**: postings come from public job feeds (a background worker fetches them every 6 hours, removes
-   duplicates, fills in missing fields), CSV uploads, or a form.
-2. **Storage**: one Postgres database. Each posting gets a weighted full-text index (and optionally an embedding).
-3. **Search**: the React page keeps filters in the URL and calls the API. The API builds a single SQL query that
-   filters, sorts, and pages, and it stays under 60 ms at the 95th percentile on 10,000 postings.
-4. **Accounts and tracker**: argon2-hashed passwords, HTTP-only cookie sessions stored in Redis, and a status
-   history per saved posting with a drag-and-drop board.
-5. **AI (bring your own key)**: resume → top 40 by skill overlap (SQL, free) → the user's own Claude/ChatGPT/Gemini
-   scores the top 20 → follow-up Q&A that streams and must cite the resume or posting. The key stays in their
-   browser and is never stored on the server.
-6. **Quality**: 200 tests, strict typing, CI on every push, and spec-first development with Claude Code.
+1. **Data in**: the worker pulls about 800 Canadian jobs from 27 employers' public job-board APIs, filters to
+   Canada, parses locations, de-duplicates, and tags skills.
+2. **Resume in**: drop a file and you get a temporary account. Text is extracted, and only the text is stored.
+3. **Free intelligence**: SQL finds skills found and missing (`unnest` and `GROUP BY` over all open jobs) and ranks
+   jobs by skill coverage with a student-fit adjustment.
+4. **AI layer (their key)**: review, re-rank, tailor, cover letter, and cited Q&A. Prompts treat documents as data,
+   replies are validated, results are cached, and answers stream.
+5. **Product details**: no sign-up, keep the account later, a tracker board, mobile-friendly, keys never leave the
+   browser except per request.
+6. **Quality**: 261 tests, strict typing, CI that boots the real production image.
 
-### Likely questions and good answers
+### Likely questions
 | Question | Answer |
 |---|---|
-| *Why filter in SQL, not in the browser?* | The browser would have to download every posting. SQL uses indexes, returns just one page, and stays fast as data grows. |
-| *How do you stop SQL injection?* | User input is always passed as bound parameters or through the ORM, never pasted into SQL strings. Sort columns come from a fixed allowlist. |
-| *Why two stages for matching?* | Vector search is cheap enough to scan everything; the LLM is accurate but costly, so it only sees a shortlist. |
-| *How do you stop the AI from making things up?* | Context-only instructions, required citations, an exact "not enough information" answer, ignoring IDs it invents, and treating posting text as data. |
-| *Why bring-your-own-key?* | Hosting costs me nothing, users control their own spending, and they can choose the provider they trust. The key lives in their browser and is only forwarded per request. |
-| *How do you support three AI providers?* | One module (`app/ai.py`) exposes `complete()` and `stream()`; inside it uses each official SDK and normalizes their errors. Model lists come from the provider, so names never go stale. |
-| *What if the AI service is down?* | Matching falls back to similarity scores; search falls back to keyword; Q&A shows a clear message. Nothing crashes. |
-| *Why cookies + Redis instead of JWT?* | Logout and expiry take effect immediately (delete the key), and HTTP-only cookies can't be read by injected scripts. |
-| *How do you know it works?* | 200 automated tests, a performance test, and CI that also checks the database migrations and the models agree. |
-| *What would you build next?* | A tool-using assistant that can search and save postings (with confirmation), exposing the same tools over MCP, plus real public job-board sources and deployment. |
+| *Where do the jobs come from? Is it scraping?* | No. Greenhouse, Lever, and Ashby offer public JSON APIs specifically so companies' jobs can be shown elsewhere. No logins, no HTML scraping, and every job links back to the employer to apply. |
+| *Why match in SQL before AI?* | SQL compares the resume with every open job instantly, for free, and works for users without a key. AI is precise but slow and costs money per token, so it only sees a 40-job shortlist. |
+| *Why did senior roles stop showing up first?* | Raw skill overlap ranked "Senior Engineer II" at 100 for a student. A one-skill posting can't hit 100 now, and title-based student fit halves senior roles and boosts intern and co-op ones. There's a test for it. |
+| *How do you stop the AI making things up?* | Context-only prompts, required citations, an exact "not enough information" reply, never inventing experience, discarding IDs it invents, and treating resume and posting text as data. |
+| *Why bring-your-own-key?* | Hosting stays free, users control their own spend, and they pick the provider they trust. The key stays in their browser. |
+| *How does "no sign-up" work securely?* | A temporary account with a random password nobody knows and a normal HTTP-only session, rate-limited per network and deleted after 7 days unless claimed with an email and password. |
+| *What breaks if a job board changes?* | Only that source. The run is logged, it auto-pauses after 3 failures, and the other 26 keep working. Adapters are tested against recorded responses. |
+| *How would it scale?* | Search is indexed SQL (p95 about 55 ms on 10,000 postings in CI). The AI cost sits with users. The importer is a queue, so more workers can be added. |
+| *What's next?* | More employers and schools' public feeds, email alerts for new matches, a tool-using assistant exposed over MCP, and per-school location presets. |
 
 ---
 
-## 7. Where to look when you want to change something
+## 7. Where to change things
 
 | I want to change… | Look in |
 |---|---|
-| What a page looks like | `frontend/src/pages/` and `frontend/src/components/` |
-| A search filter | `backend/app/schemas/posting.py` + `backend/app/services/postings.py` + `frontend/src/components/FilterBar.tsx` |
-| How matching scores postings | `backend/app/services/resume.py` (`_RERANK_PROMPT`) |
-| What the Q&A assistant may say | `backend/app/agent/resume_qa.py` (`_SYSTEM_PROMPT`) |
-| Which AI providers are supported / how keys are handled | `backend/app/ai.py` (server), `frontend/src/api/aiKey.ts` + `pages/AiKeyPage.tsx` (browser) |
-| The "how to get a key" steps | `frontend/src/api/aiKey.ts` (`PROVIDER_GUIDES`) and `docs/AI_KEYS.md` |
-| A database table | `backend/app/models/` + a new migration (use the `/db-migration` skill in Claude Code) |
-| A new job feed | `backend/app/ingest/` (see "Add an ingest adapter" in `docs/PROJECT_GUIDE.md`) |
-| Sample data | `backend/seed/` |
-| What the demo account contains | `backend/app/services/demo.py` |
-| The welcome section / demo button | `frontend/src/components/WelcomeHero.tsx`, `DemoButton.tsx` |
-| How the site is hosted | `Dockerfile`, `docker-compose.prod.yml`, `render.yaml`, `docs/DEPLOY.md` |
+| Which employers are imported | `backend/seed/job_boards.py` |
+| Which locations are kept | `INGEST_LOCATION_FILTER` (`backend/app/config.py`) |
+| How free matching scores jobs | `backend/app/services/resume.py` (`_MIN_SKILLS`, `_student_fit`, `SENIOR_TITLE_PATTERN`) |
+| The AI review | `backend/app/services/insights.py` (`_INSIGHTS_PROMPT`) |
+| Tailor / cover letter / Q&A prompts | `backend/app/agent/resume_qa.py` |
+| The skill list | `backend/seed/skills.py` (re-seeding updates aliases) |
+| The resume page | `frontend/src/pages/ResumePage.tsx` |
+| The per-job assistant | `frontend/src/components/ConversationPanel.tsx` |
+| Home page hero | `frontend/src/components/WelcomeHero.tsx` |
+| AI providers and key handling | `backend/app/ai.py`, `frontend/src/api/aiKey.ts`, `pages/AiKeyPage.tsx` |
+| A database table | `backend/app/models/` + a migration (the `/db-migration` skill) |
+| Hosting | `Dockerfile`, `render.yaml`, `docker-compose.prod.yml`, `docs/DEPLOY.md` |

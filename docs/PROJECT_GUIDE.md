@@ -1,7 +1,7 @@
 # CoopRadar — The Project Guide
 
 This is the deep technical reference: how every part works, so you can debug and extend it.
-Start with the shorter guides if you haven't: **[GETTING_STARTED.md](GETTING_STARTED.md)** (run and use it) and
+Start with the shorter guides if you haven't: **[USER_GUIDE.md](USER_GUIDE.md)** (use it, put it online, tips) and
 **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)** (how it works, plus how to explain it).
 
 **Contents**
@@ -27,7 +27,7 @@ CoopRadar is a **monorepo** with a Python API, a React single-page app, and five
 
 | Container | What it is | Why it exists |
 |---|---|---|
-| `db` | PostgreSQL 16 (`pgvector/pgvector:pg16` image) | Single source of truth. Also does keyword search (`tsvector`), vector search (`pgvector`), and fuzzy matching (`fuzzystrmatch`), so there's no separate search engine to run. |
+| `db` | PostgreSQL 16 (`pgvector/pgvector:pg16` image) | Single source of truth. Also does keyword search (`tsvector`), skill-overlap ranking (array `unnest`), and optional vector search (`pgvector`), so there's no separate search engine to run. |
 | `redis` | Redis 7 | Three jobs: login sessions, rate-limit counters, and the RQ job queue. |
 | `api` | FastAPI on Uvicorn, port 8000 | Every HTTP endpoint. Runs `alembic upgrade head` on start. |
 | `worker` | `python -m app.worker` (same image as `api`) | Executes background jobs (ingesting feeds, generating embeddings) and schedules ingest runs every 6 hours. |
@@ -65,8 +65,9 @@ Then walk through the app and check that each piece works. This doubles as your 
 4. Toggle **smart search** and try `low-level firmware`. Results come back ranked by meaning.
 5. **Register** (password ≥ 10 chars). Bookmark a posting, then open **Saved**: change status, add a note with a date,
    switch to **Board** and drag a card, and **↓ CSV** to export.
-6. **Matches**: upload a PDF/DOCX resume. Within ~10–30 s you get up to 20 scored matches. Click **Ask about this
-   role** and ask "What skills am I missing?" The answer streams in with `Resume:`/`Posting:` citations.
+6. **My resume**: drop a PDF/DOCX resume (signed out is fine: a temporary account is created). With no AI key you
+   immediately get skills found, in-demand skills missing, and 20 skill-ranked matches. Add a key on **AI key**, then
+   try **Get my AI review**, **Re-rank with my AI**, and a match's **Tailor my resume**. Answers stream in.
 7. Make yourself admin (see the README), refresh, and open **Admin**. Click **Run now** on "Acme Jobs (Dev Fixture)".
    After a few seconds, **History** shows a run with 5 added. Run it again: 0 added, 5 updated, 0 closed.
 8. **http://localhost:8000/docs**: the interactive OpenAPI docs. Try endpoints directly.
@@ -163,14 +164,15 @@ postings, 0003 tracker events, 0004 ingestion, pgvector, and admin, 0005 resume 
 | `app/llm.py` | `get_client()` builds the Anthropic client from settings; `response_text()` joins text blocks and skips thinking blocks; `parse_json()` tolerates code fences and prose. |
 | `app/worker.py` | RQ worker plus a scheduler thread that enqueues due ingest sources every 10 minutes. Also `create_queue()`, used by the API to enqueue jobs. |
 | `app/api/postings.py` | List, detail, similar, filter metadata, CSV upload (rate-limited 3/hour per user via a Redis counter), manual create. |
-| `app/api/auth.py`, `me.py` | Register, login (5 failed attempts / 15 min → 429), logout, profile, change password, delete account. |
+| `app/api/auth.py`, `me.py` | Register, login (5 failed attempts / 15 min → 429), logout, demo + guest temporary accounts, profile, change password, delete account, claim (keep) a temporary account. |
 | `app/api/saved.py` | Tracker CRUD, status changes (each one writes an event), CSV export. |
-| `app/api/resume.py` | Upload/get/delete a resume, list matches, and SSE Q&A. |
+| `app/api/resume.py` | Upload (AI optional)/get/delete a resume, list matches, AI re-rank, insights (GET free + cached / POST AI review), and the SSE assistant (`mode`: question · tailor · cover_letter). |
 | `app/api/admin.py` | Sources list, run history, trigger a run, enable/re-enable a source. |
 | `app/services/*.py` | The logic behind each router (see section 6). |
-| `app/ingest/` | `base.py` (`RawPosting`, `BaseAdapter`), `json_api.py`, `rss.py`, `registry.py` (adapter_type → class), `runner.py` (one ingest pass), `dedup.py` (Levenshtein), `extract.py` (regex then Claude), `embed.py` (OpenAI + backfill CLI), `csv_validator.py`. |
+| `app/ingest/` | `base.py` (`RawPosting`, `BaseAdapter`), `boards.py` (Greenhouse / Lever / Ashby adapters, location filter + parser, HTML to text), `json_api.py`, `rss.py`, `registry.py` (adapter_type → class), `runner.py` (one ingest pass, estimated deadlines), `dedup.py` (difflib title similarity), `skill_match.py` (context-aware skill detection), `extract.py` (skills/term/work mode, then Claude if the owner set a key), `embed.py` (OpenAI + backfill CLI; skipped without a key), `csv_validator.py`. |
 | `app/agent/resume_qa.py` | The streaming, citation-grounded Q&A. |
-| `seed/` | `python -m seed` runs `__main__.py`: postings, skills, and two fixture-backed sources. Idempotent. |
+| `seed/` | `python -m seed`: skills (always; aliases updated on re-run), `job_boards.py` (27 employers), sample postings, and two fixture sources, each behind a `SEED_*` flag. Idempotent. |
+| `app/services/insights.py` | Free insights (skills found, in-demand skills missing via `unnest … GROUP BY`) and the cached AI review. |
 
 ---
 
@@ -223,31 +225,54 @@ flowchart TD
     I --> E["after commit: enqueue run_embed_job per new posting"]
 ```
 
-To add a real source, insert an `ingest_sources` row with `adapter_type='json_api'` and
-`config={"url": "...", "field_map": {"title": "job_title", ...}}`, or write a new adapter (see recipes). Always
-check the site's terms and robots.txt first.
+**Career boards (the main source):** `seed/job_boards.py` lists 27 employers as `(company, adapter_type, board)`,
+with adapter types `greenhouse`, `lever`, and `ashby`. These official public job-board APIs exist for syndicating a
+company's openings. `boards.py` keeps only locations matching `INGEST_LOCATION_FILTER` (Canada by default; for
+multi-location jobs it picks the first matching one), parses `City, Province`, and maps work mode. Most boards
+publish no deadline, so the runner sets an *estimated* apply-by date 45 days out, flags it in
+`low_confidence_fields`, and pushes it forward on each run while the job is still listed. To add an employer,
+append a tuple and redeploy (or insert an `ingest_sources` row). For other feeds use `adapter_type='json_api'` with
+a `field_map`, or write an adapter (see recipes). Always check the site's terms and robots.txt first.
 
-### 6.5 Resume matcher (`services/resume.py`) — bring your own key
+### 6.5 Resume matcher (`services/resume.py`), with AI optional
 1. **Credentials** (`app/ai.py → ai_credentials`): the visitor's key arrives as `X-AI-Provider` / `X-AI-Key` /
    `X-AI-Model` headers. With no key, the owner's `ANTHROPIC_API_KEY` is used if set (then `AI_DAILY_LIMIT`
-   applies via `services/usage.py`); otherwise 400 `AI_KEY_REQUIRED`.
+   applies via `services/usage.py`). Upload uses `ai_credentials("rank", optional=True)`: with no key at all it gets
+   `None` and ranks for free. AI-only endpoints (`rematch`, insights `POST`, `ask`) return 400 `AI_KEY_REQUIRED`.
 2. **Upload**: the extension must be `.pdf`/`.docx` and the file ≤ 5 MB. Text comes out via pypdf/python-docx, and
    empty text gives 422. The old resume is deleted (its matches cascade), and the new one is stored.
 3. **Stage 1, recall (`find_candidates`)**: by default, `skills_in_text` finds which posting skills appear in the
-   resume (whole-word, so "C" ≠ "C++"), and SQL ranks open postings by the *share of their skills covered*
-   (`unnest(skills) … = ANY(:resume_skills)`). No AI, no cost. If the owner set `OPENAI_API_KEY`, pgvector cosine
-   similarity is used instead.
+   resume (`skill_match.mentions`: whole-word, so "C" ≠ "C++", plus context rules for C/R/Go/Spring), and SQL ranks
+   open postings by coverage = matched ÷ `greatest(cardinality(skills), 3)`, adjusted by `_student_fit` (×0.5 for
+   `SENIOR_TITLE_PATTERN`, +0.25 for `STUDENT_TITLE_PATTERN`, capped at 1). No AI, no cost. If the owner set
+   `OPENAI_API_KEY`, pgvector cosine similarity (with the same student fit) is used instead. Without AI the top 20
+   are stored with a skill reason ("You have Python, SQL; it also asks for Go.").
 4. **Stage 2, precision (`rank_with_ai`)**: one call through `ai.complete()` to the visitor's provider/model scores
    every candidate 0–100 with a reason as a JSON array. The code drops invented IDs and duplicates, clamps scores,
    and keeps the top 20.
 5. **Fallback**: unusable output → the stage-1 relevance becomes the score. A rejected key, unknown model, or
    exhausted credit is **raised** (400/429 with a clear code) rather than hidden, and the old resume is kept
    (the transaction rolls back).
-6. **Q&A** (`agent/resume_qa.py`): `POST /api/resume/matches/{posting_id}/ask` checks that the posting is in *your*
-   matches, then streams Server-Sent Events through `ai.stream()`: `data: {"delta": "…"}` … `data: [DONE]`. The
-   system prompt forces `Resume:`/`Posting:` citations, the exact "I don't have enough information to answer
-   that." line, and treats the tagged posting/resume text as data (a prompt-injection guard). Provider errors arrive
-   in-band as `data: {"error": "…"}` because the HTTP status is already 200 once streaming starts.
+6. **Re-rank** (`POST /api/resume/rematch`): re-runs both stages on the stored text with the visitor's AI and
+   replaces the stored matches.
+7. **Assistant** (`agent/resume_qa.py`): `POST /api/resume/matches/{posting_id}/ask` with `mode` = `question`
+   (question required), `tailor`, or `cover_letter`. It checks that the posting is in *your* matches, then streams
+   Server-Sent Events through `ai.stream()`: `data: {"delta": "…"}` … `data: [DONE]`. The question prompt forces
+   `Resume:`/`Posting:` citations and the exact "I don't have enough information to answer that." line. Every
+   prompt treats the tagged posting/resume text as data (a prompt-injection guard) and forbids inventing
+   experience. Provider errors arrive in-band as `data: {"error": "…"}` because the HTTP status is already 200 once
+   streaming starts.
+8. **Insights** (`services/insights.py`): `GET /api/resume/insights` returns skills found plus the 8 most-requested
+   missing skills (free), and `resumes.insights` if cached. `POST` sends the resume and those market numbers to the
+   visitor's AI for strict JSON (summary, strengths, improvements, tailoring tips, roles, keywords), validates and
+   truncates every field, caches it, and returns 502 `AI_BAD_RESPONSE` if unparseable.
+
+### 6.6 Temporary accounts (`services/demo.py`)
+`POST /api/auth/demo` (pre-filled tracker + resume + skill matches) and `POST /api/auth/guest` (empty, used when a
+signed-out visitor uploads a resume) both create a user with `is_demo = true` and a random unknown password,
+rate-limited to 10 per network per hour. Accounts older than 7 days are deleted (cascading) whenever a new one is
+created. `POST /api/me/claim {email, password}` keeps one: email uniqueness (409 `EMAIL_TAKEN`), argon2 hash,
+`is_demo = false`.
 
 **`app/ai.py` in one paragraph:** `complete()` and `stream()` hide three official SDKs (`anthropic`, `openai`,
 `google-genai`). `list_models()` powers `POST /api/ai/check` (rate-limited per IP) so the UI offers only models the
@@ -265,7 +290,10 @@ the visitor per posting. SQL narrows thousands of postings to 40, then one LLM c
 | Piece | Where | Notes |
 |---|---|---|
 | Providers | `src/main.tsx` | `BrowserRouter` plus `QueryClientProvider` (30 s staleTime, 1 retry). |
-| Routes | `src/App.tsx` | `/` list · `/postings/:id` detail · `/saved` tracker · `/matches` resume matcher · `/ai-key` bring-your-own-key · `/account` · `/add` CSV + manual entry · `/admin/sources`. Signed-out visitors see `WelcomeHero` with the demo button. Heavy pages are lazy-loaded. |
+| Routes | `src/App.tsx` | `/` jobs · `/postings/:id` detail · `/resume` My resume (upload, insights, matches, assistant) · `/saved` tracker · `/ai-key` bring-your-own-key · `/account` · `/add` CSV + manual entry · `/admin/sources` · `/matches` → `/resume`. Signed-out visitors see `WelcomeHero` ("Analyze my resume"). Heavy pages are lazy-loaded. |
+| Resume page | `pages/ResumePage.tsx` | `ResumeDropzone` (guest login if signed out, then upload), `InsightsSection`, `MatchesSection` + `MatchCard`. |
+| Per-job assistant | `components/ConversationPanel.tsx`, `RichText.tsx` | Tailor / cover letter / ask buttons, streamed replies rendered from a safe Markdown subset (never HTML), copy button. |
+| Temporary accounts | `components/DemoBanner.tsx`, `ClaimAccountForm.tsx` | Banner with **Keep my account** → `POST /api/me/claim`. |
 | HTTP | `src/api/client.ts` | `apiFetch` (relative `/api` URLs, cookies, JSON, throws `ApiError {status, code}`) and `toApiError`. |
 | AI key | `src/api/aiKey.ts`, `pages/AiKeyPage.tsx` | Key kept in session/localStorage only; `aiHeaders()` attaches it to AI requests; provider how-to steps in `PROVIDER_GUIDES`. |
 | Hooks | `src/api/{postings,auth,saved,resume,ingest,meta,aiKey}.ts` | One TanStack Query hook per endpoint. Mutations invalidate affected keys (e.g. saving invalidates `['saved']` and `['postings']` so `is_saved` refreshes). |
@@ -283,9 +311,9 @@ origin (see `docs/DEPLOY.md`).
 
 ## 8. Testing: how it works and why
 
-**Backend** (`backend/tests/`, 177 tests):
-- `conftest.py` rebuilds the schema once per session (`drop_all`/`create_all`, after enabling `vector` and
-  `fuzzystrmatch`). Each test then runs inside an outer transaction with
+**Backend** (`backend/tests/`, 234 tests):
+- `conftest.py` rebuilds the schema once per session (`drop_all`/`create_all`, after enabling `vector`). Each
+  test then runs inside an outer transaction with
   `join_transaction_mode="create_savepoint"`, so a service's `commit()` only releases a savepoint and everything
   rolls back after the test. Tests are isolated yet exercise the real commit paths.
 - `client` is an httpx client on the real app with `get_db`/`get_redis` overridden. It keeps cookies, so
@@ -293,15 +321,19 @@ origin (see `docs/DEPLOY.md`).
   won't send Secure cookies over `http://test`.
 - `fake_queue` (autouse) replaces RQ. `mock_claude_create`, `mock_claude_stream`, and `mock_embedding` replace AI
   calls, so **no test touches the network**.
-- Folders: `api/` endpoints · `ingest/` adapters, runner, dedup, extraction, admin · `resume/` upload, matching,
-  Q&A · `eval/` output-handling cases for the matcher · `perf/` the 10k-row latency budget (`-m perf`).
+- Folders: `api/` endpoints (incl. guest/claim, students-only, free matching, student fit) · `ingest/` career-board
+  adapters (respx-mocked recorded responses), location parsing, skill matching, runner, dedup, extraction, admin ·
+  `resume/` upload, matching, insights, tailor/cover-letter modes, Q&A · `eval/` output-handling cases for the
+  matcher · `perf/` the 10k-row latency budget (`-m perf`).
 
-**Frontend** (`frontend/tests/`, 23 tests): FilterBar, PostingsTable, DemoButton, the AI key store + page, and the API client, using Vitest + Testing
-Library in jsdom.
+**Frontend** (`frontend/tests/`, 27 tests): FilterBar, PostingsTable (incl. Live badge, location formatting),
+DemoButton, ResumePage (guest-then-upload flow, file validation), RichText, the AI key store + page, and the API
+client, using Vitest + Testing Library in jsdom.
 
 **CI** (`.github/workflows/ci.yml`) on every push runs ruff → mypy --strict → migrations up/down/up →
 `alembic check` → pytest → perf for the backend, eslint → tsc → vitest → `vite build` for the frontend, then builds
-the production image with `docker-compose.prod.yml` and smoke-tests the site, API, and demo login.
+the production image with `docker-compose.prod.yml` and smoke-tests the site, the resume page, the API (incl.
+`students_only`), and demo and guest accounts.
 
 ---
 
@@ -393,12 +425,12 @@ is a classic bug class:
 - **Spec 004 remainder**: a tool-use assistant (search/compare/save with a UI confirmation step),
   an MCP server exposing the same tools, `agent_runs` logging (tokens, latency, cost), and a YAML eval runner that
   gates CI at 80%. The `agent-tools` skill describes the intended design.
-- **Real sources**: only the two dev fixtures exist. Add public job boards whose terms allow it.
+- **More sources**: 27 employer boards today; add more employers, and schools' public feeds where terms allow.
 - **Admin UX**: creating sources is SQL-only; there's no UI to add sources or review `low_confidence_fields`.
 - **Fit breakdown**: the spec's "60% required skills / 25% similarity / 15% eligibility" breakdown isn't shown; the
   score is a single number with a reason.
 - **Unsave from the list page**: the list knows `is_saved` but not the saved-row ID, so the bookmark there can only save.
-- **Deploy**: Feature 005 (hosting, health page, error tracking, usage dashboard).
+- **Ops**: error tracking and a usage dashboard for the hosted site.
 
 ---
 
@@ -406,9 +438,10 @@ is a classic bug class:
 
 | Symptom | Fix |
 |---|---|
-| Matches page says "No matches found yet" | Postings have no embeddings. Set `OPENAI_API_KEY`, then `docker compose exec api python -m app.ingest.embed`. |
-| Upload says matching is unavailable (503) | The OpenAI key is missing or invalid. |
-| Q&A shows "The assistant is unavailable right now" | `ANTHROPIC_API_KEY` is missing/invalid, or the model name in `AGENT_MODEL` is wrong. |
+| My resume shows no matches | No open postings yet. On a fresh site the worker imports the career boards within a few minutes (`docker compose logs worker`), or click **Run now** on the Admin page. |
+| No jobs at all after deploy | Check the worker started (`RUN_WORKER=true`) and outbound internet is allowed; check `ingest_runs.error_log` on the Admin page. |
+| A resume shows "We couldn't spot any listed skills" | The PDF is an image, or it has no skills the postings mention. Try a text-based PDF with a Skills line. |
+| AI buttons say "Add your own AI key…" | Expected without a key: add one on **AI key** (or set the owner's `ANTHROPIC_API_KEY`). |
 | Logged in but still treated as logged out | You're calling the API on another origin. Use the app at `localhost:5173` (proxy), or set `VITE_API_URL` **and** `CORS_ORIGINS`. |
 | "Run now" returns 503 `QUEUE_UNAVAILABLE` | Redis or the worker isn't running: `docker compose ps`, then `docker compose logs worker`. |
 | A source shows "Auto-paused" | 3 consecutive failures. Fix the URL/config, then click **Re-enable**. |
