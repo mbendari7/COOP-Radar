@@ -290,14 +290,20 @@ async def list_models(provider: Provider, api_key: str) -> list[dict[str, str]]:
 # ── FastAPI dependency ────────────────────────────────────────────────────────
 
 
-def ai_credentials(task: Literal["rank", "chat"]) -> Any:
-    """Dependency factory: `creds: AICredentials = Depends(ai_credentials("chat"))`."""
+def ai_credentials(task: Literal["rank", "chat"], optional: bool = False) -> Any:
+    """
+    Dependency factory: `creds: AICredentials = Depends(ai_credentials("chat"))`.
+    With optional=True the dependency yields None (instead of 400 AI_KEY_REQUIRED) when
+    neither the visitor nor the site has a key, so the endpoint can use its free path.
+    """
 
     def dependency(
         x_ai_provider: str | None = Header(default=None),
         x_ai_key: str | None = Header(default=None),
         x_ai_model: str | None = Header(default=None),
-    ) -> AICredentials:
+    ) -> AICredentials | None:
+        if optional and not x_ai_key and not get_settings().anthropic_api_key:
+            return None
         return credentials_from_headers(x_ai_provider, x_ai_key, x_ai_model, task)
 
     return dependency

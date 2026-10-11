@@ -26,7 +26,13 @@ from app.redis import get_redis
 from app.schemas.insights import ResumeInsights
 from app.schemas.resume import AskRequest, MatchesResponse, ResumeOut, UploadResponse
 from app.services.insights import generate_ai_insights, get_insights
-from app.services.resume import delete_resume, get_matches, get_resume, upload_resume
+from app.services.resume import (
+    delete_resume,
+    get_matches,
+    get_resume,
+    rematch_resume,
+    upload_resume,
+)
 from app.services.usage import consume_ai_quota
 
 router = APIRouter(prefix="/resume", tags=["resume"])
@@ -38,14 +44,15 @@ async def upload_resume_endpoint(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     redis: aioredis.Redis = Depends(get_redis),
-    creds: AICredentials = Depends(ai_credentials("rank")),
+    creds: AICredentials | None = Depends(ai_credentials("rank", optional=True)),
 ) -> UploadResponse:
     """
     Upload a resume (PDF/DOCX, ≤5 MB), extract text, run match pipeline,
-    store results, and return ranked matches. Uses the visitor's AI key (X-AI-* headers);
-    only the site owner's fallback key counts toward the daily AI limit.
+    store results, and return ranked matches. With the visitor's AI key (X-AI-* headers) the
+    AI ranks and explains matches; without any key, matches are ranked by skill overlap for
+    free. Only the site owner's fallback key counts toward the daily AI limit.
     """
-    if creds.source == "server":
+    if creds is not None and creds.source == "server":
         await consume_ai_quota(redis, current_user.id)
     file_bytes = await file.read()
     filename = file.filename or "resume"
@@ -178,3 +185,17 @@ async def generate_resume_insights(
     if creds.source == "server":
         await consume_ai_quota(redis, current_user.id)
     return await generate_ai_insights(db, resume, creds)
+
+
+@router.post("/rematch", response_model=UploadResponse)
+async def rematch_endpoint(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
+    creds: AICredentials = Depends(ai_credentials("rank")),
+) -> UploadResponse:
+    """Re-rank the stored resume against today's postings with the visitor's AI."""
+    resume = await _require_resume(db, current_user)
+    if creds.source == "server":
+        await consume_ai_quota(redis, current_user.id)
+    return await rematch_resume(db, resume, creds)

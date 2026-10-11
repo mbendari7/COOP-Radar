@@ -59,15 +59,77 @@ def test_site_owner_key_is_the_fallback(monkeypatch: pytest.MonkeyPatch) -> None
     assert creds.source == "server" and creds.model == get_settings().agent_model
 
 
-async def test_upload_without_any_key_explains_what_to_do(client: AsyncClient) -> None:
+NO_KEY = {"X-AI-Provider": "", "X-AI-Key": "", "X-AI-Model": ""}
+
+
+def _docx(text_value: str) -> bytes:
+    import io
+
+    from docx import Document
+
+    doc = Document()
+    doc.add_paragraph(text_value)
+    buf = io.BytesIO()
+    doc.save(buf)
+    return buf.getvalue()
+
+
+async def _seed_two_postings(db_session: AsyncSession) -> None:
+    def posting(title: str, skills: list[str]) -> Posting:
+        return Posting(
+            title=title, company="Acme", city="Toronto", province="ON", work_mode=WorkMode.hybrid,
+            term="Summer 2027", duration_months=4, deadline=date.today() + timedelta(days=30),
+            description="d", skills=skills,
+        )
+
+    db_session.add_all([posting("Backend Co-op", ["Python", "SQL", "Go"]),
+                        posting("iOS Intern", ["Swift"])])
+    await db_session.flush()
+
+
+async def test_upload_without_any_key_gives_free_skill_matches(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    """No AI key anywhere: the upload still works, ranked and explained by skill overlap."""
+    await _seed_two_postings(db_session)
     await client.post("/api/auth/register", json={"email": "nokey@test.com", "password": "Password1!"})
     res = await client.post(
         "/api/resume",
-        files={"file": ("r.pdf", b"%PDF", "application/pdf")},
-        headers={"X-AI-Provider": "", "X-AI-Key": "", "X-AI-Model": ""},
+        files={"file": ("r.docx", _docx("Skills: Python, SQL"), "application/octet-stream")},
+        headers=NO_KEY,
     )
-    assert res.status_code == 400
-    assert res.json()["code"] == "AI_KEY_REQUIRED"
+    assert res.status_code == 200
+    top = res.json()["matches"][0]
+    assert top["title"] == "Backend Co-op"
+    assert top["score"] == 67
+    assert top["reason"] == "You have Python, SQL; it also asks for Go."
+
+
+async def test_rematch_needs_a_key_then_ranks_with_ai(
+    client: AsyncClient,
+    db_session: AsyncSession,
+    mock_claude_create: Callable[[str], AsyncMock],
+) -> None:
+    await _seed_two_postings(db_session)
+    await client.post("/api/auth/register", json={"email": "rematch@test.com", "password": "Password1!"})
+    files = {"file": ("r.docx", _docx("Skills: Python, SQL"), "application/octet-stream")}
+    first = await client.post("/api/resume", files=files, headers=NO_KEY)
+    backend_id = first.json()["matches"][0]["posting_id"]
+
+    no_key = await client.post("/api/resume/rematch", headers=NO_KEY)
+    assert no_key.status_code == 400
+    assert no_key.json()["code"] == "AI_KEY_REQUIRED"
+
+    mock_claude_create(json.dumps([
+        {"posting_id": backend_id, "score": 91, "reason": "Python and SQL APIs fit well."}
+    ]))
+    res = await client.post("/api/resume/rematch")  # client sends the test AI key headers
+    assert res.status_code == 200
+    assert [(m["score"], m["reason"]) for m in res.json()["matches"]] == [
+        (91, "Python and SQL APIs fit well.")
+    ]
+    stored = (await client.get("/api/resume/matches")).json()["items"]
+    assert [m["score"] for m in stored] == [91]
 
 
 # ── Provider calls (mocked SDKs) ──────────────────────────────────────────────

@@ -126,7 +126,7 @@ async def _candidates_by_skills(db: AsyncSession, resume_text: str) -> list[Any]
     stmt = (
         select(
             Posting.id, Posting.title, Posting.company, Posting.city, Posting.province,
-            Posting.term, Posting.deadline, Posting.description, similarity,
+            Posting.term, Posting.deadline, Posting.description, Posting.skills, similarity,
         )
         .where(*_OPEN)
         .order_by(similarity.desc(), Posting.deadline, Posting.id)
@@ -153,7 +153,8 @@ async def _candidates_by_embedding(db: AsyncSession, resume_text: str) -> list[A
     stmt = (
         select(
             Posting.id, Posting.title, Posting.company, Posting.city, Posting.province,
-            Posting.term, Posting.deadline, Posting.description, (1 - distance).label("similarity"),
+            Posting.term, Posting.deadline, Posting.description, Posting.skills,
+            (1 - distance).label("similarity"),
         )
         .join(PostingEmbedding, PostingEmbedding.posting_id == Posting.id)
         .where(*_OPEN)
@@ -206,29 +207,47 @@ async def rank_with_ai(
     return [item for item in parsed if isinstance(item, dict)]
 
 
-def _shortlist_rankings(rows: list[Any]) -> list[dict[str, Any]]:
-    """Fallback ranking: turn the stage-1 relevance into a 0-100 score."""
+def _skill_reason(posting_skills: list[str], resume_text: str) -> str:
+    """'You have Python, SQL; the posting also asks for Go.' — no AI involved."""
+    if not posting_skills:
+        return "Matched on how closely your resume's wording fits the posting."
+    have = skills_in_text(posting_skills, resume_text)
+    missing = [s for s in posting_skills if s not in have]
+    reason = f"You have {', '.join(have)}" if have else "None of its listed skills found yet"
+    return reason + (f"; it also asks for {', '.join(missing)}." if missing else ".")
+
+
+def _shortlist_rankings(
+    rows: list[Any], resume_text: str, ai_failed: bool = False
+) -> list[dict[str, Any]]:
+    """Ranking without AI: the stage-1 relevance as a 0-100 score, explained by skills."""
+    note = " (AI ranking unavailable.)" if ai_failed else ""
     return [
         {
             "posting_id": str(r["id"]),
             "score": round(float(r.get("similarity") or 0.0) * 100),
-            "reason": "Ranked by how closely your resume matches the posting "
-            "(AI ranking unavailable).",
+            "reason": _skill_reason(list(r.get("skills") or []), resume_text) + note,
         }
         for r in rows[:_TOP_N]
     ]
 
 
 async def embed_and_rank(
-    db: AsyncSession, extracted_text: str, creds: AICredentials
+    db: AsyncSession, extracted_text: str, creds: AICredentials | None
 ) -> list[MatchResultOut]:
-    """Run both stages and return up to 20 results, best first."""
+    """
+    Run both stages and return up to 20 results, best first. Without AI credentials the
+    free skill-overlap ranking is used (stage 1 only).
+    """
     rows = await find_candidates(db, extracted_text)
     if not rows:
         return []
 
-    resume_snippet = extracted_text[:_RESUME_CHARS]
-    rankings = await rank_with_ai(creds, resume_snippet, rows) or _shortlist_rankings(rows)
+    if creds is None:
+        rankings = _shortlist_rankings(rows, extracted_text)
+    else:
+        ai_rankings = await rank_with_ai(creds, extracted_text[:_RESUME_CHARS], rows)
+        rankings = ai_rankings or _shortlist_rankings(rows, extracted_text, ai_failed=True)
 
     posting_by_id = {str(r["id"]): r for r in rows}
     results: list[MatchResultOut] = []
@@ -273,7 +292,7 @@ async def upload_resume(
     user_id: UUID,
     filename: str,
     file_bytes: bytes,
-    creds: AICredentials,
+    creds: AICredentials | None,
 ) -> UploadResponse:
     """
     Validate, extract text, run match pipeline, and store results.
@@ -328,10 +347,20 @@ async def upload_resume(
     db.add(resume)
     await db.flush()  # populate resume.id before FK use
 
-    # Run match pipeline
     matches = await embed_and_rank(db, extracted, creds)
+    await _store_matches(db, resume, matches)
+    return UploadResponse(resume=ResumeOut.model_validate(resume), matches=matches)
 
-    # Bulk-insert match results
+
+async def rematch_resume(db: AsyncSession, resume: Resume, creds: AICredentials) -> UploadResponse:
+    """Re-run matching on the stored resume text (e.g. with AI after adding a key)."""
+    matches = await embed_and_rank(db, resume.extracted_text, creds)
+    await db.execute(delete(MatchResult).where(MatchResult.resume_id == resume.id))
+    await _store_matches(db, resume, matches)
+    return UploadResponse(resume=ResumeOut.model_validate(resume), matches=matches)
+
+
+async def _store_matches(db: AsyncSession, resume: Resume, matches: list[MatchResultOut]) -> None:
     if matches:
         await db.execute(
             pg_insert(MatchResult),
@@ -345,14 +374,8 @@ async def upload_resume(
                 for m in matches
             ],
         )
-
     await db.commit()
     await db.refresh(resume)
-
-    return UploadResponse(
-        resume=ResumeOut.model_validate(resume),
-        matches=matches,
-    )
 
 
 async def get_resume(db: AsyncSession, user_id: UUID) -> Resume | None:
