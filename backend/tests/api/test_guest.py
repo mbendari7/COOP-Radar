@@ -125,3 +125,21 @@ async def test_students_only_keeps_intern_coop_and_new_grad_roles(
     everything = await client.get("/api/postings", params={"page_size": 50})
     assert everything.json()["total"] == 6
     assert "source_id" in everything.json()["items"][0]
+
+
+async def test_hide_senior_drops_senior_lead_and_manager_titles(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    db_session.add_all([
+        _posting("Software Engineer"),
+        _posting("Data Analyst Intern"),
+        _posting("Senior Software Engineer"),
+        _posting("Engineering Manager"),
+        _posting("Software Engineer II"),
+        _posting("Leadership Programs Coordinator"),  # "Leadership" must not match "lead"
+    ])
+    await db_session.flush()
+
+    res = await client.get("/api/postings", params={"hide_senior": "true", "page_size": 50})
+    titles = {item["title"] for item in res.json()["items"]}
+    assert titles == {"Software Engineer", "Data Analyst Intern", "Leadership Programs Coordinator"}

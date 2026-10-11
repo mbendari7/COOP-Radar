@@ -31,7 +31,7 @@ from app.models.posting import Posting
 from app.models.posting_embedding import PostingEmbedding
 from app.models.resume import Resume
 from app.schemas.resume import MatchesResponse, MatchResultOut, ResumeOut, UploadResponse
-from app.services.postings import STUDENT_TITLE_PATTERN
+from app.services.postings import SENIOR_TITLE_PATTERN, STUDENT_TITLE_PATTERN
 
 logger = logging.getLogger(__name__)
 
@@ -102,10 +102,6 @@ _RERANK_PROMPT = (
 _MIN_SKILLS = 3  # a posting listing 1 skill shouldn't score 100 on one match
 _OPEN = (Posting.closed_at.is_(None), Posting.deadline >= func.current_date())
 
-# Titles that are clearly not for students (Postgres regex, \m / \M = word boundaries)
-SENIOR_TITLE_PATTERN = (
-    r"\m(senior|sr|staff|principal|lead|manager|director|head|vp|architect|ii|iii|iv)\M"
-)
 
 
 def _student_fit(similarity: Any) -> Any:

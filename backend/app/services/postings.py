@@ -33,6 +33,10 @@ from app.schemas.posting import (
 # unknown values are already rejected by Pydantic before we get here.
 # Postgres regex: \m = start of word, \M = end of word
 STUDENT_TITLE_PATTERN = r"\m(intern|interns|internship|co-?op|student|new grad(uate)?|apprentice)\M"
+# Titles that are clearly not for students
+SENIOR_TITLE_PATTERN = (
+    r"\m(senior|sr|staff|principal|lead|manager|director|head|vp|architect|ii|iii|iv)\M"
+)
 
 _SORT_MAP = {
     "posted_at": Posting.posted_at,
@@ -107,6 +111,9 @@ async def list_postings(
     if params.students_only:
         # Constant pattern (no user input): whole-word intern / co-op / student / new grad
         stmt = stmt.where(Posting.title.op("~*")(STUDENT_TITLE_PATTERN))
+
+    if params.hide_senior:
+        stmt = stmt.where(~Posting.title.op("~*")(SENIOR_TITLE_PATTERN))
 
     if params.province:
         stmt = stmt.where(Posting.province.ilike(params.province))

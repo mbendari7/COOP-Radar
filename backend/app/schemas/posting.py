@@ -166,6 +166,8 @@ class PostingListParams(BaseModel):
     show_closed: bool = False
     # Only internships, co-ops, student and new-grad roles (matched on the job title)
     students_only: bool = False
+    # Hide senior / staff / lead / manager / director roles (matched on the job title)
+    hide_senior: bool = False
     search_mode: Literal["keyword", "semantic"] = "keyword"
 
     # Whitelisted sort columns — anything else is a 422 before service is called
