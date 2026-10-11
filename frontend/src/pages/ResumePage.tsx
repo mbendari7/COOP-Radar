@@ -14,6 +14,7 @@ import { providerName, useAiKey } from '../api/aiKey'
 import { guestLogin, useMe } from '../api/auth'
 import { ApiError } from '../api/client'
 import { usePublicConfig } from '../api/meta'
+import { useSavePosting } from '../api/saved'
 import {
   useDeleteResume,
   useGenerateInsights,
@@ -362,7 +363,30 @@ function MatchCard({ match }: { match: MatchResultOut }) {
       </div>
       <p className="text-sm text-gray-700">{match.reason}</p>
       <ConversationPanel postingId={match.posting_id} postingTitle={match.title} company={match.company} />
+      <SaveToTracker postingId={match.posting_id} />
     </article>
+  )
+}
+
+/** Save a matched job to the tracker (saving twice is harmless on the server). */
+function SaveToTracker({ postingId }: { postingId: string }) {
+  const save = useSavePosting()
+  return (
+    <div className="flex items-center gap-3 text-sm">
+      <Link to={`/postings/${postingId}`} className="text-blue-700 hover:underline">View job &amp; apply ↗</Link>
+      {save.isSuccess ? (
+        <Link to="/saved" className="text-green-700 font-medium hover:underline">Saved to tracker ✓</Link>
+      ) : (
+        <button
+          type="button"
+          onClick={() => save.mutate(postingId)}
+          disabled={save.isPending}
+          className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
+        >
+          {save.isPending ? 'Saving…' : '☆ Save to tracker'}
+        </button>
+      )}
+    </div>
   )
 }
 

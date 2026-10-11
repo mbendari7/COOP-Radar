@@ -90,7 +90,7 @@ export default function AuthModal({ open, onClose, initialTab = 'register' }: Pr
       >
         <button
           onClick={onClose}
-          className="absolute top-4 right-4 text-gray-400 hover:text-gray-600"
+          className="absolute top-4 right-4 text-gray-500 hover:text-gray-600"
           aria-label="Close"
         >
           ✕
@@ -148,7 +148,7 @@ export default function AuthModal({ open, onClose, initialTab = 'register' }: Pr
 
           <div>
             <label htmlFor="auth-password" className="block text-sm font-medium text-gray-700 mb-1">
-              Password {tab === 'register' && <span className="text-gray-400 font-normal">(min 10 characters)</span>}
+              Password {tab === 'register' && <span className="text-gray-500 font-normal">(min 10 characters)</span>}
             </label>
             <input
               id="auth-password"

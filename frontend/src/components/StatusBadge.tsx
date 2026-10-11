@@ -23,7 +23,7 @@ function badgeClass(status: ApplicationStatus | null): string {
     case 'offer':      return 'bg-green-100 text-green-700'
     case 'rejected':   return 'bg-gray-100 text-gray-500'
     case 'withdrawn':  return 'bg-orange-50 text-orange-500'
-    default:           return 'bg-gray-50 text-gray-400'
+    default:           return 'bg-gray-50 text-gray-500'
   }
 }
 

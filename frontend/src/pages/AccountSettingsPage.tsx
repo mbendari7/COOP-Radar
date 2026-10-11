@@ -30,7 +30,7 @@ export default function AccountSettingsPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
 
   if (isLoading) {
-    return <div className="flex justify-center items-center h-64 text-gray-400">Loading…</div>
+    return <div className="flex justify-center items-center h-64 text-gray-500">Loading…</div>
   }
 
   if (!me) {
@@ -123,7 +123,7 @@ export default function AccountSettingsPage() {
           </div>
           <div>
             <label htmlFor="new-pw" className="block text-sm font-medium text-gray-700 mb-1">
-              New password <span className="text-gray-400 font-normal">(min 10 characters)</span>
+              New password <span className="text-gray-500 font-normal">(min 10 characters)</span>
             </label>
             <input
               id="new-pw"

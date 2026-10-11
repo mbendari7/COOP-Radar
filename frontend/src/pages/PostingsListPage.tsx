@@ -29,12 +29,14 @@ import WelcomeHero from '../components/WelcomeHero'
 const P = {
   q: 'q', city: 'city', province: 'province', term: 'term',
   work_mode: 'work_mode', duration: 'duration', skills: 'skills',
-  show_expired: 'show_expired', search_mode: 'search_mode', students_only: 'students_only',
+  show_expired: 'show_expired', search_mode: 'search_mode', level: 'level',
   sort: 'sort', order: 'order',
   page: 'page', page_size: 'page_size',
 } as const
 
 const PAGE_SIZES: PageSize[] = [10, 25, 50]
+
+type Level = '' | 'students' | 'all'
 
 export default function PostingsListPage() {
   const [sp, setSp] = useSearchParams()
@@ -50,7 +52,10 @@ export default function PostingsListPage() {
   const duration     = sp.getAll(P.duration).map(Number).filter((d) => [4,8,12,16].includes(d))
   const skills       = sp.getAll(P.skills).filter(Boolean)
   const show_expired = sp.get(P.show_expired) === 'true'
-  const students_only = sp.get(P.students_only) === 'true'
+  // Level: '' = students & entry-level (default, hides senior roles) · 'students' · 'all'
+  const level = (sp.get(P.level) ?? (sp.get('students_only') === 'true' ? 'students' : '')) as Level
+  const students_only = level === 'students'
+  const hide_senior = level === ''
   const search_mode  = ((sp.get(P.search_mode) ?? 'keyword') as SearchMode)
   const sort         = (sp.get(P.sort) ?? 'posted_at') as SortField
   const order        = (sp.get(P.order) ?? 'desc') as SortOrder
@@ -68,6 +73,7 @@ export default function PostingsListPage() {
     skills: skills.length ? skills : undefined,
     show_expired,
     students_only,
+    hide_senior,
     search_mode,
     sort,
     order,
@@ -118,15 +124,18 @@ export default function PostingsListPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-4">
-        {/* Students-only toggle */}
-        <label className="flex items-center gap-2 text-sm font-medium text-gray-800 cursor-pointer select-none">
-          <input
-            type="checkbox"
-            className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
-            checked={students_only}
-            onChange={(e) => update({ [P.students_only]: e.target.checked ? 'true' : null })}
-          />
-          Co-op &amp; intern roles only
+        {/* Level */}
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-800">
+          Level
+          <select
+            value={level}
+            onChange={(e) => update({ [P.level]: e.target.value || null, students_only: null })}
+            className="border border-gray-300 rounded-lg px-2 py-1.5 text-sm font-normal focus:outline-none focus:ring-2 focus:ring-brand-500"
+          >
+            <option value="">Students &amp; entry-level</option>
+            <option value="students">Co-op &amp; intern only</option>
+            <option value="all">All levels</option>
+          </select>
         </label>
 
         {/* Show expired toggle */}
@@ -185,15 +194,16 @@ export default function PostingsListPage() {
         sort={sort}
         order={order}
         onSortChange={(field, dir) => update({ [P.sort]: field, [P.order]: dir })}
+        showBookmarks
       />
 
       {data && data.total === 0 && students_only && (
         <p className="text-sm text-gray-600">
           No co-op or intern roles match right now — most are posted in waves before each term.{' '}
-          <button type="button" className="text-blue-700 hover:underline" onClick={() => update({ [P.students_only]: null })}>
-            Show all jobs
+          <button type="button" className="text-blue-700 hover:underline" onClick={() => update({ [P.level]: null, students_only: null })}>
+            Show entry-level jobs too
           </button>{' '}
-          (many junior roles welcome students too).
+          (many junior roles welcome students).
         </p>
       )}
 
@@ -239,7 +249,7 @@ export default function PostingsListPage() {
           </div>
         </div>
       )}
-      <p className="text-xs text-gray-400">
+      <p className="text-xs text-gray-500">
         Know a posting that's missing? Signed-in users can <Link to="/add" className="underline">add postings</Link>.
       </p>
     </div>

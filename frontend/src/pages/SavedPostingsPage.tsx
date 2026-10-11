@@ -53,7 +53,7 @@ export default function SavedPostingsPage() {
   const unsave = useUnsavePosting()
 
   if (meLoading) {
-    return <div className="flex justify-center items-center h-64 text-gray-400">Loading…</div>
+    return <div className="flex justify-center items-center h-64 text-gray-500">Loading…</div>
   }
 
   if (!me) {
@@ -127,7 +127,7 @@ export default function SavedPostingsPage() {
       {view === 'board' && (
         <>
           {isLoading && (
-            <div className="h-48 flex items-center justify-center text-gray-400">Loading…</div>
+            <div className="h-48 flex items-center justify-center text-gray-500">Loading…</div>
           )}
           {isError && (
             <p className="text-red-600 text-sm">Failed to load. <button onClick={() => refetch()} className="underline">Retry</button></p>
@@ -157,7 +157,7 @@ export default function SavedPostingsPage() {
               >
                 {tab.label}
                 {tab.value && (statusCounts[tab.value] ?? 0) > 0 && (
-                  <span className="ml-1 text-xs text-gray-400">({statusCounts[tab.value]})</span>
+                  <span className="ml-1 text-xs text-gray-500">({statusCounts[tab.value]})</span>
                 )}
               </button>
             ))}
@@ -213,7 +213,7 @@ export default function SavedPostingsPage() {
                         <p className="text-sm text-gray-600 mt-0.5">
                           {saved.posting.company} · {formatLocation(saved.posting.city, saved.posting.province)} · {saved.posting.term}
                         </p>
-                        <p className="text-xs text-gray-400 mt-1">
+                        <p className="text-xs text-gray-500 mt-1">
                           Saved {formatDate(saved.saved_at)} · Deadline {formatDate(saved.posting.deadline)}
                           {saved.last_status_at && (
                             <> · Updated {formatDate(saved.last_status_at)}</>

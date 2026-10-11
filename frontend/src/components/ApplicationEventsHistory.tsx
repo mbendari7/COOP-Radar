@@ -21,7 +21,7 @@ export default function ApplicationEventsHistory({ events }: Props) {
       <button
         type="button"
         onClick={() => setExpanded((v) => !v)}
-        className="text-xs text-gray-400 hover:text-gray-600 flex items-center gap-1"
+        className="text-xs text-gray-500 hover:text-gray-600 flex items-center gap-1"
         aria-expanded={expanded}
       >
         <span>{expanded ? '▾' : '▸'}</span>
@@ -37,10 +37,10 @@ export default function ApplicationEventsHistory({ events }: Props) {
                   {STATUS_LABELS[ev.status]}
                 </span>
                 {ev.event_date && (
-                  <span className="text-gray-400">on {ev.event_date}</span>
+                  <span className="text-gray-500">on {ev.event_date}</span>
                 )}
                 <span className="text-gray-300">·</span>
-                <span className="text-gray-400">{formatDate(ev.created_at)}</span>
+                <span className="text-gray-500">{formatDate(ev.created_at)}</span>
               </div>
               {ev.notes && (
                 <p className="mt-0.5 text-gray-500 italic">{ev.notes}</p>

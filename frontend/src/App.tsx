@@ -119,7 +119,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       <main>
-        <Suspense fallback={<div className="flex justify-center items-center h-64 text-gray-400">Loading…</div>}>
+        <Suspense fallback={<div className="flex justify-center items-center h-64 text-gray-500">Loading…</div>}>
           <Routes>
             <Route path="/" element={<PostingsListPage />} />
             <Route path="/postings/:id" element={<PostingDetailPage />} />

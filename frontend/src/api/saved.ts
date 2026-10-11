@@ -136,6 +136,7 @@ export function useSavePosting() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['saved'] })
       qc.invalidateQueries({ queryKey: ['postings'] })
+      qc.invalidateQueries({ queryKey: ['posting'] })
     },
   })
 }
@@ -147,6 +148,7 @@ export function useUnsavePosting() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['saved'] })
       qc.invalidateQueries({ queryKey: ['postings'] })
+      qc.invalidateQueries({ queryKey: ['posting'] })
     },
   })
 }

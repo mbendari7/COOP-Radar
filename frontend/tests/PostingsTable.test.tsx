@@ -83,6 +83,18 @@ describe('PostingsTable', () => {
     expect(screen.getAllByText('Frontend Dev').length).toBeGreaterThan(0)
   })
 
+  it('keeps every header above its own column when bookmarks are shown', () => {
+    renderTable({ data: [makePosting({ title: 'Backend Dev', company: 'Shopify' })], showBookmarks: true })
+    const table = screen.getByRole('table', { name: /co-op postings/i })
+    const headers = Array.from(table.querySelectorAll('thead th')).map((th) => th.textContent ?? '')
+    const cells = Array.from(table.querySelectorAll('tbody tr:first-child td'))
+    expect(cells).toHaveLength(headers.length)
+    const roleIdx = headers.findIndex((h) => /role/i.test(h))
+    const companyIdx = headers.findIndex((h) => /company/i.test(h))
+    expect(cells[roleIdx]).toHaveTextContent('Backend Dev')
+    expect(cells[companyIdx]).toHaveTextContent('Shopify')
+  })
+
   it('marks live employer jobs and never shows a dangling comma for remote jobs', () => {
     renderTable({ data: [makePosting({ title: 'Data Intern', city: 'Remote', province: '', source_id: 'src-1' })] })
     expect(screen.getAllByText('Live').length).toBeGreaterThan(0)

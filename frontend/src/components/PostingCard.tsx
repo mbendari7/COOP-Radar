@@ -76,7 +76,7 @@ export default function PostingCard({ posting, showBookmark = false }: Props) {
             </span>
           ))}
           {posting.skills.length > 5 && (
-            <span className="text-xs text-gray-400">+{posting.skills.length - 5}</span>
+            <span className="text-xs text-gray-500">+{posting.skills.length - 5}</span>
           )}
         </div>
       )}

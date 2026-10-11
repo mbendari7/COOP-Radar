@@ -188,7 +188,7 @@ export default function AiKeyPage() {
               <>
                 <div>
                   <label htmlFor="ai-model" className="block text-sm font-medium text-gray-700 mb-1">
-                    Model <span className="font-normal text-gray-400">(we pre-selected a good default)</span>
+                    Model <span className="font-normal text-gray-500">(we pre-selected a good default)</span>
                   </label>
                   <select
                     id="ai-model"

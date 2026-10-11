@@ -76,7 +76,7 @@ function PostingCard({ saved, isDragging }: { saved: SavedPostingOut; isDragging
       </Link>
       <p className="text-xs text-gray-500 mt-0.5">{saved.posting.company}</p>
       {saved.posting.deadline && (
-        <p className="text-xs text-gray-400 mt-1">
+        <p className="text-xs text-gray-500 mt-1">
           Due {new Date(saved.posting.deadline).toLocaleDateString()}
         </p>
       )}
@@ -99,7 +99,7 @@ function BoardColumn({
         <h3 className={`text-xs font-semibold uppercase tracking-wide ${HEADER_COLORS[status]}`}>
           {STATUS_LABELS[status]}
         </h3>
-        <span className="text-xs text-gray-400 bg-white rounded-full px-1.5 py-0.5 border border-gray-200">
+        <span className="text-xs text-gray-500 bg-white rounded-full px-1.5 py-0.5 border border-gray-200">
           {cards.length}
         </span>
       </div>

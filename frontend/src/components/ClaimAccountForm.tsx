@@ -31,7 +31,7 @@ export default function ClaimAccountForm({ onDone }: { onDone?: () => void }) {
         />
       </label>
       <label className="flex-1 text-sm">
-        <span className="block text-gray-700 mb-1">Password <span className="text-gray-400">(10+ characters)</span></span>
+        <span className="block text-gray-700 mb-1">Password <span className="text-gray-500">(10+ characters)</span></span>
         <input
           type="password"
           required

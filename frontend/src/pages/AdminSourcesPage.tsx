@@ -25,8 +25,8 @@ function StatusBadge({ status }: { status: string | null }) {
 function RunHistoryPanel({ sourceId }: { sourceId: string }) {
   const { data, isLoading } = useRunHistory(sourceId)
 
-  if (isLoading) return <p className="text-xs text-gray-400 py-2">Loading history…</p>
-  if (!data?.items.length) return <p className="text-xs text-gray-400 py-2">No runs yet.</p>
+  if (isLoading) return <p className="text-xs text-gray-500 py-2">Loading history…</p>
+  if (!data?.items.length) return <p className="text-xs text-gray-500 py-2">No runs yet.</p>
 
   return (
     <div className="overflow-x-auto mt-2">

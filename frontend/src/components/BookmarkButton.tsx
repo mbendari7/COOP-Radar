@@ -66,7 +66,7 @@ export default function BookmarkButton({ postingId, savedId, isSaved, onSaved, o
         aria-label={effectivelySaved ? 'Remove from saved postings' : 'Save posting'}
         className={`
           p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
-          ${effectivelySaved ? 'text-blue-600 hover:text-blue-800' : 'text-gray-400 hover:text-blue-600'}
+          ${effectivelySaved ? 'text-blue-600 hover:text-blue-800' : 'text-gray-500 hover:text-blue-600'}
           ${isPending ? 'opacity-50 cursor-wait' : ''}
         `}
       >

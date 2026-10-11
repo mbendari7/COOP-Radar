@@ -7,66 +7,24 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
+import type { components } from './types.gen'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-export type WorkMode = 'onsite' | 'hybrid' | 'remote'
+// Response types come from the backend's OpenAPI schema (src/api/types.gen.ts), so they can't
+// drift from the Pydantic models. Regenerate after changing a schema:
+//   cd backend && python -m scripts.export_openapi && cd ../frontend && npm run gen:api
+type Schemas = components['schemas']
 
-export interface PostingListItem {
-  id: string
-  title: string
-  company: string
-  city: string
-  province: string
-  work_mode: WorkMode
-  term: string
-  duration_months: number
-  deadline: string          // ISO date string "YYYY-MM-DD"
-  posted_at: string         // ISO datetime string
-  skills: string[]
-  source_url: string | null
-  closed_at: string | null  // set when the posting disappeared from its ingest source
-  source_id: string | null  // set for jobs imported live from an employer's career board
-  // Populated for authenticated requests; null/undefined for unauthenticated
-  is_saved?: boolean | null
-}
-
-export interface PostingDetail extends PostingListItem {
-  description: string
-  low_confidence_fields?: Record<string, number> | null
-}
-
-export interface SimilarPostingOut {
-  id: string
-  title: string
-  company: string
-  city: string
-  province: string
-  work_mode: WorkMode | null
-  term: string
-  deadline: string | null
-  similarity: number
-}
-
-export interface SimilarPostingsResponse {
-  items: SimilarPostingOut[]
-}
-
+export type WorkMode = Schemas['WorkMode']
+/** `source_id` is set for jobs imported live from an employer's career board; `is_saved` only when signed in */
+export type PostingListItem = Schemas['PostingListItem']
+export type PostingDetail = Schemas['PostingDetail']
+export type SimilarPostingOut = Schemas['SimilarPostingOut']
+export type SimilarPostingsResponse = Schemas['SimilarPostingsResponse']
+export type PostingsPage = Schemas['Page_PostingListItem_']
+export type FilterMeta = Schemas['FilterMeta']
 export type SearchMode = 'keyword' | 'semantic'
-
-export interface PostingsPage {
-  items: PostingListItem[]
-  total: number
-  page: number
-  page_size: number
-}
-
-export interface FilterMeta {
-  cities: string[]
-  provinces: string[]
-  terms: string[]
-  skills: string[]
-}
 
 export type SortField = 'posted_at' | 'deadline' | 'company' | 'title'
 export type SortOrder = 'asc' | 'desc'
@@ -84,6 +42,8 @@ export interface PostingListParams {
   show_closed?: boolean
   /** Only intern / co-op / student / new-grad roles */
   students_only?: boolean
+  /** Hide senior / staff / lead / manager roles */
+  hide_senior?: boolean
   search_mode?: SearchMode
   sort?: SortField
   order?: SortOrder
@@ -110,6 +70,7 @@ function buildQueryString(params: PostingListParams): string {
   if (params.show_expired) sp.set('show_expired', 'true')
   if (params.show_closed) sp.set('show_closed', 'true')
   if (params.students_only) sp.set('students_only', 'true')
+  if (params.hide_senior) sp.set('hide_senior', 'true')
   if (params.search_mode && params.search_mode !== 'keyword') sp.set('search_mode', params.search_mode)
   if (params.sort) sp.set('sort', params.sort)
   if (params.order) sp.set('order', params.order)

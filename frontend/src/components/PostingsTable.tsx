@@ -157,7 +157,9 @@ export default function PostingsTable({
       <div className="md:hidden space-y-3">
         {isLoading
           ? Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
-          : data.map((posting) => <PostingCard key={posting.id} posting={posting} />)
+          : data.map((posting) => (
+              <PostingCard key={posting.id} posting={posting} showBookmark={showBookmarks} />
+            ))
         }
       </div>
 
@@ -233,11 +235,7 @@ export default function PostingsTable({
                     className="hover:bg-blue-50 cursor-pointer focus:outline-none focus:bg-blue-50 focus:ring-inset focus:ring-2 focus:ring-brand-500"
                     aria-label={`${row.original.title} at ${row.original.company}`}
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-3 text-gray-700 whitespace-nowrap">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
+                    {/* Same position as the "Saved" header cell: first */}
                     {showBookmarks && (
                       <td
                         className="px-2 py-3"
@@ -249,6 +247,11 @@ export default function PostingsTable({
                         />
                       </td>
                     )}
+                    {row.getVisibleCells().map((cell) => (
+                      <td key={cell.id} className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </td>
+                    ))}
                   </tr>
                 ))
             }

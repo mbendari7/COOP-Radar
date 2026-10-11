@@ -7,6 +7,7 @@
 
 import { useNavigate, useParams } from 'react-router-dom'
 import { usePosting } from '../api/postings'
+import BookmarkButton from '../components/BookmarkButton'
 import { SimilarPostings } from '../components/SimilarPostings'
 import { formatDate, formatLocation, workModeLabel } from '../utils/format'
 
@@ -62,9 +63,12 @@ export default function PostingDetailPage() {
 
       <article className="md:col-span-2">
         {/* Title + company */}
-        <header className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">{posting.title}</h1>
-          <p className="text-lg text-gray-600 mt-1">{posting.company}</p>
+        <header className="mb-6 flex items-start justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">{posting.title}</h1>
+            <p className="text-lg text-gray-600 mt-1">{posting.company}</p>
+          </div>
+          <BookmarkButton postingId={posting.id} isSaved={posting.is_saved === true} />
         </header>
 
         {/* Meta grid */}

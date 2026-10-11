@@ -155,13 +155,13 @@ export default function ConversationPanel({ postingId, postingTitle, company }: 
                 <div key={i} className="text-sm">
                   {msg.role === 'user' ? (
                     <p className="font-medium text-gray-800">
-                      <span className="block text-xs text-gray-400 mb-0.5">You</span>
+                      <span className="block text-xs text-gray-500 mb-0.5">You</span>
                       {msg.text}
                     </p>
                   ) : (
                     <div className="text-gray-700">
                       <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs text-gray-400">{msg.streaming ? 'Writing…' : 'Assistant'}</span>
+                        <span className="text-xs text-gray-500">{msg.streaming ? 'Writing…' : 'Assistant'}</span>
                         {!msg.streaming && msg.text && <CopyButton text={msg.text} />}
                       </div>
                       <RichText text={msg.text} />
@@ -205,7 +205,7 @@ export default function ConversationPanel({ postingId, postingTitle, company }: 
               {loading ? '…' : 'Send'}
             </button>
           </div>
-          <p className="text-xs text-gray-400">
+          <p className="text-xs text-gray-500">
             Answers use only your resume and this posting. Always check before you send anything.
           </p>
         </div>
