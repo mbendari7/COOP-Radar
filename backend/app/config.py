@@ -55,6 +55,8 @@ class Settings(BaseSettings):
     # Folder with the built React app (index.html + assets/). When it exists, the API also
     # serves the website, so one container = the whole site. Set by the production Dockerfile.
     static_dir: str = ""
+    # Postgres cancels any single statement that runs longer than this (milliseconds).
+    db_statement_timeout_ms: int = 10_000
 
     # Career-board imports keep only jobs whose location matches this regex (case-insensitive;
     # province codes are matched case-sensitively). Empty = the Canada default below.

@@ -29,6 +29,11 @@ def _make_engine() -> AsyncEngine:
     return create_async_engine(
         settings.database_url,
         pool_pre_ping=True,
+        # Fail fast instead of hanging: Postgres cancels any statement running longer than
+        # this, and the request returns the standard error shape (500) instead of timing out.
+        connect_args={
+            "server_settings": {"statement_timeout": str(settings.db_statement_timeout_ms)}
+        },
         # echo=True is handy for debugging but too noisy in prod
         echo=False,
     )

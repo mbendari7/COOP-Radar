@@ -39,6 +39,12 @@ QUERIES = [
     "/api/postings?skills=Python&skills=Docker&sort=deadline&order=asc",
     "/api/postings?term=Summer%202027&work_mode=remote&page=3&page_size=50",
     "/api/postings?q=developer&duration=4&duration=8&sort=company",
+    # Worst case: keyword + every filter + sort + a later page
+    "/api/postings?q=python&city=Waterloo&province=ON&term=Summer%202027&work_mode=hybrid"
+    "&duration=4&duration=8&skills=Python&skills=SQL&students_only=false&hide_senior=true"
+    "&sort=deadline&order=desc&page=2&page_size=10",
+    "/api/postings/meta/filters",
+    "/api/postings/{id}",
 ]
 
 
@@ -84,16 +90,18 @@ async def test_list_postings_p95_under_300ms(db_engine) -> None:  # type: ignore
             transport=ASGITransport(app=app),
             base_url="http://test",
         ) as client:
+            first = (await client.get("/api/postings?page_size=10")).json()["items"][0]["id"]
+            queries = [q.replace("{id}", first) for q in QUERIES]
             # Warm up (first requests pay for connection setup and query planning)
-            for url in QUERIES:
+            for url in queries:
                 await client.get(url)
 
             # Measure per-request latency (the constitution's budget) across a mix of
             # realistic list/search queries. Requests run one at a time: firing many
             # concurrently into a single in-process app measures event-loop throughput,
             # not the latency a user sees.
-            for i in range(100):
-                url = QUERIES[i % len(QUERIES)]
+            for i in range(120):
+                url = queries[i % len(queries)]
                 start = time.perf_counter()
                 resp = await client.get(url)
                 latencies.append((time.perf_counter() - start) * 1000)  # ms

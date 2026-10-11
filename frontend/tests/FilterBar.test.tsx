@@ -2,7 +2,7 @@
  * FilterBar tests — renders controls, chip removal, clear-all.
  */
 
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 import FilterBar from '../src/components/FilterBar'
 import type { FilterMeta } from '../src/api/postings'
@@ -81,5 +81,23 @@ describe('FilterBar', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /Remove filter: City: Toronto/i }))
     expect(onChange).toHaveBeenCalledWith({ city: '' })
+  })
+
+  it('keeps keyboard focus on the next chip after removing one', async () => {
+    const { rerender } = renderBar({ ...EMPTY_FILTERS, skills: ['Python', 'SQL'] })
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Python' }))
+    // The parent applies the change: re-render without Python
+    rerender(
+      <FilterBar
+        filters={{ ...EMPTY_FILTERS, skills: ['SQL'] }}
+        meta={META}
+        metaLoading={false}
+        onChange={vi.fn()}
+        onClearAll={vi.fn()}
+      />,
+    )
+    await waitFor(() =>
+      expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Remove filter: SQL' })),
+    )
   })
 })

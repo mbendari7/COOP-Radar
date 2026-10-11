@@ -88,6 +88,8 @@ interface Props {
   order: SortOrder
   onSortChange: (field: SortField, order: SortOrder) => void
   showBookmarks?: boolean
+  /** Shown as a "Clear all filters" button inside the empty state */
+  onClearFilters?: () => void
 }
 
 export default function PostingsTable({
@@ -99,6 +101,7 @@ export default function PostingsTable({
   order,
   onSortChange,
   showBookmarks = false,
+  onClearFilters,
 }: Props) {
   const navigate = useNavigate()
 
@@ -147,6 +150,15 @@ export default function PostingsTable({
     return (
       <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center">
         <p className="text-gray-500">No postings match — clear filters</p>
+        {onClearFilters && (
+          <button
+            type="button"
+            onClick={onClearFilters}
+            className="mt-3 text-sm font-medium text-blue-700 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500 rounded"
+          >
+            Clear all filters
+          </button>
+        )}
       </div>
     )
   }

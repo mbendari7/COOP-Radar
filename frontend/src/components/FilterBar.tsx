@@ -7,7 +7,7 @@
  * so it doesn't push the card list off screen.
  */
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import type { FilterMeta, WorkMode } from '../api/postings'
 import { workModeLabel } from '../utils/format'
 
@@ -33,6 +33,16 @@ interface Props {
 
 export default function FilterBar({ filters, meta, metaLoading, onChange, onClearAll }: Props) {
   const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  /** After a chip is removed its button disappears: keep keyboard focus nearby. */
+  const removeChip = (patch: Partial<Filters>) => {
+    onChange(patch)
+    requestAnimationFrame(() => {
+      const next = rootRef.current?.querySelector<HTMLElement>('button[aria-label^="Remove filter"]')
+      ;(next ?? rootRef.current)?.focus()
+    })
+  }
 
   const activeCount = [
     filters.city, filters.province, filters.term, filters.work_mode,
@@ -40,7 +50,7 @@ export default function FilterBar({ filters, meta, metaLoading, onChange, onClea
   ].filter(Boolean).length
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg">
+    <div ref={rootRef} tabIndex={-1} className="bg-white border border-gray-200 rounded-lg focus:outline-none">
       {/* Mobile toggle */}
       <button
         type="button"
@@ -175,29 +185,29 @@ export default function FilterBar({ filters, meta, metaLoading, onChange, onClea
             <span className="text-xs text-gray-500">Active filters:</span>
 
             {filters.city && (
-              <Chip label={`City: ${filters.city}`} onRemove={() => onChange({ city: '' })} />
+              <Chip label={`City: ${filters.city}`} onRemove={() => removeChip({ city: '' })} />
             )}
             {filters.province && (
-              <Chip label={`Province: ${filters.province}`} onRemove={() => onChange({ province: '' })} />
+              <Chip label={`Province: ${filters.province}`} onRemove={() => removeChip({ province: '' })} />
             )}
             {filters.term && (
-              <Chip label={`Term: ${filters.term}`} onRemove={() => onChange({ term: '' })} />
+              <Chip label={`Term: ${filters.term}`} onRemove={() => removeChip({ term: '' })} />
             )}
             {filters.work_mode && (
-              <Chip label={workModeLabel(filters.work_mode)} onRemove={() => onChange({ work_mode: '' })} />
+              <Chip label={workModeLabel(filters.work_mode)} onRemove={() => removeChip({ work_mode: '' })} />
             )}
             {filters.duration.map((d) => (
               <Chip
                 key={d}
                 label={`${d} mo`}
-                onRemove={() => onChange({ duration: filters.duration.filter((x) => x !== d) })}
+                onRemove={() => removeChip({ duration: filters.duration.filter((x) => x !== d) })}
               />
             ))}
             {filters.skills.map((s) => (
               <Chip
                 key={s}
                 label={s}
-                onRemove={() => onChange({ skills: filters.skills.filter((x) => x !== s) })}
+                onRemove={() => removeChip({ skills: filters.skills.filter((x) => x !== s) })}
               />
             ))}
 

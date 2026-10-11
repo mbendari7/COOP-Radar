@@ -117,7 +117,7 @@ export default function PostingsListPage() {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
-          <p className="text-sm text-gray-500 mt-0.5">
+          <p className="text-sm text-gray-500 mt-0.5" aria-live="polite" aria-atomic="true">
             {data ? `${data.total} open job${data.total !== 1 ? 's' : ''}` : 'Loading…'} · pulled from
             employers' own career pages and refreshed every few hours
           </p>
@@ -195,6 +195,7 @@ export default function PostingsListPage() {
         order={order}
         onSortChange={(field, dir) => update({ [P.sort]: field, [P.order]: dir })}
         showBookmarks
+        onClearFilters={clearAll}
       />
 
       {data && data.total === 0 && students_only && (
