@@ -14,6 +14,7 @@ async def public_config() -> PublicConfig:
     settings = get_settings()
     return PublicConfig(
         demo_enabled=settings.demo_enabled,
-        ai_enabled=bool(settings.anthropic_api_key and settings.openai_api_key),
+        server_ai_enabled=bool(settings.anthropic_api_key),
+        semantic_search_enabled=bool(settings.openai_api_key),
         ai_daily_limit=settings.ai_daily_limit,
     )

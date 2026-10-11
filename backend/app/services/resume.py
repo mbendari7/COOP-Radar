@@ -2,26 +2,30 @@
 Resume upload, text extraction, match pipeline, and delete logic.
 
 Match pipeline (two stages):
-  1. pgvector cosine similarity between the resume embedding and every open
-     posting's embedding -> top 40 candidates (fast, cheap, done in SQL).
-  2. Claude (FAST_MODEL) re-ranks those candidates -> top 20 with a 0-100 score
-     and a one-sentence reason. If Claude is unavailable or returns unusable
-     output, we fall back to the cosine ranking so uploads never fail on it.
+  1. Shortlist ~40 open postings. Default: by the share of each posting's skills found in the
+     resume (pure SQL, no AI key needed). If the site owner set OPENAI_API_KEY, by embedding
+     similarity instead.
+  2. The visitor's own AI (Claude, ChatGPT, or Gemini — see app/ai.py) scores the shortlist
+     0-100 with a one-sentence reason and the top 20 are kept. If the AI reply is unusable,
+     the stage-1 order is used so uploads don't fail; a rejected key is reported instead.
 """
 
 import io
 import json
 import logging
+import re
 from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import delete, func, select, text
+from sqlalchemy import ARRAY, Text, delete, func, literal, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app import ai
+from app.ai import AICredentials
 from app.config import get_settings
-from app.llm import get_client, parse_json, response_text
+from app.llm import parse_json
 from app.models.match_result import MatchResult
 from app.models.posting import Posting
 from app.models.posting_embedding import PostingEmbedding
@@ -77,8 +81,8 @@ def extract_text(filename: str, data: bytes) -> str:
 # Match pipeline
 # ---------------------------------------------------------------------------
 
-_RESUME_CHARS = 8000          # ~2000 tokens of resume text sent to the models
-_POSTING_CHARS = 1500         # per-candidate description excerpt in the re-rank prompt
+_RESUME_CHARS = 8000          # ~2000 tokens of resume text sent to the model
+_POSTING_CHARS = 1500         # per-candidate description excerpt in the ranking prompt
 _CANDIDATES = 40
 _TOP_N = 20
 
@@ -91,11 +95,95 @@ _RERANK_PROMPT = (
     '[{"posting_id": "<uuid>", "score": <int 0-100>, "reason": "<one sentence>"}]'
 )
 
+_OPEN = (Posting.closed_at.is_(None), Posting.deadline >= func.current_date())
 
-async def _rerank_with_claude(
-    resume_snippet: str, rows: list[Any]
+
+def skills_in_text(skills: list[str], text_value: str) -> list[str]:
+    """Skills mentioned in the text as whole words ("C" must not match "C++" or "CSS")."""
+    lowered = text_value.lower()
+    found = []
+    for skill in skills:
+        pattern = r"(?<![\w+#.])" + re.escape(skill.lower()) + r"(?![\w+#])"
+        if re.search(pattern, lowered):
+            found.append(skill)
+    return found
+
+
+async def _candidates_by_skills(db: AsyncSession, resume_text: str) -> list[Any]:
+    """
+    Shortlist without any AI or embeddings: rank open postings by the share of their
+    required skills that appear in the resume. Works for every visitor, at no cost.
+    """
+    all_skills = list(
+        (await db.execute(select(func.unnest(Posting.skills)).distinct())).scalars().all()
+    )
+    resume_skills = skills_in_text([s for s in all_skills if s], resume_text)
+
+    # unnest(postings.skills) AS u(s): one row per required skill of the outer posting
+    unnested = func.unnest(Posting.skills).table_valued("s").render_derived(name="u")
+    overlap = (
+        select(func.count())
+        .select_from(unnested)
+        .where(unnested.c.s == func.any(literal(resume_skills or [""], ARRAY(Text))))
+        .scalar_subquery()
+    )
+    similarity = (overlap / func.greatest(func.cardinality(Posting.skills), 1)).label("similarity")
+    stmt = (
+        select(
+            Posting.id, Posting.title, Posting.company, Posting.city, Posting.province,
+            Posting.term, Posting.deadline, Posting.description, similarity,
+        )
+        .where(*_OPEN)
+        .order_by(similarity.desc(), Posting.deadline, Posting.id)
+        .limit(_CANDIDATES)
+    )
+    return list((await db.execute(stmt)).mappings().all())
+
+
+async def _candidates_by_embedding(db: AsyncSession, resume_text: str) -> list[Any] | None:
+    """
+    Shortlist by meaning (pgvector). Only used when the site owner set OPENAI_API_KEY, which
+    also powers smart search; returns None when unavailable so the skill shortlist is used.
+    """
+    from app.ingest.embed import generate_embedding
+
+    if not get_settings().openai_api_key:
+        return None
+    try:
+        resume_vec = await generate_embedding(resume_text[:_RESUME_CHARS])
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Resume embedding failed, using skill shortlist: %s", exc)
+        return None
+    distance = PostingEmbedding.embedding.cosine_distance(resume_vec)
+    stmt = (
+        select(
+            Posting.id, Posting.title, Posting.company, Posting.city, Posting.province,
+            Posting.term, Posting.deadline, Posting.description, (1 - distance).label("similarity"),
+        )
+        .join(PostingEmbedding, PostingEmbedding.posting_id == Posting.id)
+        .where(*_OPEN)
+        .order_by(distance)
+        .limit(_CANDIDATES)
+    )
+    rows = list((await db.execute(stmt)).mappings().all())
+    return rows or None
+
+
+async def find_candidates(db: AsyncSession, resume_text: str) -> list[Any]:
+    """Stage 1: the ~40 most promising open postings for this resume."""
+    return await _candidates_by_embedding(db, resume_text) or await _candidates_by_skills(
+        db, resume_text
+    )
+
+
+async def rank_with_ai(
+    creds: AICredentials, resume_snippet: str, rows: list[Any]
 ) -> list[dict[str, Any]] | None:
-    """Ask Claude to score the candidates. Returns None when the call or parse fails."""
+    """
+    Stage 2: the visitor's AI scores each candidate. Returns None when the reply can't be used
+    (the caller falls back to the stage-1 order). A rejected key is raised, not hidden, so the
+    visitor learns their key is wrong instead of silently getting non-AI results.
+    """
     candidates = json.dumps(
         [
             {
@@ -107,93 +195,52 @@ async def _rerank_with_claude(
             for r in rows
         ]
     )
+    user = f"<resume>\n{resume_snippet}\n</resume>\n\n<postings>\n{candidates}\n</postings>"
     try:
-        message = await get_client().messages.create(
-            model=get_settings().fast_model,
-            max_tokens=8000,
-            # Scoring is a bulk, well-specified task: low effort keeps it fast and cheap.
-            output_config={"effort": "low"},
-            system=_RERANK_PROMPT,
-            messages=[
-                {
-                    "role": "user",
-                    "content": f"<resume>\n{resume_snippet}\n</resume>\n\n"
-                    f"<postings>\n{candidates}\n</postings>",
-                }
-            ],
-        )
-        parsed = parse_json(response_text(message))
-    except Exception as exc:  # noqa: BLE001 — any failure falls back to cosine ranking
-        logger.warning("Claude re-rank failed, using cosine ranking: %s", exc)
+        parsed = parse_json(await ai.complete(creds, _RERANK_PROMPT, user))
+    except ai.AIProviderError as exc:
+        if exc.code in ("AI_KEY_INVALID", "AI_MODEL_INVALID", "AI_PROVIDER_RATE_LIMITED"):
+            raise exc.to_http() from exc
+        logger.warning("AI ranking failed, using shortlist order: %s", exc.code)
+        return None
+    except ValueError:
+        logger.warning("AI ranking reply was not JSON, using shortlist order")
         return None
     if not isinstance(parsed, list):
         return None
     return [item for item in parsed if isinstance(item, dict)]
 
 
-def _cosine_rankings(rows: list[Any]) -> list[dict[str, Any]]:
-    """Fallback ranking: turn cosine similarity into a 0-100 score."""
+def _shortlist_rankings(rows: list[Any]) -> list[dict[str, Any]]:
+    """Fallback ranking: turn the stage-1 relevance into a 0-100 score."""
     return [
         {
             "posting_id": str(r["id"]),
             "score": round(float(r.get("similarity") or 0.0) * 100),
-            "reason": "Ranked by semantic similarity between your resume and the posting.",
+            "reason": "Ranked by how closely your resume matches the posting "
+            "(AI ranking unavailable).",
         }
         for r in rows[:_TOP_N]
     ]
 
 
 async def embed_and_rank(
-    db: AsyncSession, extracted_text: str
+    db: AsyncSession, extracted_text: str, creds: AICredentials
 ) -> list[MatchResultOut]:
-    """Run the two-stage match pipeline and return up to 20 results, best first."""
-    from app.ingest.embed import generate_embedding
-
-    resume_snippet = extracted_text[:_RESUME_CHARS]
-    try:
-        resume_vec = await generate_embedding(resume_snippet)
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Resume embedding failed: %s", exc)
-        raise HTTPException(
-            status_code=503,
-            detail={
-                "detail": "Matching is unavailable: the embedding service could not be reached.",
-                "code": "AI_UNAVAILABLE",
-            },
-        ) from exc
-
-    # Stage 1: cosine similarity in SQL (HNSW index) — open, unexpired postings only
-    distance = PostingEmbedding.embedding.cosine_distance(resume_vec)
-    stmt = (
-        select(
-            Posting.id,
-            Posting.title,
-            Posting.company,
-            Posting.city,
-            Posting.province,
-            Posting.term,
-            Posting.deadline,
-            Posting.description,
-            (1 - distance).label("similarity"),
-        )
-        .join(PostingEmbedding, PostingEmbedding.posting_id == Posting.id)
-        .where(Posting.closed_at.is_(None), Posting.deadline >= func.current_date())
-        .order_by(distance)
-        .limit(_CANDIDATES)
-    )
-    rows = list((await db.execute(stmt)).mappings().all())
+    """Run both stages and return up to 20 results, best first."""
+    rows = await find_candidates(db, extracted_text)
     if not rows:
         return []
 
-    # Stage 2: Claude re-ranking, falling back to cosine order
-    rankings = await _rerank_with_claude(resume_snippet, rows) or _cosine_rankings(rows)
+    resume_snippet = extracted_text[:_RESUME_CHARS]
+    rankings = await rank_with_ai(creds, resume_snippet, rows) or _shortlist_rankings(rows)
 
     posting_by_id = {str(r["id"]): r for r in rows}
     results: list[MatchResultOut] = []
     seen: set[str] = set()
     for item in rankings:
         pid = str(item.get("posting_id", ""))
-        # Skip IDs Claude invented and duplicates (match_results has a unique constraint)
+        # Skip IDs the model invented and duplicates (match_results has a unique constraint)
         if pid not in posting_by_id or pid in seen:
             continue
         seen.add(pid)
@@ -231,6 +278,7 @@ async def upload_resume(
     user_id: UUID,
     filename: str,
     file_bytes: bytes,
+    creds: AICredentials,
 ) -> UploadResponse:
     """
     Validate, extract text, run match pipeline, and store results.
@@ -286,7 +334,7 @@ async def upload_resume(
     await db.flush()  # populate resume.id before FK use
 
     # Run match pipeline
-    matches = await embed_and_rank(db, extracted)
+    matches = await embed_and_rank(db, extracted, creds)
 
     # Bulk-insert match results
     if matches:

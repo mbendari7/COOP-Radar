@@ -20,11 +20,12 @@ dependencies = [
     "redis>=5.0",            # sessions/rate limits (redis.asyncio) + RQ queue
     "pandas>=2.2",           # CSV upload parsing + tracker CSV export
     "rq>=1.16",              # background job queue (ingest + embedding jobs)
-    "openai>=1.30",          # text-embedding-3-small for semantic search
+    "openai>=1.30",          # embeddings (smart search) + ChatGPT for visitors' own keys
     "pgvector>=0.3",         # pgvector SQLAlchemy integration
     "python-multipart>=0.0.9", # FastAPI file upload support
     "feedparser>=6.0",       # RSS/Atom feed parsing
-    "anthropic>=1.0",        # Claude: match re-ranking, field extraction, resume Q&A
+    "anthropic>=1.0",        # Claude: match ranking, field extraction, resume Q&A
+    "google-genai>=1.0",     # Gemini, for visitors who bring a Google AI key
     "pypdf>=4.0",            # PDF text extraction for resume upload
     "python-docx>=1.1",      # DOCX text extraction for resume upload
 ]

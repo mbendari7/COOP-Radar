@@ -17,7 +17,7 @@ import os
 os.environ.setdefault("COOKIE_SECURE", "false")
 
 from collections.abc import AsyncGenerator, Callable  # noqa: E402
-from typing import Any  # noqa: E402
+from typing import TYPE_CHECKING, Any  # noqa: E402
 from unittest.mock import AsyncMock, MagicMock  # noqa: E402
 
 import pytest  # noqa: E402
@@ -33,6 +33,9 @@ from app.main import create_app  # noqa: E402
 from app.redis import get_redis  # noqa: E402
 
 get_settings.cache_clear()
+
+if TYPE_CHECKING:
+    from app.ai import AICredentials
 
 
 def get_test_db_url() -> str:
@@ -99,6 +102,9 @@ class MockRedis:
         pass
 
 
+TEST_AI_HEADERS = {"X-AI-Provider": "anthropic", "X-AI-Key": "sk-test-key", "X-AI-Model": "claude-test"}
+
+
 @pytest.fixture
 def mock_redis() -> MockRedis:
     return MockRedis()
@@ -139,6 +145,8 @@ async def client(
     async with AsyncClient(
         transport=ASGITransport(app=app),
         base_url="http://test",
+        # Like a visitor who saved their own key on the AI key page (see app/ai.py)
+        headers=TEST_AI_HEADERS,
     ) as ac:
         yield ac
 
@@ -168,7 +176,7 @@ def mock_claude_create(monkeypatch: pytest.MonkeyPatch) -> Callable[[str], Async
 
 @pytest.fixture
 def mock_claude_stream(monkeypatch: pytest.MonkeyPatch) -> Callable[..., MagicMock]:
-    """Patch `client.beta.messages.stream` to stream `text_value` in small chunks."""
+    """Patch Claude's `client.messages.stream` to stream `text_value` in small chunks."""
 
     def _install(text_value: str, stop_reason: str = "end_turn") -> MagicMock:
         async def text_stream() -> AsyncGenerator[str, None]:
@@ -182,9 +190,9 @@ def mock_claude_stream(monkeypatch: pytest.MonkeyPatch) -> Callable[..., MagicMo
         stream.get_final_message = AsyncMock(return_value=MagicMock(stop_reason=stop_reason))
 
         client = MagicMock()
-        client.beta.messages.stream = MagicMock(return_value=stream)
+        client.messages.stream = MagicMock(return_value=stream)
         monkeypatch.setattr("anthropic.AsyncAnthropic", MagicMock(return_value=client))
-        return client.beta.messages.stream
+        return client.messages.stream
 
     return _install
 
@@ -195,3 +203,11 @@ def mock_embedding(monkeypatch: pytest.MonkeyPatch) -> AsyncMock:
     mock = AsyncMock(return_value=[0.1] * 1536)
     monkeypatch.setattr("app.ingest.embed.generate_embedding", mock)
     return mock
+
+
+@pytest.fixture
+def test_creds() -> "AICredentials":
+    """Visitor credentials for calling services directly (Claude, mocked)."""
+    from app.ai import AICredentials
+
+    return AICredentials("anthropic", "sk-test-key", "claude-test", "user")

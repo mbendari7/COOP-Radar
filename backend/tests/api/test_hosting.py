@@ -112,29 +112,34 @@ def _docx_bytes(text: str) -> bytes:
     return buf.getvalue()
 
 
-async def test_ai_daily_limit_blocks_extra_uploads(
+async def test_ai_daily_limit_applies_to_the_site_owners_key(
     client: AsyncClient,
     mock_embedding: AsyncMock,
     mock_claude_create: Callable[[str], AsyncMock],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    """Visitors without their own key use the owner's key, limited per day; own keys are not."""
     monkeypatch.setattr(get_settings(), "ai_daily_limit", 1)
+    monkeypatch.setattr(get_settings(), "anthropic_api_key", "sk-owner-key")
     mock_claude_create("[]")
     await client.post("/api/auth/register", json={"email": "quota@test.com", "password": "Password1!"})
     files = {"file": ("r.docx", _docx_bytes("Skills: Python, SQL"), "application/octet-stream")}
+    no_key = {"X-AI-Provider": "", "X-AI-Key": "", "X-AI-Model": ""}
 
-    assert (await client.post("/api/resume", files=files)).status_code == 200
-    second = await client.post("/api/resume", files=files)
-
+    assert (await client.post("/api/resume", files=files, headers=no_key)).status_code == 200
+    second = await client.post("/api/resume", files=files, headers=no_key)
     assert second.status_code == 429
     assert second.json()["code"] == "AI_LIMIT_REACHED"
+
+    # The visitor's own key is never limited
+    assert (await client.post("/api/resume", files=files)).status_code == 200
 
 
 # ── /api/config ───────────────────────────────────────────────────────────────
 
 async def test_public_config_reports_flags_without_secrets(client: AsyncClient) -> None:
     body = (await client.get("/api/config")).json()
-    assert set(body) == {"demo_enabled", "ai_enabled", "ai_daily_limit"}
+    assert set(body) == {"demo_enabled", "server_ai_enabled", "semantic_search_enabled", "ai_daily_limit"}
     assert body["demo_enabled"] is True
 
 

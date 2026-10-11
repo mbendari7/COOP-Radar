@@ -8,7 +8,10 @@ from uuid import uuid4
 
 import pytest
 
+from app.ai import AICredentials
 from app.services.resume import extract_docx_text, extract_pdf_text, extract_text
+
+TEST_CREDS = AICredentials("anthropic", "sk-test-key", "claude-test", "user")
 
 # ---------------------------------------------------------------------------
 # Text extraction
@@ -101,7 +104,7 @@ async def test_embed_and_rank_returns_top20(monkeypatch: pytest.MonkeyPatch) -> 
         MagicMock(return_value=mock_anthropic_client),
     )
 
-    results = await embed_and_rank(mock_db, "Python Django PostgreSQL developer")
+    results = await embed_and_rank(mock_db, "Python Django PostgreSQL developer", TEST_CREDS)
 
     assert len(results) <= 20
     # Results sorted by score descending
@@ -129,7 +132,7 @@ async def test_embed_and_rank_empty_db(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_db = AsyncMock()
     mock_db.execute = AsyncMock(return_value=mock_result)
 
-    results = await embed_and_rank(mock_db, "some resume text")
+    results = await embed_and_rank(mock_db, "some resume text", TEST_CREDS)
     assert results == []
 
 
@@ -156,10 +159,10 @@ async def test_rerank_garbage_falls_back_to_cosine(mock_embedding, mock_claude_c
 
     mock_claude_create("Sorry, no JSON today.")
 
-    results = await embed_and_rank(_db_with_rows(_rows(3)), "resume")
+    results = await embed_and_rank(_db_with_rows(_rows(3)), "resume", TEST_CREDS)
 
     assert [r.score for r in results] == [90, 89, 88]
-    assert all("semantic similarity" in r.reason for r in results)
+    assert all("AI ranking unavailable" in r.reason for r in results)
 
 
 @pytest.mark.asyncio
@@ -180,21 +183,25 @@ async def test_rerank_accepts_fenced_json_and_drops_duplicates(
         ]) + "\n```"
     )
 
-    results = await embed_and_rank(_db_with_rows(rows), "resume")
+    results = await embed_and_rank(_db_with_rows(rows), "resume", TEST_CREDS)
 
     assert [(str(r.posting_id), r.score) for r in results] == [(pid, 70)]
 
 
 @pytest.mark.asyncio
-async def test_embedding_outage_returns_503(monkeypatch) -> None:
+async def test_rejected_key_is_reported_not_hidden(monkeypatch) -> None:
+    """A bad key must surface as 400 AI_KEY_INVALID, not silently fall back to non-AI results."""
     from fastapi import HTTPException
 
+    from app import ai
     from app.services.resume import embed_and_rank
 
     monkeypatch.setattr(
-        "app.ingest.embed.generate_embedding", AsyncMock(side_effect=RuntimeError("down"))
+        "app.ai.complete",
+        AsyncMock(side_effect=ai.AIProviderError(400, "AI_KEY_INVALID", "rejected")),
     )
 
     with pytest.raises(HTTPException) as exc:
-        await embed_and_rank(_db_with_rows([]), "resume")
-    assert exc.value.status_code == 503
+        await embed_and_rank(_db_with_rows(_rows(2)), "resume", TEST_CREDS)
+    assert exc.value.status_code == 400
+    assert exc.value.detail["code"] == "AI_KEY_INVALID"

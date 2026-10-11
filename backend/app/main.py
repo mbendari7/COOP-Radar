@@ -17,6 +17,7 @@ from sqlalchemy import text
 from starlette.exceptions import HTTPException
 
 from app.api.admin import router as admin_router
+from app.api.ai import router as ai_router
 from app.api.auth import router as auth_router
 from app.api.me import router as me_router
 from app.api.meta import router as meta_router
@@ -120,6 +121,7 @@ def create_app() -> FastAPI:
     app.include_router(resume_router, prefix="/api")
     app.include_router(admin_router, prefix="/api")
     app.include_router(meta_router, prefix="/api")
+    app.include_router(ai_router, prefix="/api")
 
     @app.get("/api/health", tags=["meta"])
     async def health() -> dict[str, str]:

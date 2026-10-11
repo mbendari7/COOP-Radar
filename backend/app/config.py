@@ -25,9 +25,10 @@ class Settings(BaseSettings):
     # httpx (like any non-browser client) won't send Secure cookies over plain http.
     cookie_secure: bool = True
 
-    # --- AI providers -------------------------------------------------------
-    # Empty keys are allowed so the app still boots without AI features configured;
-    # the AI endpoints degrade gracefully (see services/resume.py and ingest/extract.py).
+    # --- AI providers (all optional) ------------------------------------------
+    # Visitors normally bring their OWN key (Claude, ChatGPT, or Gemini — see app/ai.py), so
+    # the site owner pays nothing. Setting ANTHROPIC_API_KEY here lets visitors without a key
+    # use AI too (limited by ai_daily_limit). OPENAI_API_KEY enables smart search.
     anthropic_api_key: str = ""
     openai_api_key: str = ""
 

@@ -15,14 +15,13 @@ import anthropic
 from app.config import get_settings
 
 
-def get_client() -> anthropic.AsyncAnthropic:
+def get_client(api_key: str | None = None) -> anthropic.AsyncAnthropic:
     """
-    Build an async Anthropic client.
-
-    An empty ANTHROPIC_API_KEY passes None so the SDK falls back to its normal
-    credential resolution (env var, `ant auth login` profile, etc.).
+    Build an async Anthropic client — with a visitor's own key when given (see app/ai.py),
+    otherwise the site owner's ANTHROPIC_API_KEY. An empty server key passes None so the SDK
+    falls back to its normal credential resolution (env var, `ant auth login` profile, etc.).
     """
-    return anthropic.AsyncAnthropic(api_key=get_settings().anthropic_api_key or None)
+    return anthropic.AsyncAnthropic(api_key=api_key or get_settings().anthropic_api_key or None)
 
 
 def response_text(message: Any) -> str:

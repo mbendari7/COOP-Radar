@@ -18,6 +18,10 @@ from uuid import uuid4
 
 import pytest
 
+from app.ai import AICredentials
+
+TEST_CREDS = AICredentials("anthropic", "sk-test-key", "claude-test", "user")
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -40,7 +44,7 @@ async def _collect(question: str, posting_text: str, resume_text: str) -> str:
 
     chunks: list[str] = []
     async for chunk in stream_answer(
-        posting_text=posting_text, resume_text=resume_text, question=question
+        TEST_CREDS, posting_text=posting_text, resume_text=resume_text, question=question
     ):
         if chunk.startswith("data: ") and "[DONE]" not in chunk:
             chunks.append(json.loads(chunk[6:].strip()).get("delta", ""))
@@ -185,7 +189,7 @@ async def test_score_strong_resume(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_db = AsyncMock()
     mock_db.execute = AsyncMock(return_value=mock_result)
 
-    results = await embed_and_rank(mock_db, _STRONG_RESUME)
+    results = await embed_and_rank(mock_db, _STRONG_RESUME, TEST_CREDS)
     assert results
     assert results[0].score >= 70
 
@@ -218,7 +222,7 @@ async def test_score_mid_resume(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_db = AsyncMock()
     mock_db.execute = AsyncMock(return_value=mock_result)
 
-    results = await embed_and_rank(mock_db, _MID_RESUME)
+    results = await embed_and_rank(mock_db, _MID_RESUME, TEST_CREDS)
     assert results
     assert 40 <= results[0].score < 70
 
@@ -251,7 +255,7 @@ async def test_score_weak_resume(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_db = AsyncMock()
     mock_db.execute = AsyncMock(return_value=mock_result)
 
-    results = await embed_and_rank(mock_db, _WEAK_RESUME)
+    results = await embed_and_rank(mock_db, _WEAK_RESUME, TEST_CREDS)
     assert results
     assert results[0].score < 40
 
@@ -284,7 +288,7 @@ async def test_score_irrelevant_resume(monkeypatch: pytest.MonkeyPatch) -> None:
     mock_db = AsyncMock()
     mock_db.execute = AsyncMock(return_value=mock_result)
 
-    results = await embed_and_rank(mock_db, _IRRELEVANT_RESUME)
+    results = await embed_and_rank(mock_db, _IRRELEVANT_RESUME, TEST_CREDS)
     assert results
     assert results[0].score < 20
 
@@ -302,7 +306,7 @@ async def test_score_empty_db_returns_empty(monkeypatch: pytest.MonkeyPatch) -> 
     mock_db = AsyncMock()
     mock_db.execute = AsyncMock(return_value=mock_result)
 
-    results = await embed_and_rank(mock_db, "any resume")
+    results = await embed_and_rank(mock_db, "any resume", TEST_CREDS)
     assert results == []
 
 

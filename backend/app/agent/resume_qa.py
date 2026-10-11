@@ -1,12 +1,14 @@
 """
 Streaming Q&A with citation grounding for the AI Resume Matcher.
 
+Runs on the visitor's own AI key (Claude, ChatGPT, or Gemini — see app/ai.py).
+
 stream_answer() yields SSE-formatted chunks then a [DONE] sentinel.
 Each chunk: 'data: {"delta": "..."}\n\n'
 Errors:     'data: {"error": "..."}\n\n'
 Final:      'data: [DONE]\n\n'
 
-Claude is constrained to cite only from the provided POSTING and RESUME context.
+The model is constrained to cite only from the provided POSTING and RESUME context.
 When it cannot answer, it must reply: "I don't have enough information to answer that."
 """
 
@@ -14,20 +16,13 @@ import json
 import logging
 from collections.abc import AsyncIterator
 
-import anthropic
-
-from app.config import get_settings
-from app.llm import get_client
+from app import ai
+from app.ai import AICredentials
 
 logger = logging.getLogger(__name__)
 
 _RESUME_CHARS = 8000   # ~2000 tokens
 _POSTING_CHARS = 6000  # ~1500 tokens
-
-# Server-side refusal fallback: if the primary model declines, the API re-runs the
-# same request on this model inside the same call (no extra client logic needed).
-_FALLBACK_BETA = "server-side-fallback-2026-06-01"
-_FALLBACK_MODEL = "claude-opus-4-8"
 
 _SYSTEM_PROMPT = (
     "You are a co-op application assistant helping a student understand how well they match "
@@ -51,6 +46,7 @@ def _sse(payload: dict[str, str]) -> str:
 
 
 async def stream_answer(
+    creds: AICredentials,
     posting_text: str,
     resume_text: str,
     question: str,
@@ -63,8 +59,6 @@ async def stream_answer(
     Ends with:
         'data: [DONE]\n\n'
     """
-    client = get_client()
-
     user_message = (
         f"<posting>\n{posting_text[:_POSTING_CHARS]}\n</posting>\n\n"
         f"<resume>\n{resume_text[:_RESUME_CHARS]}\n</resume>\n\n"
@@ -72,26 +66,11 @@ async def stream_answer(
     )
 
     try:
-        async with client.beta.messages.stream(
-            model=get_settings().agent_model,
-            max_tokens=4096,
-            system=_SYSTEM_PROMPT,
-            messages=[{"role": "user", "content": user_message}],
-            # Short, grounded answers don't need deep reasoning; set effort explicitly
-            # because Opus 5.5 defaults to "medium" and other models to "high".
-            output_config={"effort": "low"},
-            betas=[_FALLBACK_BETA],
-            fallbacks=[{"model": _FALLBACK_MODEL}],
-        ) as stream:
-            async for text_chunk in stream.text_stream:
-                yield _sse({"delta": text_chunk})
-
-            final = await stream.get_final_message()
-            if getattr(final, "stop_reason", None) == "refusal":
-                yield _sse({"delta": "I can't help with that request."})
-    except anthropic.APIError as exc:
+        async for text_chunk in ai.stream(creds, _SYSTEM_PROMPT, user_message):
+            yield _sse({"delta": text_chunk})
+    except ai.AIProviderError as exc:
         # The HTTP status is already 200 once streaming starts, so report errors in-band.
-        logger.warning("Resume Q&A request failed: %s", exc)
-        yield _sse({"error": "The assistant is unavailable right now. Please try again."})
+        logger.warning("Resume Q&A failed (%s): %s", creds.provider, exc.code)
+        yield _sse({"error": exc.message})
 
     yield "data: [DONE]\n\n"

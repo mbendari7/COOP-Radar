@@ -17,6 +17,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ai import AICredentials, ai_credentials
 from app.db import get_db
 from app.deps import get_current_user
 from app.models.user import User
@@ -34,15 +35,18 @@ async def upload_resume_endpoint(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     redis: aioredis.Redis = Depends(get_redis),
+    creds: AICredentials = Depends(ai_credentials("rank")),
 ) -> UploadResponse:
     """
     Upload a resume (PDF/DOCX, ≤5 MB), extract text, run match pipeline,
-    store results, and return ranked matches. Counts toward the daily AI limit.
+    store results, and return ranked matches. Uses the visitor's AI key (X-AI-* headers);
+    only the site owner's fallback key counts toward the daily AI limit.
     """
-    await consume_ai_quota(redis, current_user.id)
+    if creds.source == "server":
+        await consume_ai_quota(redis, current_user.id)
     file_bytes = await file.read()
     filename = file.filename or "resume"
-    return await upload_resume(db, current_user.id, filename, file_bytes)
+    return await upload_resume(db, current_user.id, filename, file_bytes, creds)
 
 
 @router.get("", response_model=ResumeOut, status_code=status.HTTP_200_OK)
@@ -86,6 +90,7 @@ async def ask_about_posting(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
     redis: aioredis.Redis = Depends(get_redis),
+    creds: AICredentials = Depends(ai_credentials("chat")),
 ) -> StreamingResponse:
     """
     Stream a cited Q&A response about a matched posting.
@@ -118,8 +123,9 @@ async def ask_about_posting(
             detail={"detail": "Posting not in your match results.", "code": "MATCH_NOT_FOUND"},
         )
 
-    # Only count questions that will actually reach the model
-    await consume_ai_quota(redis, current_user.id)
+    # Only the site owner's key is limited; visitors' own keys are theirs to spend
+    if creds.source == "server":
+        await consume_ai_quota(redis, current_user.id)
 
     # Fetch posting description
     posting = (
@@ -132,7 +138,7 @@ async def ask_about_posting(
     )
 
     return StreamingResponse(
-        stream_answer(posting_text, resume.extracted_text, body.question),
+        stream_answer(creds, posting_text, resume.extracted_text, body.question),
         media_type="text/event-stream",
         headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
