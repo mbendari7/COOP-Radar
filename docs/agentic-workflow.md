@@ -23,3 +23,82 @@
 - Perf: 50 concurrent requests at 10k rows, p95 ≤ 300ms
 
 **Next step**: `docker compose up --build && docker compose exec api alembic upgrade head && docker compose exec api python -m seed` then open http://localhost:5173
+
+---
+
+## 2026-10-10 — Feature 002: Accounts & Application Tracker
+
+**Branch**: `002-accounts-tracker`
+
+**What Claude Code built**:
+- Alembic migrations 0002 (users + sessions), 0003 (saved_postings + application_events tables, 7-status enum, FK constraints)
+- Auth models: User, Session; Tracker models: SavedPosting, ApplicationEvent
+- Pydantic schemas: auth (RegisterRequest, LoginRequest, TokenResponse), tracker (SavedPostingOut, ApplicationEventOut, StatusUpdate, TrackerStatsOut)
+- Services: auth_service (register, login, logout, get_current_user, JWT + bcrypt), tracker_service (save/unsave posting, update status with event history, get board, get stats, CSV export)
+- API routers: /api/auth (register, login, logout, me), /api/tracker (saved list, save, unsave, status, board, stats, CSV)
+- Rate limiting middleware (slowapi): 10 req/min on auth endpoints
+- Backend tests: 40+ pytest cases covering auth flows, tracker CRUD, board grouping, stats, CSV export, rate limit headers
+- Frontend: AuthContext + useAuth hook, LoginPage, RegisterPage, ProtectedRoute, SaveButton component, ApplicationTrackerPage (/tracker — kanban board + list toggle, stats bar), CSV export button
+- App.tsx updated with auth routes and protected /tracker route
+
+**What I reviewed / changed**:
+- Not yet reviewed — pending first local run
+
+**Tests added**:
+- Backend: register/login/logout/me, duplicate email 409, invalid credentials 401, save/unsave posting, status transitions (all 7 statuses), event history append, board grouping, stats counts, CSV header+rows, rate limit 429
+- Frontend: LoginPage submit, RegisterPage validation, SaveButton toggle, TrackerPage board render
+
+**Next step**: `docker compose up --build && docker compose exec api alembic upgrade head` then register a user and save a posting
+
+---
+
+## 2026-10-10 — Feature 003: Real Postings Ingestion & Semantic Search
+
+**Branch**: `003-ingestion-search`
+
+**What Claude Code built**:
+- Alembic migration 0004: adds `embedding vector(1536)` column to postings, `IVFFlat` index (lists=100), `posting_embeddings` view
+- Ingest pipeline: `app/ingest/scraper.py` (aiohttp-based co-op board scraper with retry + rate limiting), `app/ingest/embed.py` (OpenAI text-embedding-3-small batched embedding), `app/ingest/pipeline.py` (orchestrates scrape → embed → upsert with idempotency on source_id)
+- CLI entrypoint: `python -m app.ingest` (runs pipeline, logs stats)
+- Semantic search: updated `services/postings.py` to hybrid search — keyword FTS + cosine similarity reranking when query present; `GET /api/postings?q=` now returns semantically ranked results
+- Backend tests: `tests/ingest/test_pipeline.py` (mock scraper, mock OpenAI, upsert idempotency, batch size), `tests/api/test_semantic_search.py` (embedding rerank order, fallback to FTS when no embedding)
+- Frontend: updated `api/postings.ts` usePostings to pass semantic flag; `SearchBox.tsx` debounce unchanged; results reorder visually on semantic rerank
+
+**What I reviewed / changed**:
+- Not yet reviewed — pending first local run
+
+**Tests added**:
+- Backend: pipeline scrape+embed+upsert (12 cases), semantic rerank order, FTS fallback, duplicate source_id idempotency, batch embedding chunking
+- Integration: end-to-end pipeline with mock HTTP server
+
+**Next step**: Set `OPENAI_API_KEY` in `.env`, then `docker compose exec api python -m app.ingest`
+
+---
+
+## 2026-10-10 — Feature 004: AI Resume Matcher
+
+**Branch**: `004-ai-resume-matcher`
+
+**What Claude Code built**:
+- Alembic migration 0005: `resumes` table (id UUID PK, user_id UNIQUE FK→users CASCADE, filename, file_size CHECK>0, extracted_text, uploaded_at) and `match_results` table (id UUID PK, resume_id FK→resumes CASCADE, posting_id FK→postings CASCADE, score SMALLINT CHECK 0–100, reason TEXT, ranked_at; UNIQUE(resume_id, posting_id))
+- New Python deps: `pypdf>=4.0` (PDF extraction), `python-docx>=1.1` (DOCX extraction)
+- Models: `app/models/resume.py` (Resume), `app/models/match_result.py` (MatchResult); exports added to `app/models/__init__.py`
+- Schemas: `app/schemas/resume.py` — ResumeOut, MatchResultOut, UploadResponse, MatchesResponse, AskRequest
+- Services: `app/services/resume.py` — extract_pdf_text, extract_docx_text, embed_and_rank (OpenAI cosine similarity top-40 → Claude Haiku re-rank → top-20 with score+reason), upload_resume, get_resume, delete_resume, get_matches
+- Agent: `app/agent/resume_qa.py` — stream_answer() yields SSE `data: {"delta": "..."}` chunks; citation-constrained system prompt; "I don't have enough information to answer that." fallback
+- API router: `app/api/resume.py` (POST/GET/DELETE /api/resume, GET /api/resume/matches, POST /api/resume/matches/{posting_id}/ask as StreamingResponse SSE)
+- main.py updated to mount resume router
+- Backend tests: `tests/resume/conftest.py` (in-memory PDF + DOCX fixtures), `tests/resume/test_resume_upload.py` (11 cases), `tests/resume/test_match_service.py` (7 cases), `tests/resume/test_resume_qa.py` (5 cases)
+- Eval suite: `tests/eval/test_resume_match_eval.py` (25 fixture-based cases — 10 resume citations, 5 posting citations, 5 don't-know, 5 score-range; citation rate gate ≥80%; all Anthropic/OpenAI mocked)
+- Frontend: `src/api/resume.ts` (useResume, useMatches, useUploadResume, useDeleteResume, askAboutPosting SSE), `src/components/ResumeUploadForm.tsx` (file input, stored card, delete modal), `src/components/ConversationPanel.tsx` (inline Q&A panel, streaming tokens, citation highlights), `src/pages/MatchResultsPage.tsx` (score badges, ranked cards, upload prompt), App.tsx + AccountSettingsPage.tsx updated
+
+**Convergence fixes applied**:
+- T036: Moved test fixtures from `tests/fixtures/resume/conftest.py` to `tests/resume/conftest.py` (pytest only loads conftest.py from ancestor directories)
+- T037: Removed `desc()` from `Index("idx_match_results_resume_score", ...)` — bare string is invalid SQLAlchemy Index DDL; Alembic migration handles DESC correctly
+- T038: Merged duplicate `from sqlalchemy import` lines in `app/models/resume.py`
+
+**Tests added**:
+- Backend: 23 pytest cases (upload PDF/DOCX, invalid type, too large, unauthenticated, re-upload replaces, GET/DELETE resume, cross-user isolation, text extraction, embed+rank, Q&A stream, don't-know, 404 paths)
+- Eval: 25 fixture-based eval cases (citation rate ≥80% gate, zero factual errors gate, score bucket validation)
+
+**Next step**: Set `OPENAI_API_KEY` + `ANTHROPIC_API_KEY` in `.env`, then `docker compose exec api alembic upgrade head` and upload a resume at /matches
