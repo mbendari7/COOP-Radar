@@ -15,7 +15,7 @@
  */
 
 import { useCallback } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useFilterMeta, usePostings, type SearchMode, type SortField, type SortOrder, type WorkMode, type PageSize } from '../api/postings'
 import { useMe } from '../api/auth'
 import { usePublicConfig } from '../api/meta'
@@ -29,7 +29,7 @@ import WelcomeHero from '../components/WelcomeHero'
 const P = {
   q: 'q', city: 'city', province: 'province', term: 'term',
   work_mode: 'work_mode', duration: 'duration', skills: 'skills',
-  show_expired: 'show_expired', search_mode: 'search_mode',
+  show_expired: 'show_expired', search_mode: 'search_mode', students_only: 'students_only',
   sort: 'sort', order: 'order',
   page: 'page', page_size: 'page_size',
 } as const
@@ -50,6 +50,7 @@ export default function PostingsListPage() {
   const duration     = sp.getAll(P.duration).map(Number).filter((d) => [4,8,12,16].includes(d))
   const skills       = sp.getAll(P.skills).filter(Boolean)
   const show_expired = sp.get(P.show_expired) === 'true'
+  const students_only = sp.get(P.students_only) === 'true'
   const search_mode  = ((sp.get(P.search_mode) ?? 'keyword') as SearchMode)
   const sort         = (sp.get(P.sort) ?? 'posted_at') as SortField
   const order        = (sp.get(P.order) ?? 'desc') as SortOrder
@@ -66,6 +67,7 @@ export default function PostingsListPage() {
     duration: duration.length ? duration : undefined,
     skills: skills.length ? skills : undefined,
     show_expired,
+    students_only,
     search_mode,
     sort,
     order,
@@ -106,13 +108,26 @@ export default function PostingsListPage() {
       {!meLoading && !me && <WelcomeHero />}
 
       {/* Header */}
-      <div className="flex items-baseline justify-between">
+      <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Co-op postings</h1>
+          <h1 className="text-2xl font-bold text-gray-900">Jobs</h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {data ? `${data.total} posting${data.total !== 1 ? 's' : ''}` : 'Loading…'}
+            {data ? `${data.total} open job${data.total !== 1 ? 's' : ''}` : 'Loading…'} · pulled from
+            employers' own career pages and refreshed every few hours
           </p>
         </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+        {/* Students-only toggle */}
+        <label className="flex items-center gap-2 text-sm font-medium text-gray-800 cursor-pointer select-none">
+          <input
+            type="checkbox"
+            className="rounded border-gray-300 text-brand-500 focus:ring-brand-500"
+            checked={students_only}
+            onChange={(e) => update({ [P.students_only]: e.target.checked ? 'true' : null })}
+          />
+          Co-op &amp; intern roles only
+        </label>
 
         {/* Show expired toggle */}
         <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
@@ -124,6 +139,7 @@ export default function PostingsListPage() {
           />
           Show expired
         </label>
+        </div>
       </div>
 
       {/* Search */}
@@ -171,6 +187,16 @@ export default function PostingsListPage() {
         onSortChange={(field, dir) => update({ [P.sort]: field, [P.order]: dir })}
       />
 
+      {data && data.total === 0 && students_only && (
+        <p className="text-sm text-gray-600">
+          No co-op or intern roles match right now — most are posted in waves before each term.{' '}
+          <button type="button" className="text-blue-700 hover:underline" onClick={() => update({ [P.students_only]: null })}>
+            Show all jobs
+          </button>{' '}
+          (many junior roles welcome students too).
+        </p>
+      )}
+
       {/* Pagination */}
       {data && data.total > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
@@ -213,6 +239,9 @@ export default function PostingsListPage() {
           </div>
         </div>
       )}
+      <p className="text-xs text-gray-400">
+        Know a posting that's missing? Signed-in users can <Link to="/add" className="underline">add postings</Link>.
+      </p>
     </div>
   )
 }

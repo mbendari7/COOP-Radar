@@ -37,6 +37,31 @@ export interface MatchesResponse {
   resume: ResumeOut | null
 }
 
+export interface DemandSkill {
+  skill: string
+  /** How many open postings ask for it */
+  postings: number
+}
+
+export interface AIInsights {
+  summary: string
+  strengths: string[]
+  improvements: string[]
+  tailoring_tips: string[]
+  roles_to_search: string[]
+  keywords_to_add: string[]
+}
+
+export interface ResumeInsights {
+  skills_found: string[]
+  in_demand_missing: DemandSkill[]
+  /** null until the visitor runs the AI review */
+  ai: AIInsights | null
+}
+
+/** What the per-job assistant should do */
+export type AskMode = 'question' | 'tailor' | 'cover_letter'
+
 // ── Fetchers ──────────────────────────────────────────────────────────────────
 
 const fetchMatches = () => apiFetch<MatchesResponse>('/api/resume/matches')
@@ -52,10 +77,11 @@ const deleteResumeFile = () => apiFetch<void>('/api/resume', { method: 'DELETE' 
 // ── Hooks ─────────────────────────────────────────────────────────────────────
 
 /** Get stored ranked match results. Returns empty list when no resume on file. */
-export function useMatches() {
+export function useMatches(enabled = true) {
   return useQuery({
     queryKey: ['matches'],
     queryFn: fetchMatches,
+    enabled,
   })
 }
 
@@ -67,7 +93,37 @@ export function useUploadResume() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['resume'] })
       void queryClient.invalidateQueries({ queryKey: ['matches'] })
+      void queryClient.invalidateQueries({ queryKey: ['insights'] })
     },
+  })
+}
+
+/** Free insights (skills found, in-demand skills missing) plus the cached AI review. */
+export function useInsights(enabled: boolean) {
+  return useQuery({
+    queryKey: ['insights'],
+    queryFn: () => apiFetch<ResumeInsights>('/api/resume/insights'),
+    enabled,
+  })
+}
+
+/** Run the AI resume review with the visitor's key; the result is cached server-side. */
+export function useGenerateInsights() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<ResumeInsights>('/api/resume/insights', { method: 'POST', headers: aiHeaders() }),
+    onSuccess: (data) => queryClient.setQueryData(['insights'], data),
+  })
+}
+
+/** Re-rank the stored resume against current postings with the visitor's AI. */
+export function useRematch() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: () =>
+      apiFetch<UploadResponse>('/api/resume/rematch', { method: 'POST', headers: aiHeaders() }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['matches'] }),
   })
 }
 
@@ -79,6 +135,7 @@ export function useDeleteResume() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ['resume'] })
       void queryClient.invalidateQueries({ queryKey: ['matches'] })
+      void queryClient.invalidateQueries({ queryKey: ['insights'] })
     },
   })
 }
@@ -86,7 +143,8 @@ export function useDeleteResume() {
 // ── SSE streaming Q&A ─────────────────────────────────────────────────────────
 
 /**
- * Ask a question about a matched posting using SSE streaming.
+ * Ask about a matched posting using SSE streaming.
+ * mode 'question' answers `question`; 'tailor' and 'cover_letter' need no question.
  * Calls onDelta for each token, onDone when stream ends, onError on failure.
  */
 export async function askAboutPosting(
@@ -95,12 +153,13 @@ export async function askAboutPosting(
   onDelta: (token: string) => void,
   onDone: () => void,
   onError: (err: Error) => void,
+  mode: AskMode = 'question',
 ): Promise<void> {
   try {
     const res = await fetch(`${API_BASE}/api/resume/matches/${postingId}/ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...aiHeaders() },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, mode }),
       credentials: 'include',
     })
 

@@ -6,10 +6,10 @@
  */
 
 import { useState } from 'react'
-import { Navigate, useNavigate } from 'react-router-dom'
 import { changePassword, deleteAccount, useLogout, useMe } from '../api/auth'
 import { ApiError } from '../api/client'
-import ResumeUploadForm from '../components/ResumeUploadForm'
+import { Link, Navigate, useNavigate } from 'react-router-dom'
+import ClaimAccountForm from '../components/ClaimAccountForm'
 
 export default function AccountSettingsPage() {
   const navigate = useNavigate()
@@ -82,6 +82,22 @@ export default function AccountSettingsPage() {
     }
   }
 
+  if (me.is_demo) {
+    return (
+      <div className="max-w-lg mx-auto px-4 py-10 space-y-6">
+        <h1 className="text-2xl font-semibold text-gray-900">Temporary account</h1>
+        <p className="text-sm text-gray-600">
+          This account is private to you and is deleted automatically 7 days after it was created.
+          Add an email and password to keep it — your resume, matches, and tracker all stay.
+        </p>
+        <ClaimAccountForm />
+        <p className="text-sm text-gray-500">
+          Not keeping it? Just sign out — everything is removed when it expires.
+        </p>
+      </div>
+    )
+  }
+
   return (
     <div className="max-w-lg mx-auto px-4 py-10">
       <h1 className="text-2xl font-semibold text-gray-900 mb-8">Account Settings</h1>
@@ -136,8 +152,10 @@ export default function AccountSettingsPage() {
 
       {/* ── Resume ── */}
       <section className="mb-10">
-        <h2 className="text-lg font-medium text-gray-900 mb-4">Resume</h2>
-        <ResumeUploadForm showStoredCard />
+        <h2 className="text-lg font-medium text-gray-900 mb-2">Resume</h2>
+        <p className="text-sm text-gray-600">
+          Upload, replace, or delete your resume on <Link to="/resume" className="text-blue-700 hover:underline">My resume</Link>.
+        </p>
       </section>
 
       <hr className="border-gray-200 mb-10" />

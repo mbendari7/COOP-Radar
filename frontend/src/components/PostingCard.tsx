@@ -7,7 +7,8 @@
 import { useNavigate } from 'react-router-dom'
 import type { PostingListItem } from '../api/postings'
 import BookmarkButton from './BookmarkButton'
-import { formatDate, workModeLabel } from '../utils/format'
+import LiveBadge from './LiveBadge'
+import { formatDate, formatLocation, workModeLabel } from '../utils/format'
 
 interface Props {
   posting: PostingListItem
@@ -37,7 +38,10 @@ export default function PostingCard({ posting, showBookmark = false }: Props) {
     >
       <div className="flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <p className="font-semibold text-gray-900 truncate">{posting.title}</p>
+          <p className="font-semibold text-gray-900 truncate">
+            {posting.title}
+            {posting.source_id && <LiveBadge />}
+          </p>
           <p className="text-sm text-gray-600 truncate">{posting.company}</p>
         </div>
         <div className="flex items-center gap-1 shrink-0">
@@ -54,7 +58,7 @@ export default function PostingCard({ posting, showBookmark = false }: Props) {
       </div>
 
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-gray-500">
-        <span>{posting.city}, {posting.province}</span>
+        <span>{formatLocation(posting.city, posting.province)}</span>
         <span>{posting.term}</span>
         <span>{posting.duration_months} mo</span>
       </div>

@@ -20,7 +20,8 @@ import { useNavigate } from 'react-router-dom'
 import type { PostingListItem, SortField, SortOrder } from '../api/postings'
 import BookmarkButton from './BookmarkButton'
 import PostingCard from './PostingCard'
-import { formatDate, workModeLabel } from '../utils/format'
+import LiveBadge from './LiveBadge'
+import { formatDate, formatLocation, workModeLabel } from '../utils/format'
 
 const col = createColumnHelper<PostingListItem>()
 
@@ -30,7 +31,10 @@ const columns = [
     id: 'title',
     header: 'Role',
     cell: (info) => (
-      <span className="font-medium text-gray-900">{info.getValue()}</span>
+      <span className="font-medium text-gray-900">
+        {info.getValue()}
+        {info.row.original.source_id && <LiveBadge />}
+      </span>
     ),
   }),
   col.accessor('company', {
@@ -40,7 +44,7 @@ const columns = [
   col.accessor('city', {
     id: 'city',
     header: 'Location',
-    cell: (info) => `${info.getValue()}, ${info.row.original.province}`,
+    cell: (info) => formatLocation(info.getValue(), info.row.original.province),
     enableSorting: false,
   }),
   col.accessor('work_mode', {

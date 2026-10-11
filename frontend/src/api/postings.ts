@@ -26,6 +26,7 @@ export interface PostingListItem {
   skills: string[]
   source_url: string | null
   closed_at: string | null  // set when the posting disappeared from its ingest source
+  source_id: string | null  // set for jobs imported live from an employer's career board
   // Populated for authenticated requests; null/undefined for unauthenticated
   is_saved?: boolean | null
 }
@@ -81,6 +82,8 @@ export interface PostingListParams {
   skills?: string[]
   show_expired?: boolean
   show_closed?: boolean
+  /** Only intern / co-op / student / new-grad roles */
+  students_only?: boolean
   search_mode?: SearchMode
   sort?: SortField
   order?: SortOrder
@@ -106,6 +109,7 @@ function buildQueryString(params: PostingListParams): string {
   }
   if (params.show_expired) sp.set('show_expired', 'true')
   if (params.show_closed) sp.set('show_closed', 'true')
+  if (params.students_only) sp.set('students_only', 'true')
   if (params.search_mode && params.search_mode !== 'keyword') sp.set('search_mode', params.search_mode)
   if (params.sort) sp.set('sort', params.sort)
   if (params.order) sp.set('order', params.order)

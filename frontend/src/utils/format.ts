@@ -12,3 +12,8 @@ export function workModeLabel(mode: string): string {
     default:       return mode
   }
 }
+
+/** "Toronto, ON", "Remote", or "Canada" — never a dangling comma when a part is missing. */
+export function formatLocation(city: string, province: string): string {
+  return [city, province].filter(Boolean).join(', ')
+}

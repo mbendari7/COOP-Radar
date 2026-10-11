@@ -1,14 +1,18 @@
 /**
- * ConversationPanel — inline Q&A panel for a single match card.
+ * ConversationPanel — the AI assistant for one matched job.
  *
- * - "Ask about this role" button toggles the panel
- * - Free-text question input streams the response word-by-word
- * - Citation prefixes "Resume: " and "Posting: " are bolded
- * - Clears conversation on close
+ * - One-click actions: "Tailor my resume" and "Cover letter opener"
+ * - "Ask a question" opens a free-text Q&A (answers cite the resume / posting)
+ * - Replies stream in word by word; each can be copied
+ * - Without an AI key it points the visitor to the AI key page instead
  */
 
 import { useRef, useState } from 'react'
-import { askAboutPosting } from '../api/resume'
+import { Link } from 'react-router-dom'
+import { useAiKey } from '../api/aiKey'
+import { usePublicConfig } from '../api/meta'
+import { askAboutPosting, type AskMode } from '../api/resume'
+import RichText from './RichText'
 
 interface Props {
   postingId: string
@@ -22,21 +26,34 @@ interface Message {
   streaming?: boolean
 }
 
-/** Bold "Resume: " and "Posting: " citation prefixes within a text string */
-function CitedText({ text }: { text: string }) {
-  const parts = text.split(/((?:Resume|Posting):\s)/g)
+const ACTION_LABELS: Record<Exclude<AskMode, 'question'>, string> = {
+  tailor: 'How should I tailor my resume for this job?',
+  cover_letter: 'Write a cover letter opener for this job.',
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
   return (
-    <>
-      {parts.map((part, i) =>
-        /^(?:Resume|Posting):\s$/.test(part)
-          ? <strong key={i}>{part}</strong>
-          : <span key={i}>{part}</span>
-      )}
-    </>
+    <button
+      type="button"
+      onClick={() => {
+        void navigator.clipboard?.writeText(text).then(() => {
+          setCopied(true)
+          setTimeout(() => setCopied(false), 1500)
+        })
+      }}
+      className="text-xs text-gray-500 hover:text-gray-800"
+    >
+      {copied ? 'Copied ✓' : 'Copy'}
+    </button>
   )
 }
 
 export default function ConversationPanel({ postingId, postingTitle, company }: Props) {
+  const aiKey = useAiKey()
+  const { data: config } = usePublicConfig()
+  const canUseAi = Boolean(aiKey) || Boolean(config?.server_ai_enabled)
+
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
@@ -51,40 +68,30 @@ export default function ConversationPanel({ postingId, postingTitle, company }: 
     setError(null)
   }
 
-  async function handleSend() {
-    const q = input.trim()
-    if (!q || loading) return
-
-    setInput('')
+  async function run(mode: AskMode, question: string) {
+    if (loading) return
+    setOpen(true)
     setError(null)
-    setMessages((prev) => [...prev, { role: 'user', text: q }])
+    setMessages((prev) => [
+      ...prev,
+      { role: 'user', text: mode === 'question' ? question : ACTION_LABELS[mode] },
+      { role: 'assistant', text: '', streaming: true },
+    ])
     setLoading(true)
-
-    // Add a streaming assistant message placeholder
-    setMessages((prev) => [...prev, { role: 'assistant', text: '', streaming: true }])
 
     await askAboutPosting(
       postingId,
-      q,
+      question,
       (delta) => {
         setMessages((prev) => {
           const next = [...prev]
           const last = next[next.length - 1]
-          if (last?.role === 'assistant') {
-            next[next.length - 1] = { ...last, text: last.text + delta }
-          }
+          if (last?.role === 'assistant') next[next.length - 1] = { ...last, text: last.text + delta }
           return next
         })
       },
       () => {
-        setMessages((prev) => {
-          const next = [...prev]
-          const last = next[next.length - 1]
-          if (last?.role === 'assistant') {
-            next[next.length - 1] = { ...last, streaming: false }
-          }
-          return next
-        })
+        setMessages((prev) => prev.map((m) => (m.streaming ? { ...m, streaming: false } : m)))
         setLoading(false)
         setTimeout(() => inputRef.current?.focus(), 50)
       },
@@ -93,74 +100,83 @@ export default function ConversationPanel({ postingId, postingTitle, company }: 
         setMessages((prev) => prev.filter((m) => !m.streaming))
         setLoading(false)
       },
+      mode,
     )
   }
 
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      void handleSend()
-    }
+  function handleSend() {
+    const q = input.trim()
+    if (!q) return
+    setInput('')
+    void run('question', q)
+  }
+
+  const actionClass =
+    'text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50'
+
+  if (!canUseAi) {
+    return (
+      <p className="text-sm text-gray-500">
+        <Link to="/ai-key" className="text-blue-700 font-medium hover:underline">Add a free AI key</Link>{' '}
+        to tailor your resume, draft a cover letter opener, or ask questions about this job.
+      </p>
+    )
   }
 
   return (
     <div>
-      {/* Toggle button */}
-      <button
-        onClick={() => (open ? handleClose() : setOpen(true))}
-        className="mt-3 text-sm text-brand-600 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500 rounded"
-        aria-expanded={open}
-        aria-controls={`conversation-${postingId}`}
-      >
-        {open ? 'Close conversation' : 'Ask about this role'}
-      </button>
+      <div className="flex flex-wrap gap-2">
+        <button type="button" disabled={loading} onClick={() => void run('tailor', '')} className={actionClass}>
+          ✏️ Tailor my resume
+        </button>
+        <button type="button" disabled={loading} onClick={() => void run('cover_letter', '')} className={actionClass}>
+          ✉️ Cover letter opener
+        </button>
+        <button
+          type="button"
+          onClick={() => (open ? handleClose() : setOpen(true))}
+          className="text-sm px-3 py-1.5 text-blue-700 hover:underline"
+          aria-expanded={open}
+          aria-controls={`conversation-${postingId}`}
+        >
+          {open ? 'Close' : 'Ask a question'}
+        </button>
+      </div>
 
-      {/* Inline panel */}
       {open && (
         <div
           id={`conversation-${postingId}`}
           className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3"
-          aria-label={`Q&A for ${postingTitle} at ${company}`}
+          aria-label={`AI assistant for ${postingTitle} at ${company}`}
         >
-          {/* Context label */}
-          <p className="text-xs text-gray-500 font-medium">
-            Asking about: <span className="text-gray-700">{postingTitle}</span> at {company}
-          </p>
-
-          {/* Message history */}
           {messages.length > 0 && (
-            <div className="space-y-3 max-h-80 overflow-y-auto" role="log" aria-live="polite">
+            <div className="space-y-4 max-h-[28rem] overflow-y-auto" role="log" aria-live="polite">
               {messages.map((msg, i) => (
-                <div
-                  key={i}
-                  className={`text-sm ${msg.role === 'user' ? 'text-gray-800 font-medium' : 'text-gray-700'}`}
-                >
-                  {msg.role === 'user' && (
-                    <span className="text-xs text-gray-400 block mb-0.5">You</span>
-                  )}
-                  {msg.role === 'assistant' && (
-                    <span className="text-xs text-gray-400 block mb-0.5">
-                      {msg.streaming ? 'Thinking…' : 'Assistant'}
-                    </span>
-                  )}
-                  {msg.role === 'assistant'
-                    ? <CitedText text={msg.text} />
-                    : msg.text
-                  }
-                  {msg.streaming && msg.text === '' && (
-                    <span className="inline-block w-2 h-4 bg-gray-400 animate-pulse ml-0.5" aria-hidden="true" />
+                <div key={i} className="text-sm">
+                  {msg.role === 'user' ? (
+                    <p className="font-medium text-gray-800">
+                      <span className="block text-xs text-gray-400 mb-0.5">You</span>
+                      {msg.text}
+                    </p>
+                  ) : (
+                    <div className="text-gray-700">
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs text-gray-400">{msg.streaming ? 'Writing…' : 'Assistant'}</span>
+                        {!msg.streaming && msg.text && <CopyButton text={msg.text} />}
+                      </div>
+                      <RichText text={msg.text} />
+                      {msg.streaming && msg.text === '' && (
+                        <span className="inline-block w-2 h-4 bg-gray-400 animate-pulse" aria-hidden="true" />
+                      )}
+                    </div>
                   )}
                 </div>
               ))}
             </div>
           )}
 
-          {/* Error */}
-          {error && (
-            <p role="alert" className="text-sm text-red-600">{error}</p>
-          )}
+          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
 
-          {/* Input row */}
           <div className="flex gap-2 items-end">
             <label htmlFor={`qa-input-${postingId}`} className="sr-only">
               Ask a question about this role
@@ -171,22 +187,26 @@ export default function ConversationPanel({ postingId, postingTitle, company }: 
               rows={2}
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              placeholder="e.g. What Python skills match this role?"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  handleSend()
+                }
+              }}
+              placeholder="e.g. Do I have the skills for this role?"
               disabled={loading}
               className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50"
             />
             <button
-              onClick={() => void handleSend()}
+              onClick={handleSend}
               disabled={!input.trim() || loading}
               className="shrink-0 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
               {loading ? '…' : 'Send'}
             </button>
           </div>
-
           <p className="text-xs text-gray-400">
-            Press Enter to send, Shift+Enter for a new line.
+            Answers use only your resume and this posting. Always check before you send anything.
           </p>
         </div>
       )}

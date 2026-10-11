@@ -73,9 +73,10 @@ export default function AiKeyPage() {
       <header>
         <h1 className="text-2xl font-bold text-gray-900">Your AI key</h1>
         <p className="mt-2 text-gray-600">
-          CoopRadar's AI features — ranking postings against your resume and answering questions about
-          them — run on <strong>your own</strong> AI account. Pick a provider, get a key in a couple of
-          minutes, and paste it here.
+          The free features (skills found, in-demand skills, skill-based job matches) need no key. The AI
+          extras — a full resume review, smarter job ranking, tailoring tips, and cover letter openers — run
+          on <strong>your own</strong> AI account. Gemini has a free tier: pick a provider, get a key in a
+          couple of minutes, and paste it here.
         </p>
         {config?.server_ai_enabled && (
           <p className="mt-2 text-sm text-gray-500">
@@ -97,7 +98,8 @@ export default function AiKeyPage() {
             </p>
             {justSaved && (
               <p className="mt-1 text-sm text-green-800">
-                Saved. Head to <Link to="/matches" className="underline font-medium">Matches</Link> to upload your resume.
+                Saved. Go to <Link to="/resume" className="underline font-medium">My resume</Link> for your AI
+                review, smarter job ranking, and one-click tailoring.
               </p>
             )}
           </div>

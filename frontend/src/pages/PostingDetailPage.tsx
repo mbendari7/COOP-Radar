@@ -8,7 +8,7 @@
 import { useNavigate, useParams } from 'react-router-dom'
 import { usePosting } from '../api/postings'
 import { SimilarPostings } from '../components/SimilarPostings'
-import { formatDate, workModeLabel } from '../utils/format'
+import { formatDate, formatLocation, workModeLabel } from '../utils/format'
 
 export default function PostingDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -69,11 +69,14 @@ export default function PostingDetailPage() {
 
         {/* Meta grid */}
         <dl className="grid grid-cols-2 sm:grid-cols-3 gap-x-6 gap-y-4 mb-8 text-sm">
-          <MetaItem label="Location" value={`${posting.city}, ${posting.province}`} />
+          <MetaItem label="Location" value={formatLocation(posting.city, posting.province)} />
           <MetaItem label="Work mode" value={workModeLabel(posting.work_mode)} />
           <MetaItem label="Term" value={posting.term} />
           <MetaItem label="Duration" value={`${posting.duration_months} months`} />
-          <MetaItem label="Deadline" value={formatDate(posting.deadline)} />
+          <MetaItem
+            label={posting.low_confidence_fields?.deadline !== undefined ? 'Apply by (estimated)' : 'Deadline'}
+            value={formatDate(posting.deadline)}
+          />
           <MetaItem label="Posted" value={formatDate(posting.posted_at)} />
         </dl>
 
@@ -117,7 +120,7 @@ export default function PostingDetailPage() {
                 hover:bg-brand-700 focus:outline-none focus:ring-2 focus:ring-brand-500 focus:ring-offset-2
               "
             >
-              View original posting
+              {posting.source_id ? `Apply on ${posting.company}'s site` : 'View original posting'}
               <span aria-hidden="true">↗</span>
             </a>
           </div>

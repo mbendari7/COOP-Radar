@@ -26,6 +26,7 @@ function makePosting(overrides: Partial<PostingListItem> = {}): PostingListItem 
     skills: ['Python', 'SQL'],
     source_url: null,
     closed_at: null,
+    source_id: null,
     ...overrides,
   }
 }
@@ -80,6 +81,13 @@ describe('PostingsTable', () => {
     // Both titles visible in the table (hidden on mobile in the DOM but in the table)
     expect(screen.getAllByText('Backend Dev').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Frontend Dev').length).toBeGreaterThan(0)
+  })
+
+  it('marks live employer jobs and never shows a dangling comma for remote jobs', () => {
+    renderTable({ data: [makePosting({ title: 'Data Intern', city: 'Remote', province: '', source_id: 'src-1' })] })
+    expect(screen.getAllByText('Live').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('Remote').length).toBeGreaterThan(0)
+    expect(screen.queryByText('Remote,')).not.toBeInTheDocument()
   })
 
   it('calls onSortChange with correct args when a sortable header is clicked', () => {

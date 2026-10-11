@@ -26,7 +26,7 @@ import DeadlinesPanel from '../components/DeadlinesPanel'
 import StatsPanel from '../components/StatsPanel'
 import StatusBadge from '../components/StatusBadge'
 import TrackerBoard from '../components/TrackerBoard'
-import { formatDate } from '../utils/format'
+import { formatDate, formatLocation } from '../utils/format'
 
 type ViewMode = 'table' | 'board'
 
@@ -211,7 +211,7 @@ export default function SavedPostingsPage() {
                           </Link>
                         </div>
                         <p className="text-sm text-gray-600 mt-0.5">
-                          {saved.posting.company} · {saved.posting.city}, {saved.posting.province} · {saved.posting.term}
+                          {saved.posting.company} · {formatLocation(saved.posting.city, saved.posting.province)} · {saved.posting.term}
                         </p>
                         <p className="text-xs text-gray-400 mt-1">
                           Saved {formatDate(saved.saved_at)} · Deadline {formatDate(saved.posting.deadline)}

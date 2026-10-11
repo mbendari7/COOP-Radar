@@ -1,67 +1,58 @@
 /**
- * WelcomeHero — first-visit introduction on the postings page for signed-out visitors.
- * Explains what CoopRadar does in one glance and offers the demo or sign-up.
+ * WelcomeHero — first-visit introduction on the jobs page for signed-out visitors.
+ * One clear action ("Analyze my resume"), plus the pre-filled demo for the curious.
  */
 
-import { useState } from 'react'
-import AuthModal from './AuthModal'
+import { Link } from 'react-router-dom'
 import DemoButton from './DemoButton'
 
-const FEATURES = [
+const STEPS = [
   {
-    title: 'Search every posting in one place',
-    body: 'Filter by city, term, work mode, duration, and skills — or search by meaning with smart search.',
+    title: '1. Upload your resume',
+    body: 'PDF or Word. No sign-up — you get a private account you can keep or let expire.',
   },
   {
-    title: 'Track every application',
-    body: 'Save postings, move them from Applying to Offer on a board, and never miss a deadline.',
+    title: '2. See what it says',
+    body: 'Skills employers can see, in-demand skills you are missing, and an AI review with tailoring tips.',
   },
   {
-    title: 'Match your resume with your own AI',
-    body: 'Bring a Claude, ChatGPT, or Gemini key: get your best-fit postings scored and explained, then ask follow-up questions.',
+    title: '3. Apply to the right jobs',
+    body: 'Real co-op and intern postings from Canadian employers, ranked for you — with a one-click tailoring plan for each.',
   },
 ]
 
 export default function WelcomeHero() {
-  const [authOpen, setAuthOpen] = useState(false)
-
   return (
     <section
       aria-labelledby="welcome-heading"
       className="rounded-2xl bg-gradient-to-br from-blue-700 to-indigo-700 text-white p-6 sm:p-10 shadow-sm"
     >
-      <h2 id="welcome-heading" className="text-2xl sm:text-3xl font-bold tracking-tight">
-        Find, track, and win your next co-op.
+      <h2 id="welcome-heading" className="text-2xl sm:text-4xl font-bold tracking-tight">
+        Land your next co-op.
       </h2>
-      <p className="mt-2 max-w-2xl text-blue-100">
-        CoopRadar brings co-op and internship postings together, keeps your applications organised,
-        and tells you which roles fit your resume — and what you're missing.
+      <p className="mt-3 max-w-2xl text-blue-100 text-lg">
+        Drop in your resume. CoopRadar shows what it's good at, how to tailor it, and which real
+        jobs near you to apply for.
       </p>
 
-      <div className="mt-5 flex flex-wrap items-start gap-3">
-        <DemoButton variant="hero" />
-        <button
-          type="button"
-          onClick={() => setAuthOpen(true)}
-          className="px-5 py-2.5 rounded-lg bg-white/10 text-white font-semibold ring-1 ring-white/40 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-white"
+      <div className="mt-6 flex flex-wrap items-center gap-3">
+        <Link
+          to="/resume"
+          className="px-6 py-3 rounded-lg bg-white text-blue-800 font-semibold hover:bg-blue-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-white"
         >
-          Create a free account
-        </button>
+          Analyze my resume — free
+        </Link>
+        <DemoButton variant="hero-outline" label="See a demo first" />
       </div>
-      <p className="mt-2 text-xs text-blue-200">
-        The demo opens a private sample account instantly — no sign-up needed.
-      </p>
 
-      <ul className="mt-8 grid gap-4 sm:grid-cols-3" role="list">
-        {FEATURES.map((f) => (
-          <li key={f.title} className="rounded-xl bg-white/10 p-4">
-            <h3 className="font-semibold">{f.title}</h3>
-            <p className="mt-1 text-sm text-blue-100">{f.body}</p>
+      <ol className="mt-8 grid gap-4 sm:grid-cols-3" role="list">
+        {STEPS.map((s) => (
+          <li key={s.title} className="rounded-xl bg-white/10 p-4">
+            <h3 className="font-semibold">{s.title}</h3>
+            <p className="mt-1 text-sm text-blue-100">{s.body}</p>
           </li>
         ))}
-      </ul>
-
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab="register" />
+      </ol>
     </section>
   )
 }

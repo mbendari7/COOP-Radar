@@ -15,7 +15,7 @@ export interface UserOut {
   email: string
   created_at: string
   is_admin: boolean
-  /** Throwaway "Try the demo" account (deleted after 24 hours) */
+  /** Temporary account (demo or guest) — deleted after 7 days unless saved with /api/me/claim */
   is_demo: boolean
 }
 
@@ -86,6 +86,23 @@ export function useDemoLogin() {
   return useMutation({
     mutationFn: () => apiFetch<UserOut>('/api/auth/demo', { method: 'POST' }),
     onSuccess: () => qc.invalidateQueries(),
+  })
+}
+
+/**
+ * Start without signing up: the server creates an empty temporary account and logs into it.
+ * Used when a signed-out visitor uploads their resume.
+ */
+export function guestLogin(): Promise<UserOut> {
+  return apiFetch<UserOut>('/api/auth/guest', { method: 'POST' })
+}
+
+/** Keep a temporary account: add an email + password. All saved jobs and the resume stay. */
+export function useClaimAccount() {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: (body: Credentials) => apiFetch<UserOut>('/api/me/claim', { method: 'POST', json: body }),
+    onSuccess: (user) => qc.setQueryData(['me'], user),
   })
 }
 
