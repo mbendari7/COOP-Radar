@@ -6,8 +6,14 @@ Upload a resume and Claude ranks the best-fit postings and answers cited questio
 
 [![CI](https://github.com/mbendari7/COOP-Radar/actions/workflows/ci.yml/badge.svg)](https://github.com/mbendari7/COOP-Radar/actions/workflows/ci.yml)
 
-> New to the codebase? Read **[docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md)**. It walks through how every part
-> works, how a request flows through the system, and how to extend it.
+## 📚 Documentation
+
+| Read this | When you want to… |
+|---|---|
+| **[GETTING_STARTED.md](GETTING_STARTED.md)** | Install, run, and **use** the app, step by step, including troubleshooting |
+| **[HOW_IT_WORKS.md](HOW_IT_WORKS.md)** | Understand how the program works, where everything lives, and **how to explain it** |
+| [docs/PROJECT_GUIDE.md](docs/PROJECT_GUIDE.md) | Go deep: every module, the database, testing strategy, recipes for common changes |
+| [CLAUDE.md](CLAUDE.md) | See the rules Claude Code follows in this repo |
 
 ---
 
@@ -80,36 +86,31 @@ flowchart LR
 | CI / infra | GitHub Actions · Docker Compose · nginx (production frontend image) |
 | AI-assisted workflow | [Spec Kit](https://github.com/github/spec-kit) + Claude Code skills (see below) |
 
-## Getting started
+## Quick start
 
-### Prerequisites
-- [Docker Desktop](https://www.docker.com/products/docker-desktop/) (or Docker Engine + Compose v2)
-- Optional, for AI features: an [Anthropic API key](https://console.anthropic.com/) and an [OpenAI API key](https://platform.openai.com/api-keys)
-
-### Run it
+You need **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** running. AI keys are optional
+([Anthropic](https://console.anthropic.com/), [OpenAI](https://platform.openai.com/api-keys)).
 
 ```bash
 git clone https://github.com/mbendari7/COOP-Radar.git
 cd COOP-Radar
-cp .env.example .env            # then edit: set POSTGRES_PASSWORD, and the AI keys if you have them
+cp .env.example .env                                # set POSTGRES_PASSWORD (+ AI keys if you have them)
 
-docker compose up --build       # db, redis, api (runs migrations), worker, web
+docker compose up --build                           # starts db, redis, api, worker, web
 
-# in a second terminal — load sample data (55 postings, skills taxonomy, 2 demo sources)
-docker compose exec api python -m seed
-# give postings embeddings so semantic search + resume matching work (needs OPENAI_API_KEY)
-docker compose exec api python -m app.ingest.embed
+# in a second terminal (first run only)
+docker compose exec api python -m seed              # 55 sample postings, skills list, 2 demo sources
+docker compose exec api python -m app.ingest.embed  # AI search vectors (needs OPENAI_API_KEY)
 ```
 
-Open **http://localhost:5173**. The interactive API docs are at **http://localhost:8000/docs**.
+| Open | URL |
+|---|---|
+| The app | **http://localhost:5173** |
+| Interactive API docs | http://localhost:8000/docs |
 
-**Make yourself an admin** (to see the Sources page). Register in the UI, then run:
-```bash
-docker compose exec db psql -U coopradar -c "UPDATE users SET is_admin = TRUE WHERE email = 'you@example.com';"
-```
-
-Without AI keys everything except semantic search, similar postings, and resume matching works. Those features
-degrade cleanly: keyword fallback, empty lists, or a clear "AI unavailable" message.
+Without AI keys, browsing, search, accounts, and the tracker all work; smart search, similar postings, and resume
+matching show a clear "unavailable" message. **[GETTING_STARTED.md](GETTING_STARTED.md)** covers using every
+feature, becoming an admin, stopping/resetting, and fixing common problems.
 
 ## Development commands
 
@@ -154,7 +155,11 @@ All configuration is environment variables. See [`.env.example`](.env.example) f
 
 ```
 COOP-Radar/
+├── README.md                     You are here
+├── GETTING_STARTED.md            Install, run, and use the app step by step
+├── HOW_IT_WORKS.md               How the program works + how to explain it
 ├── CLAUDE.md                     Instructions for Claude Code sessions in this repo
+├── LICENSE                       MIT
 ├── docker-compose.yml            db · redis · api · worker · web
 ├── .env.example                  Every config variable, documented
 ├── .github/workflows/ci.yml      Backend + frontend quality gates
@@ -249,6 +254,12 @@ The prompts used to spec every feature are in [`docs/speckit-prompts.md`](docs/s
 - Privacy: resumes are deletable at any time; only extracted text is stored; secrets live only in env vars.
 - Responsible data: public APIs/feeds, uploads, and manual entry only; respect robots.txt and terms; no logins scraped.
 - Accessible, mobile-first UI (keyboard reachable, visible focus, WCAG AA, usable at 375 px).
+
+## Repository workflow
+
+Everything lives on **`main`**. Build new work on a short-lived branch (e.g. `005-deploy`), open a pull request into
+`main`, and merge once CI is green. Commit messages are conventional (`feat:`, `fix:`, `docs:`, …) with no AI
+attribution lines.
 
 ## Roadmap
 

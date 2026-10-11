@@ -1,7 +1,8 @@
 # CoopRadar — The Project Guide
 
-This guide explains how CoopRadar works end to end so you can own it: explain it in an interview, debug it,
-and extend it. Read it top to bottom once, then use it as a reference.
+This is the deep technical reference: how every part works, so you can debug and extend it.
+Start with the shorter guides if you haven't: **[GETTING_STARTED.md](../GETTING_STARTED.md)** (run and use it) and
+**[HOW_IT_WORKS.md](../HOW_IT_WORKS.md)** (how it works, plus how to explain it).
 
 **Contents**
 1. [The big picture](#1-the-big-picture)

@@ -2,15 +2,15 @@
 
 ## Current status (2026-10-10)
 
-| Feature | Branch | Status |
-|---|---|---|
-| 001 Browse & Search | `001-browse-search` | Done |
-| 002 Accounts & Application Tracker | `002-accounts-tracker` | Done |
-| 003 Real Postings Ingestion & Semantic Search | `003-ingestion-search` | Done |
-| 004 AI Resume Matcher | `004-ai-resume-matcher` | Core done (upload, match, cited Q&A); tool-use agent, MCP server, YAML evals not built |
+| Feature | Status |
+|---|---|
+| 001 Browse & Search | Done |
+| 002 Accounts & Application Tracker | Done |
+| 003 Real Postings Ingestion & Semantic Search | Done |
+| 004 AI Resume Matcher | Core done (upload, match, cited Q&A); tool-use agent, MCP server, YAML evals not built |
 
-All four branches build on each other; `004-ai-resume-matcher` contains everything. `main` still holds only the
-repo skeleton — merge the feature work into `main` via a pull request when ready.
+Everything is on `main` (PR #1 merged 2026-10-10; the superseded per-feature branches and PRs #2–#4 were closed).
+New work: branch from `main`, open a PR, merge when CI is green.
 
 ## Verification (2026-10-10 full-repo review)
 
@@ -26,7 +26,7 @@ Not verified here: a full `docker compose up` (Docker wasn't available) and live
 
 ## Open work
 
-1. Merge `004-ai-resume-matcher` → `main` (PR), so CI and the GitHub contributors graph reflect the real code.
+1. ~~Merge everything into `main`~~ (done 2026-10-10).
 2. First live run with real API keys; run `python -m app.ingest.embed` so matching has vectors to search.
 3. Add a real public job-board source (check its terms + robots.txt; document it in the plan).
 4. Remaining spec-004 scope: agent tools + MCP server + `agent_runs` + YAML eval runner (see the agent-tools skill).
