@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -36,6 +37,27 @@ class Settings(BaseSettings):
     fast_model: str = "claude-haiku-5-5"
     # OpenAI embedding model. Must produce 1536-dim vectors to fit posting_embeddings.
     embed_model: str = "text-embedding-3-small"
+
+    # --- Public hosting -------------------------------------------------------
+    # One-click "Try the demo" accounts (see app/services/demo.py).
+    demo_enabled: bool = True
+    # AI actions (resume uploads + Q&A questions) per user per UTC day; 0 = unlimited.
+    ai_daily_limit: int = 20
+    # Folder with the built React app (index.html + assets/). When it exists, the API also
+    # serves the website, so one container = the whole site. Set by the production Dockerfile.
+    static_dir: str = ""
+
+    @field_validator("database_url")
+    @classmethod
+    def _asyncpg_url(cls, v: str) -> str:
+        """
+        Accept the URL formats hosting providers hand out (postgres://, postgresql://,
+        ?sslmode=require) and convert them to what SQLAlchemy + asyncpg expect.
+        """
+        for prefix in ("postgres://", "postgresql://"):
+            if v.startswith(prefix):
+                v = "postgresql+asyncpg://" + v[len(prefix):]
+        return v.replace("sslmode=", "ssl=")
 
     @property
     def cors_origins_list(self) -> list[str]:

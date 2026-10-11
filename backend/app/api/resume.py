@@ -11,6 +11,7 @@ Route order:
 
 from uuid import UUID
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
@@ -19,8 +20,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_db
 from app.deps import get_current_user
 from app.models.user import User
+from app.redis import get_redis
 from app.schemas.resume import AskRequest, MatchesResponse, ResumeOut, UploadResponse
 from app.services.resume import delete_resume, get_matches, get_resume, upload_resume
+from app.services.usage import consume_ai_quota
 
 router = APIRouter(prefix="/resume", tags=["resume"])
 
@@ -30,11 +33,13 @@ async def upload_resume_endpoint(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
 ) -> UploadResponse:
     """
     Upload a resume (PDF/DOCX, ≤5 MB), extract text, run match pipeline,
-    store results, and return ranked matches.
+    store results, and return ranked matches. Counts toward the daily AI limit.
     """
+    await consume_ai_quota(redis, current_user.id)
     file_bytes = await file.read()
     filename = file.filename or "resume"
     return await upload_resume(db, current_user.id, filename, file_bytes)
@@ -80,6 +85,7 @@ async def ask_about_posting(
     body: AskRequest,
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
+    redis: aioredis.Redis = Depends(get_redis),
 ) -> StreamingResponse:
     """
     Stream a cited Q&A response about a matched posting.
@@ -111,6 +117,9 @@ async def ask_about_posting(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={"detail": "Posting not in your match results.", "code": "MATCH_NOT_FOUND"},
         )
+
+    # Only count questions that will actually reach the model
+    await consume_ai_quota(redis, current_user.id)
 
     # Fetch posting description
     posting = (

@@ -33,10 +33,15 @@ class User(Base):
         TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False
     )
     is_admin: Mapped[bool] = mapped_column(BOOLEAN, nullable=False, server_default=text("FALSE"))
+    # Throwaway "Try the demo" account — deleted 24 h after created_at (services/demo.py)
+    is_demo: Mapped[bool] = mapped_column(BOOLEAN, nullable=False, server_default=text("FALSE"))
 
     # Back-reference so we can access user.saved_postings if needed
     saved_postings: Mapped[list["SavedPosting"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )
 
-    __table_args__ = (Index("idx_users_email", "email", unique=True),)
+    __table_args__ = (
+        Index("idx_users_email", "email", unique=True),
+        Index("idx_users_demo_created", "is_demo", "created_at"),
+    )

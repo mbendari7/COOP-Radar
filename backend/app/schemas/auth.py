@@ -30,6 +30,7 @@ class UserOut(BaseModel):
     email: str
     created_at: datetime
     is_admin: bool = False
+    is_demo: bool = False
 
 
 class ChangePasswordIn(BaseModel):

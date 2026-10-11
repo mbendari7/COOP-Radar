@@ -7,16 +7,19 @@ instantiate the app in tests with different settings without side effects.
 
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from starlette.exceptions import HTTPException
 
 from app.api.admin import router as admin_router
 from app.api.auth import router as auth_router
 from app.api.me import router as me_router
+from app.api.meta import router as meta_router
 from app.api.postings import router as postings_router
 from app.api.resume import router as resume_router
 from app.api.saved import router as saved_router
@@ -59,6 +62,33 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
     return JSONResponse(status_code=exc.status_code, content=body, headers=exc.headers)
 
 
+def mount_frontend(app: FastAPI, static_dir: Path) -> None:
+    """
+    Serve the built React app from the API process, so a single container is the whole
+    website (same origin: no CORS, first-party cookies). Must run after the API routers.
+
+    - /assets/* → hashed JS/CSS bundles
+    - any other GET that isn't /api/* → a real file if one exists, else index.html,
+      so client-side routes like /saved survive a page refresh.
+    """
+    index = static_dir / "index.html"
+    if not index.is_file():
+        return
+    root = static_dir.resolve()
+    if (static_dir / "assets").is_dir():
+        app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="assets")
+
+    @app.get("/{full_path:path}", include_in_schema=False)
+    async def spa(full_path: str) -> FileResponse:
+        if full_path == "api" or full_path.startswith("api/"):
+            raise HTTPException(status_code=404, detail="Not found")
+        candidate = (root / full_path).resolve()
+        # The parents check blocks path traversal (e.g. /../../etc/passwd)
+        if full_path and candidate.is_file() and root in candidate.parents:
+            return FileResponse(candidate)
+        return FileResponse(index)
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
 
@@ -89,11 +119,15 @@ def create_app() -> FastAPI:
     app.include_router(saved_router, prefix="/api")
     app.include_router(resume_router, prefix="/api")
     app.include_router(admin_router, prefix="/api")
+    app.include_router(meta_router, prefix="/api")
 
     @app.get("/api/health", tags=["meta"])
     async def health() -> dict[str, str]:
         """Liveness probe used by Docker/CI — no DB or Redis calls."""
         return {"status": "ok"}
+
+    if settings.static_dir:
+        mount_frontend(app, Path(settings.static_dir))
 
     return app
 
