@@ -1,20 +1,20 @@
 import type { Config } from 'tailwindcss'
 import colors from 'tailwindcss/colors'
 
-// One accent colour (pine green) on warm neutrals. `blue`, `indigo` and `brand` all point at
-// the accent and `gray` at warm stone, so every page shares the same palette.
-const pine = {
-  50: '#f0f7f3',
-  100: '#dcede3',
-  200: '#bbdcc9',
-  300: '#8ec3a7',
-  400: '#5ea381',
-  500: '#3d8764',
-  600: '#2c6d4f',
-  700: '#245840',
-  800: '#1f4735',
-  900: '#1a3b2d',
-  950: '#0d2119',
+// A job-board look: one deep blue on white and neutral greys. `blue`, `indigo` and `brand` all
+// point at the accent and `gray` at neutral, so every page shares the same palette.
+const accent = {
+  50: '#eef4fc',
+  100: '#dce8f8',
+  200: '#b9d0f0',
+  300: '#8ab0e3',
+  400: '#5a8bd2',
+  500: '#3a6fc0',
+  600: '#2557a7',
+  700: '#1f4a8f',
+  800: '#1b3d75',
+  900: '#18335f',
+  950: '#0f203d',
 }
 
 const config: Config = {
@@ -23,10 +23,10 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
-        brand: pine,
-        blue: pine,
-        indigo: pine,
-        gray: colors.stone,
+        brand: accent,
+        blue: accent,
+        indigo: accent,
+        gray: colors.neutral,
       },
       fontFamily: {
         sans: ['"Public Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],

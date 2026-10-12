@@ -207,3 +207,46 @@ async def test_run_reuses_triggered_run_record(db_session: AsyncSession):
     assert runs[0].status == "success"
     assert runs[0].added == 5
     assert len(new_ids) == 5
+
+
+@pytest.mark.asyncio
+async def test_run_stores_country_and_what_the_posting_asks_for(db_session: AsyncSession):
+    source = await _create_source(db_session)
+    raw = RawPosting(
+        title="Hardware Intern", company="Acme", city="Austin", province="TX", country="US",
+        term="Summer 2027", source_ref="hw-1",
+        description="Pursuing a degree in Electrical Engineering, graduating in 2027 or 2028.",
+    )
+
+    with patch("app.ingest.runner.adapter_for") as mock_af:
+        mock_af.return_value.fetch = AsyncMock(return_value=[raw])
+        await _execute_run(db_session, source.id)
+
+    posting = (
+        await db_session.execute(select(Posting).where(Posting.source_ref == "hw-1"))
+    ).scalar_one()
+    assert posting.country == "US"
+    assert posting.fields_of_study == ["engineering", "electrical"]
+    assert posting.grad_years == [2027, 2028]
+
+
+@pytest.mark.asyncio
+async def test_rerun_refreshes_the_location(db_session: AsyncSession):
+    """A location fixed on the board (or parsed better) replaces the old one on the next run."""
+    source = await _create_source(db_session)
+
+    def raw(city: str, province: str) -> RawPosting:
+        return RawPosting(
+            title="Data Intern", company="Acme", city=city, province=province, country="US",
+            term="Summer 2027", description="d", source_ref="loc-1",
+        )
+
+    for city, province in (("Hybrid", "NY"), ("New York", "NY")):
+        with patch("app.ingest.runner.adapter_for") as mock_af:
+            mock_af.return_value.fetch = AsyncMock(return_value=[raw(city, province)])
+            await _execute_run(db_session, source.id)
+
+    posting = (
+        await db_session.execute(select(Posting).where(Posting.source_ref == "loc-1"))
+    ).scalar_one()
+    assert (posting.city, posting.province) == ("New York", "NY")

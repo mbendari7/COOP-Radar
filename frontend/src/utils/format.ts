@@ -13,9 +13,11 @@ export function workModeLabel(mode: string): string {
   }
 }
 
-/** "Toronto, ON", "Remote", or "Canada" — never a dangling comma when a part is missing. */
-export function formatLocation(city: string, province: string): string {
-  return [city, province].filter(Boolean).join(', ')
+/** "Toronto, ON", "Austin, TX, US", "Remote" or "Canada", never a dangling comma. */
+export function formatLocation(city: string, province: string, country = 'CA'): string {
+  const parts = [city, province].filter(Boolean)
+  if (country === 'US' && city !== 'United States') parts.push('US')
+  return parts.join(', ')
 }
 
 const PROVINCES: Record<string, string> = {
@@ -25,9 +27,32 @@ const PROVINCES: Record<string, string> = {
   SK: 'Saskatchewan', YT: 'Yukon',
 }
 
-/** "ON" -> "Ontario"; unknown codes are shown as they are. */
+const STATES: Record<string, string> = {
+  AL: 'Alabama', AK: 'Alaska', AZ: 'Arizona', AR: 'Arkansas', CA: 'California', CO: 'Colorado',
+  CT: 'Connecticut', DC: 'Washington, DC', DE: 'Delaware', FL: 'Florida', GA: 'Georgia',
+  HI: 'Hawaii', ID: 'Idaho', IL: 'Illinois', IN: 'Indiana', IA: 'Iowa', KS: 'Kansas',
+  KY: 'Kentucky', LA: 'Louisiana', ME: 'Maine', MD: 'Maryland', MA: 'Massachusetts',
+  MI: 'Michigan', MN: 'Minnesota', MS: 'Mississippi', MO: 'Missouri', MT: 'Montana',
+  NE: 'Nebraska', NV: 'Nevada', NH: 'New Hampshire', NJ: 'New Jersey', NM: 'New Mexico',
+  NY: 'New York', NC: 'North Carolina', ND: 'North Dakota', OH: 'Ohio', OK: 'Oklahoma',
+  OR: 'Oregon', PA: 'Pennsylvania', RI: 'Rhode Island', SC: 'South Carolina',
+  SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont', VA: 'Virginia',
+  WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
+}
+
+/** "ON" -> "Ontario", "TX" -> "Texas"; unknown codes are shown as they are. */
 export function provinceName(code: string): string {
-  return PROVINCES[code.toUpperCase()] ?? code
+  const c = code.toUpperCase()
+  return PROVINCES[c] ?? STATES[c] ?? code
+}
+
+/** Canadian province codes vs US state codes (the two sets don't overlap). */
+export function isProvince(code: string): boolean {
+  return code.toUpperCase() in PROVINCES
+}
+
+export function countryName(code: string): string {
+  return code === 'US' ? 'United States' : 'Canada'
 }
 
 /** "today", "yesterday", "3 days ago", "2 weeks ago", else a date. */

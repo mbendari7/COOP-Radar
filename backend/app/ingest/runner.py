@@ -28,6 +28,7 @@ from app.ingest.registry import adapter_for
 from app.models.ingest_run import IngestRun
 from app.models.ingest_source import IngestSource
 from app.models.posting import Posting, WorkMode
+from app.services.education import fields_in_posting, grad_years_in_posting
 
 _AUTO_PAUSE_THRESHOLD = 3
 # Most career boards don't publish a deadline. Postings without one get an *estimated*
@@ -164,6 +165,20 @@ def _apply_updates(existing: Posting, raw: RawPosting) -> None:
         existing.source_url = raw.source_url
     if raw.skills:
         existing.skills = raw.skills
+    # Boards edit locations, and parsing improves: keep the location current
+    if raw.city:
+        existing.city = raw.city
+    if raw.province is not None:
+        existing.province = raw.province
+    existing.country = raw.country
+    _set_education(existing)
+
+
+def _set_education(posting: Posting) -> None:
+    """Programs of study and graduation years the posting asks for (used by co-op matching)."""
+    text = f"{posting.title}\n{posting.description or ''}"
+    posting.fields_of_study = fields_in_posting(text)
+    posting.grad_years = grad_years_in_posting(text)
 
 
 async def _raw_to_posting(db: AsyncSession, raw: RawPosting, source_id: UUID) -> Posting:
@@ -205,6 +220,7 @@ async def _raw_to_posting(db: AsyncSession, raw: RawPosting, source_id: UUID) ->
         city=raw.city or "Unknown",
         # Career boards give a province when they can; RSS/JSON feeds rarely do
         province=raw.province if raw.province is not None else "ON",
+        country=raw.country,
         work_mode=work_mode,
         term=term or "Open",
         duration_months=duration,
@@ -218,4 +234,5 @@ async def _raw_to_posting(db: AsyncSession, raw: RawPosting, source_id: UUID) ->
     )
     if raw.posted_at:
         posting.posted_at = raw.posted_at
+    _set_education(posting)
     return posting

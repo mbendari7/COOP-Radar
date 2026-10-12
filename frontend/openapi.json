@@ -318,6 +318,33 @@
         "title": "ChangePasswordIn",
         "type": "object"
       },
+      "CountryCount": {
+        "properties": {
+          "code": {
+            "enum": [
+              "CA",
+              "US"
+            ],
+            "title": "Code",
+            "type": "string"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "label",
+          "count"
+        ],
+        "title": "CountryCount",
+        "type": "object"
+      },
       "CsvUploadResult": {
         "description": "Response from POST /api/postings/upload.",
         "properties": {
@@ -376,6 +403,70 @@
           "postings"
         ],
         "title": "DemandSkill",
+        "type": "object"
+      },
+      "DetectedEducation": {
+        "description": "What was read from the resume's education section (blank when not found).",
+        "properties": {
+          "degree": {
+            "default": "",
+            "enum": [
+              "",
+              "diploma",
+              "bachelors",
+              "masters",
+              "phd"
+            ],
+            "title": "Degree",
+            "type": "string"
+          },
+          "grad_year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grad Year"
+          },
+          "program": {
+            "anyOf": [
+              {
+                "enum": [
+                  "computer_science",
+                  "software_engineering",
+                  "computer_engineering",
+                  "electrical_engineering",
+                  "mechanical_engineering",
+                  "other_engineering",
+                  "data_science",
+                  "mathematics",
+                  "information_technology",
+                  "business",
+                  "finance_accounting",
+                  "marketing",
+                  "design",
+                  "science"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "title": "Program"
+          },
+          "program_label": {
+            "default": "",
+            "title": "Program Label",
+            "type": "string"
+          }
+        },
+        "title": "DetectedEducation",
         "type": "object"
       },
       "EventCreateIn": {
@@ -440,10 +531,26 @@
             "title": "Companies",
             "type": "array"
           },
+          "countries": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CountryCount"
+            },
+            "title": "Countries",
+            "type": "array"
+          },
           "open_jobs": {
             "default": 0,
             "title": "Open Jobs",
             "type": "integer"
+          },
+          "programs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/ProgramOption"
+            },
+            "title": "Programs",
+            "type": "array"
           },
           "provinces": {
             "items": {
@@ -464,6 +571,14 @@
               "type": "string"
             },
             "title": "Terms",
+            "type": "array"
+          },
+          "work_modes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/WorkModeCount"
+            },
+            "title": "Work Modes",
             "type": "array"
           }
         },
@@ -693,6 +808,46 @@
             "title": "City",
             "type": "string"
           },
+          "countries": {
+            "default": [
+              "CA"
+            ],
+            "items": {
+              "enum": [
+                "CA",
+                "US"
+              ],
+              "type": "string"
+            },
+            "maxItems": 2,
+            "title": "Countries",
+            "type": "array"
+          },
+          "degree": {
+            "default": "",
+            "enum": [
+              "",
+              "diploma",
+              "bachelors",
+              "masters",
+              "phd"
+            ],
+            "title": "Degree",
+            "type": "string"
+          },
+          "grad_year": {
+            "anyOf": [
+              {
+                "maximum": 2100.0,
+                "minimum": 2000.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Grad Year"
+          },
           "keywords": {
             "default": "",
             "maxLength": 100,
@@ -709,10 +864,45 @@
             "title": "Level",
             "type": "string"
           },
+          "program": {
+            "anyOf": [
+              {
+                "enum": [
+                  "computer_science",
+                  "software_engineering",
+                  "computer_engineering",
+                  "electrical_engineering",
+                  "mechanical_engineering",
+                  "other_engineering",
+                  "data_science",
+                  "mathematics",
+                  "information_technology",
+                  "business",
+                  "finance_accounting",
+                  "marketing",
+                  "design",
+                  "science"
+                ],
+                "type": "string"
+              },
+              {
+                "const": "",
+                "type": "string"
+              }
+            ],
+            "default": "",
+            "title": "Program"
+          },
           "province": {
             "default": "",
             "maxLength": 2,
             "title": "Province",
+            "type": "string"
+          },
+          "term": {
+            "default": "",
+            "maxLength": 20,
+            "title": "Term",
             "type": "string"
           },
           "work_modes": {
@@ -855,9 +1045,22 @@
             "title": "Company",
             "type": "string"
           },
+          "country": {
+            "default": "CA",
+            "title": "Country",
+            "type": "string"
+          },
           "deadline": {
             "title": "Deadline",
             "type": "string"
+          },
+          "fit_notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Fit Notes",
+            "type": "array"
           },
           "matched_skills": {
             "default": [],
@@ -922,6 +1125,16 @@
       },
       "MatchesResponse": {
         "properties": {
+          "education": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DetectedEducation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "items": {
             "items": {
               "$ref": "#/components/schemas/MatchResultOut"
@@ -1011,6 +1224,11 @@
             "title": "Company",
             "type": "string"
           },
+          "country": {
+            "default": "CA",
+            "title": "Country",
+            "type": "string"
+          },
           "deadline": {
             "format": "date",
             "title": "Deadline",
@@ -1023,6 +1241,22 @@
           "duration_months": {
             "title": "Duration Months",
             "type": "integer"
+          },
+          "fields_of_study": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Fields Of Study",
+            "type": "array"
+          },
+          "grad_years": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Grad Years",
+            "type": "array"
           },
           "id": {
             "format": "uuid",
@@ -1061,6 +1295,17 @@
           },
           "province": {
             "title": "Province",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "coop",
+              "internship",
+              "new_grad",
+              "job"
+            ],
+            "readOnly": true,
+            "title": "Role",
             "type": "string"
           },
           "skills": {
@@ -1118,7 +1363,8 @@
           "posted_at",
           "skills",
           "source_url",
-          "description"
+          "description",
+          "role"
         ],
         "title": "PostingDetail",
         "type": "object"
@@ -1146,6 +1392,11 @@
             "title": "Company",
             "type": "string"
           },
+          "country": {
+            "default": "CA",
+            "title": "Country",
+            "type": "string"
+          },
           "deadline": {
             "format": "date",
             "title": "Deadline",
@@ -1154,6 +1405,22 @@
           "duration_months": {
             "title": "Duration Months",
             "type": "integer"
+          },
+          "fields_of_study": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Fields Of Study",
+            "type": "array"
+          },
+          "grad_years": {
+            "default": [],
+            "items": {
+              "type": "integer"
+            },
+            "title": "Grad Years",
+            "type": "array"
           },
           "id": {
             "format": "uuid",
@@ -1178,6 +1445,17 @@
           },
           "province": {
             "title": "Province",
+            "type": "string"
+          },
+          "role": {
+            "enum": [
+              "coop",
+              "internship",
+              "new_grad",
+              "job"
+            ],
+            "readOnly": true,
+            "title": "Role",
             "type": "string"
           },
           "skills": {
@@ -1234,9 +1512,44 @@
           "deadline",
           "posted_at",
           "skills",
-          "source_url"
+          "source_url",
+          "role"
         ],
         "title": "PostingListItem",
+        "type": "object"
+      },
+      "ProgramOption": {
+        "properties": {
+          "key": {
+            "enum": [
+              "computer_science",
+              "software_engineering",
+              "computer_engineering",
+              "electrical_engineering",
+              "mechanical_engineering",
+              "other_engineering",
+              "data_science",
+              "mathematics",
+              "information_technology",
+              "business",
+              "finance_accounting",
+              "marketing",
+              "design",
+              "science"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "ProgramOption",
         "type": "object"
       },
       "PublicConfig": {
@@ -1728,12 +2041,32 @@
       },
       "UploadResponse": {
         "properties": {
+          "education": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DetectedEducation"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "matches": {
             "items": {
               "$ref": "#/components/schemas/MatchResultOut"
             },
             "title": "Matches",
             "type": "array"
+          },
+          "preferences": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobPreferences"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "resume": {
             "$ref": "#/components/schemas/ResumeOut"
@@ -1831,6 +2164,23 @@
         ],
         "title": "WorkMode",
         "type": "string"
+      },
+      "WorkModeCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "key": {
+            "$ref": "#/components/schemas/WorkMode"
+          }
+        },
+        "required": [
+          "key",
+          "count"
+        ],
+        "title": "WorkModeCount",
+        "type": "object"
       }
     }
   },
@@ -2844,6 +3194,79 @@
                 }
               ],
               "title": "Posted Within"
+            }
+          },
+          {
+            "in": "query",
+            "name": "country",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "CA",
+                      "US"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "in": "query",
+            "name": "program",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "computer_science",
+                    "software_engineering",
+                    "computer_engineering",
+                    "electrical_engineering",
+                    "mechanical_engineering",
+                    "other_engineering",
+                    "data_science",
+                    "mathematics",
+                    "information_technology",
+                    "business",
+                    "finance_accounting",
+                    "marketing",
+                    "design",
+                    "science"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Program"
+            }
+          },
+          {
+            "in": "query",
+            "name": "grad_year",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 2100,
+                  "minimum": 2000,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Grad Year"
             }
           },
           {

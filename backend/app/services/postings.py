@@ -8,16 +8,19 @@ results directly; no business logic lives in the router.
 
 import io
 import time
+from dataclasses import dataclass
 from datetime import date, timedelta
+from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import func, or_, select, text
+from sqlalchemy import SmallInteger, func, literal, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.posting import Posting, WorkMode
 from app.schemas.posting import (
     CategoryCount,
+    CountryCount,
     CsvUploadResult,
     FilterMeta,
     ManualPostingIn,
@@ -25,17 +28,24 @@ from app.schemas.posting import (
     PostingListItem,
     PostingListParams,
     PostingsPage,
+    ProgramOption,
     RowError,
     SimilarPostingOut,
     SimilarPostingsResponse,
+    WorkModeCount,
 )
 from app.services.categories import CATEGORIES, any_category, category_clause
+from app.services.education import PROGRAMS
+
+COUNTRY_LABELS = {"CA": "Canada", "US": "United States"}
 
 # Maps the whitelisted sort param values to their ORM column.
 # Using a dict means we never interpolate user input into SQL —
 # unknown values are already rejected by Pydantic before we get here.
 # Postgres regex: \m = start of word, \M = end of word
-STUDENT_TITLE_PATTERN = r"\m(intern|interns|internship|co-?op|student|new grad(uate)?|apprentice)\M"
+STUDENT_TITLE_PATTERN = (
+    r"\m(intern|interns|internship|co-?op|student|new grad(uate)?|apprentice|stagiaire)\M"
+)
 # Titles that are clearly not for students
 SENIOR_TITLE_PATTERN = (
     r"\m(senior|sr|staff|principal|lead|manager|director|head|vp|architect|ii|iii|iv)\M"
@@ -116,7 +126,7 @@ async def list_postings(
         stmt = stmt.where(Posting.title.op("~*")(STUDENT_TITLE_PATTERN))
 
     if params.hide_senior:
-        stmt = stmt.where(~Posting.title.op("~*")(SENIOR_TITLE_PATTERN))
+        stmt = stmt.where(Posting.title.op("!~*")(SENIOR_TITLE_PATTERN))
 
     if params.province:
         stmt = stmt.where(Posting.province.ilike(params.province))
@@ -145,6 +155,15 @@ async def list_postings(
 
     if params.posted_within:
         stmt = stmt.where(Posting.posted_at >= func.now() - timedelta(days=params.posted_within))
+
+    if params.country:
+        stmt = stmt.where(Posting.country.in_(params.country))
+
+    if params.program:
+        stmt = stmt.where(program_clause(params.program))
+
+    if params.grad_year:
+        stmt = stmt.where(grad_year_clause(params.grad_year))
 
     # --- Total count (before pagination) ---
     # We run this as a subquery so it sees the same WHERE clauses.
@@ -191,6 +210,22 @@ async def list_postings(
         page=params.page,
         page_size=params.page_size,
     )
+
+
+def program_clause(program: str) -> Any:
+    """Jobs for a program: the description names a field it covers, or the title fits its types."""
+    info = PROGRAMS[program]
+    return or_(Posting.fields_of_study.overlap(list(info.fields)), any_category(info.categories))
+
+
+def has_grad_year(year: int) -> Any:
+    """The job names this graduation year (`year = ANY(grad_years)`, year bound as a parameter)."""
+    return literal(year, SmallInteger) == func.any(Posting.grad_years)
+
+
+def grad_year_clause(year: int) -> Any:
+    """The job doesn't name graduation years, or it names this one."""
+    return or_(func.cardinality(Posting.grad_years) == 0, has_grad_year(year))
 
 
 async def get_posting(posting_id: UUID, db: AsyncSession) -> PostingDetail:
@@ -248,17 +283,27 @@ async def get_filter_meta(db: AsyncSession) -> FilterMeta:
     )
     companies = [r for (r,) in companies_result.all() if r]
 
-    open_jobs, categories = await _category_counts(db)
+    counts = await _open_counts(db)
     return FilterMeta(
         cities=cities, provinces=provinces, terms=terms, skills=skills,
-        companies=companies, categories=categories, open_jobs=open_jobs,
+        companies=companies, categories=counts.categories, open_jobs=counts.open_jobs,
+        countries=counts.countries, work_modes=counts.work_modes,
+        programs=[ProgramOption(key=key, label=p.label) for key, p in PROGRAMS.items()],
     )
+
+
+@dataclass
+class _OpenCounts:
+    open_jobs: int
+    categories: list[CategoryCount]
+    countries: list[CountryCount]
+    work_modes: list[WorkModeCount]
 
 
 # Job type counts run nine title regexes over every open posting (~250 ms at 10k rows), and
 # jobs only change every few hours, so the result is kept for a couple of minutes.
 _COUNTS_TTL = 120.0
-_counts_cache: tuple[float, int, list[CategoryCount]] | None = None
+_counts_cache: tuple[float, _OpenCounts] | None = None
 
 
 def clear_category_counts_cache() -> None:
@@ -266,11 +311,11 @@ def clear_category_counts_cache() -> None:
     _counts_cache = None
 
 
-async def _category_counts(db: AsyncSession) -> tuple[int, list[CategoryCount]]:
-    """Open postings in total, and how many fit each job type (one pass over the table)."""
+async def _open_counts(db: AsyncSession) -> _OpenCounts:
+    """Open postings in total and per job type, country and work mode (one pass over the table)."""
     global _counts_cache
     if _counts_cache is not None and time.monotonic() - _counts_cache[0] < _COUNTS_TTL:
-        return _counts_cache[1], _counts_cache[2]
+        return _counts_cache[1]
     counts = (
         await db.execute(
             select(
@@ -279,15 +324,34 @@ async def _category_counts(db: AsyncSession) -> tuple[int, list[CategoryCount]]:
                     func.count().filter(category_clause(key)).label(key)
                     for key in CATEGORIES
                 ),
+                *(
+                    func.count().filter(Posting.country == code).label(f"country_{code}")
+                    for code in COUNTRY_LABELS
+                ),
+                *(
+                    func.count().filter(Posting.work_mode == mode).label(f"mode_{mode.value}")
+                    for mode in WorkMode
+                ),
             ).where(Posting.closed_at.is_(None), Posting.deadline >= date.today())
         )
     ).one()
-    categories = [
-        CategoryCount(key=key, label=label, count=int(getattr(counts, key)))
-        for key, (label, _) in CATEGORIES.items()
-    ]
-    _counts_cache = (time.monotonic(), int(counts.open_jobs), categories)
-    return _counts_cache[1], categories
+    result = _OpenCounts(
+        open_jobs=int(counts.open_jobs),
+        categories=[
+            CategoryCount(key=key, label=label, count=int(getattr(counts, key)))
+            for key, (label, _) in CATEGORIES.items()
+        ],
+        countries=[
+            CountryCount(code=code, label=label, count=int(getattr(counts, f"country_{code}")))
+            for code, label in COUNTRY_LABELS.items()
+        ],
+        work_modes=[
+            WorkModeCount(key=mode, count=int(getattr(counts, f"mode_{mode.value}")))
+            for mode in WorkMode
+        ],
+    )
+    _counts_cache = (time.monotonic(), result)
+    return result
 
 
 def _clean(value: object) -> str:

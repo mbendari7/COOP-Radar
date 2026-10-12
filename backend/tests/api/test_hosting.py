@@ -172,6 +172,15 @@ async def test_api_serves_spa_with_history_fallback(tmp_path: Path) -> None:
         ("postgres://u:p@h:5432/db", "postgresql+asyncpg://u:p@h:5432/db"),
         ("postgresql://u:p@h/db?sslmode=require", "postgresql+asyncpg://u:p@h/db?ssl=require"),
         ("postgresql+asyncpg://u:p@h/db", "postgresql+asyncpg://u:p@h/db"),
+        # Neon's copied connection string
+        (
+            "postgresql://u:p@ep-x.neon.tech/neondb?sslmode=require&channel_binding=require",
+            "postgresql+asyncpg://u:p@ep-x.neon.tech/neondb?ssl=require",
+        ),
+        (
+            "postgresql://u:p@h/db?channel_binding=require&sslmode=require",
+            "postgresql+asyncpg://u:p@h/db?ssl=require",
+        ),
     ],
 )
 def test_database_url_normalized_for_hosting_providers(raw: str, expected: str) -> None:

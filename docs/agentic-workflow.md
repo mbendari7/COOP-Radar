@@ -247,3 +247,36 @@ view, phone width, and a real DOCX upload with Data & AI + Software + Ontario. N
 
 **What I reviewed / changed**: _(fill in after reviewing the diff)_
 
+
+---
+
+## 2026-10-12 — Job-board look, co-op matching, ~120 employers, guides, free hosting
+
+**What the AI assistant did**:
+- Found more employers: took the employer links behind a public internship list as leads only, then probed each
+  employer's own Greenhouse / Lever / Ashby / SmartRecruiters API (plus ~250 guessed Canadian employers) and kept
+  boards with Canadian jobs or US student roles. Jobs are imported only from the employers' official APIs.
+- Ingest: `SmartRecruitersAdapter`, Greenhouse list-then-details fetching (30 MB boards), `choose_location()`
+  (Canada always, US per `INGEST_US_JOBS`, "Vancouver, WA" excluded), US location parsing, work-mode words ignored
+  in locations, location/country/education refreshed on re-import, a moved board repointed by the seed.
+- `services/education.py`: fields of study (degree sentences only) and graduation years from postings; program,
+  degree and graduation year from resumes. Migration 0010 (`country`, `fields_of_study`, `grad_years`, adapter
+  check constraint). Postings API: `country`, `program`, `grad_year` filters, `role`, counts by country and work
+  mode. Matching: program-derived job types, grad-year filter, rebalanced weights, `fit_notes`, detected education
+  in responses.
+- Frontend: job-board jobs page (search band, quick filters, `FilterDrawer`, `PostingDetailView` panel), compact
+  `PostingCard` with role badges, resume page "About you" step, "why it fits" on matches, blue/neutral palette.
+- Hosting: `render.yaml` uses a Neon `DATABASE_URL` (Neon's `channel_binding` handled), `refresh-jobs.yml`.
+- Tests: education, US/SmartRecruiters adapters, filters, co-op matching, runner, URL normalization (backend);
+  filters, cards, resume page (Vitest); Playwright e2e in CI.
+- Docs: `guides/` (visitor guide, builder guide with stack and interview Q&A), README, DEPLOY, PROJECT_GUIDE,
+  CLAUDE.md; screenshots in `docs/images/`.
+
+**Results (actual runs)**: ruff + mypy clean; backend 292 passed incl. perf (p95 47 ms); 0009↔0010 round-trip and
+`alembic check` clean; frontend lint/tsc/build clean, 42 passed; Playwright 7/7 against the local site; all 122
+boards imported with no failures (2,904 open jobs, 48 MB database). Caught along the way: scores bunching at 100
+(rebalanced), "Hybrid" parsed as a city, and degree detection matching "Employee Stock Purchase Program". Not run:
+a real Render + Neon deploy, CI on GitHub.
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_
+

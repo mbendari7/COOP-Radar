@@ -6,6 +6,7 @@ from pydantic import BaseModel, Field, field_validator, model_validator
 
 from app.models.posting import WorkMode
 from app.services.categories import CategoryKey
+from app.services.education import Degree, ProgramKey
 
 
 class ResumeOut(BaseModel):
@@ -30,6 +31,23 @@ class JobPreferences(BaseModel):
     work_modes: list[WorkMode] = Field(default=[], max_length=3)
     # entry: students + entry-level (no senior titles) · students: co-op/intern only · all
     level: Literal["entry", "students", "all"] = "entry"
+    # About the student. Blank = read from the resume (see detect_education)
+    program: ProgramKey | Literal[""] = ""
+    degree: Degree = ""
+    grad_year: int | None = Field(default=None, ge=2000, le=2100)
+    # Co-op term they want, e.g. "Summer 2027" (jobs for that term rank higher)
+    term: str = Field(default="", max_length=20)
+    # Countries to include; most students want Canada, some also do a US co-op term
+    countries: list[Literal["CA", "US"]] = Field(default=["CA"], max_length=2)
+
+
+class DetectedEducation(BaseModel):
+    """What was read from the resume's education section (blank when not found)."""
+
+    program: ProgramKey | Literal[""] = ""
+    program_label: str = ""
+    degree: Degree = ""
+    grad_year: int | None = None
 
 
 class MatchResultOut(BaseModel):
@@ -46,6 +64,9 @@ class MatchResultOut(BaseModel):
     # The posting's listed skills, split into ones the resume shows and ones it doesn't
     matched_skills: list[str] = []
     missing_skills: list[str] = []
+    country: str = "CA"
+    # Why this job fits the student, from its description: program, graduation year, term, role
+    fit_notes: list[str] = []
 
     @field_validator("score")
     @classmethod
@@ -65,12 +86,15 @@ class MatchResultOut(BaseModel):
 class UploadResponse(BaseModel):
     resume: ResumeOut
     matches: list[MatchResultOut]
+    preferences: JobPreferences | None = None
+    education: DetectedEducation | None = None
 
 
 class MatchesResponse(BaseModel):
     items: list[MatchResultOut]
     resume: ResumeOut | None
     preferences: JobPreferences | None = None
+    education: DetectedEducation | None = None
 
 
 class AskRequest(BaseModel):

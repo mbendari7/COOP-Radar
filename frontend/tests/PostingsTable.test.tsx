@@ -27,6 +27,10 @@ function makePosting(overrides: Partial<PostingListItem> = {}): PostingListItem 
     source_url: null,
     closed_at: null,
     source_id: null,
+    country: 'CA',
+    grad_years: [],
+    fields_of_study: [],
+    role: 'job',
     ...overrides,
   }
 }
@@ -55,6 +59,24 @@ function renderTable(props: Partial<React.ComponentProps<typeof PostingsTable>> 
 }
 
 // --- Tests -------------------------------------------------------------------
+
+describe('PostingCard', () => {
+  it('shows the kind of role, the term and a US location', () => {
+    renderTable({
+      view: 'cards',
+      data: [makePosting({ title: 'Data Co-op', role: 'coop', city: 'Austin', province: 'TX', country: 'US' })],
+    })
+    expect(screen.getByText('Co-op')).toBeInTheDocument()
+    expect(screen.getByText('Summer 2027')).toBeInTheDocument()
+    expect(screen.getAllByText(/Austin, TX, US/).length).toBeGreaterThan(0)
+  })
+
+  it('marks the selected job for the details panel', () => {
+    const posting = makePosting({ title: 'Picked' })
+    renderTable({ view: 'cards', data: [posting, makePosting()], selectedId: posting.id })
+    expect(screen.getByRole('article', { name: /Picked at Acme/ })).toHaveAttribute('aria-current', 'true')
+  })
+})
 
 describe('PostingsTable', () => {
   it('shows empty state when data is empty', () => {

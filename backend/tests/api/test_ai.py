@@ -101,7 +101,7 @@ async def test_upload_without_any_key_gives_free_skill_matches(
     assert res.status_code == 200
     top = res.json()["matches"][0]
     assert top["title"] == "Backend Co-op"
-    assert top["score"] == 92  # 2 of 3 skills (67) + 25 for a co-op title
+    assert top["score"] == 58  # 2 of 3 skills (67% of 65) + 15 for a co-op title
     assert top["reason"] == "You have Python, SQL; it also asks for Go."
 
 
@@ -322,10 +322,11 @@ async def test_skill_shortlist_ranks_by_overlap(db_session: AsyncSession) -> Non
     rows = await find_candidates(db_session, "Skills: Python, SQL, Docker")
     sim = {r["title"]: round(float(r["similarity"]), 2) for r in rows}
 
-    assert sim["Full match"] == 1.0
-    assert sim["Half match"] == 0.5
+    # Skills are worth 65 of the 100 points
+    assert sim["Full match"] == pytest.approx(0.65, abs=0.01)
+    assert sim["Half match"] == pytest.approx(0.65 / 2, abs=0.01)
     # Listing a single skill can't earn full marks from one match (counts as 1 of 3)
-    assert sim["One-skill posting"] == 0.33
+    assert sim["One-skill posting"] == pytest.approx(0.65 / 3, abs=0.01)
     assert sim["No match"] == 0.0
 
 
@@ -350,7 +351,8 @@ async def test_skill_shortlist_prefers_student_roles_over_senior_ones(
     rows = await find_candidates(db_session, "Skills: Python, SQL")
     sim = {r["title"]: round(float(r["similarity"]), 2) for r in rows}
 
-    assert sim["Software Engineering Intern"] == 0.75  # 2 of 4 skills + student boost
-    assert sim["Software Engineer"] == 0.5
-    assert sim["Senior Software Engineer"] == 0.25      # senior titles count half
-    assert sim["Staff Engineer II"] == 0.25
+    half = 0.65 / 2  # 2 of 4 skills
+    assert sim["Software Engineering Intern"] == pytest.approx(half + 0.15, abs=0.01)  # student role
+    assert sim["Software Engineer"] == pytest.approx(half, abs=0.01)
+    assert sim["Senior Software Engineer"] == pytest.approx(half / 2, abs=0.01)  # senior counts half
+    assert sim["Staff Engineer II"] == pytest.approx(half / 2, abs=0.01)

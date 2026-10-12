@@ -1,8 +1,8 @@
 # CoopRadar — The Project Guide
 
 This is the deep technical reference: how every part works, so you can debug and extend it.
-Start with the shorter guides if you haven't: **[USER_GUIDE.md](USER_GUIDE.md)** (use it, put it online, tips) and
-**[HOW_IT_WORKS.md](HOW_IT_WORKS.md)** (how it works, plus how to explain it).
+Start with the shorter guides if you haven't: **[Using CoopRadar](../guides/using-coopradar/README.md)** (use it,
+run it, tips) and **[How it works](../guides/how-it-works/README.md)** (the stack, plus how to explain it).
 
 **Contents**
 1. [The big picture](#1-the-big-picture)
@@ -137,7 +137,7 @@ erDiagram
 
 | Table | Key columns | Notes |
 |---|---|---|
-| `postings` | title, company, city, province, work_mode (enum), term, duration_months (4/8/12/16), deadline, skills `text[]`, description, `search_vector` | `search_vector` is a **generated column**: Postgres rebuilds it on every write, weighting title A > company/skills B > description C. GIN indexes on `search_vector` and `skills`; B-tree indexes on every sort/filter column. Ingest fields: `source_id`, `source_ref` (unique per source), `closed_at`, `low_confidence_fields`. |
+| `postings` | title, company, city, province, work_mode (enum), term, duration_months (4/8/12/16), deadline, skills `text[]`, description, `search_vector` | `search_vector` is a **generated column**: Postgres rebuilds it on every write, weighting title A > company/skills B > description C. GIN indexes on `search_vector` and `skills`; B-tree indexes on every sort/filter column. Ingest fields: `source_id`, `source_ref` (unique per source), `closed_at`, `low_confidence_fields`. `country` (`CA`/`US`; `province` holds the state for US jobs), and from the description at import time `fields_of_study text[]` and `grad_years smallint[]` (`services/education.py`). |
 | `users` | email (unique, lowercase), hashed_password (argon2id), is_admin | |
 | `saved_postings` | user_id, posting_id (unique together), status (nullable enum, 7 values), saved_at, last_status_at | CASCADE on user/posting delete. |
 | `application_events` | saved_posting_id, status, notes, event_date, created_at | One row per status change: the tracker's history. |
@@ -145,13 +145,13 @@ erDiagram
 | `ingest_runs` | status (`running`/`success`/`partial`/`failed`), added/updated/closed/errors, error_log | |
 | `skills` | name (unique), aliases `text[]`, category | The taxonomy used by extraction (`seed/skills.py`). |
 | `posting_embeddings` | posting_id (PK), embedding `vector(1536)`, model | HNSW index with `vector_cosine_ops` for fast `<=>` queries. |
-| `resumes` | user_id (unique: one per user), filename, file_size, extracted_text, insights `jsonb`, preferences `jsonb` | The file itself is never stored. `preferences` (job types, keywords, location, work modes, level) limits matching. |
+| `resumes` | user_id (unique: one per user), filename, file_size, extracted_text, insights `jsonb`, preferences `jsonb` | The file itself is never stored. `preferences` (job types, keywords, location, work modes, level, program, degree, graduation year, term, countries) limits and weights matching. |
 | `match_results` | resume_id, posting_id (unique together), score 0–100, reason | Replaced on every upload. |
 | `kv_store` | key (PK), fields `jsonb`, counter, expires_at | Login sessions and rate-limit counters when Redis isn't configured (`app/store.py`). Expired rows are ignored and purged by the scheduler. |
 
 **Migrations** (`backend/alembic/versions/`) build this schema step by step: 0001 postings, 0002 auth and saved
 postings, 0003 tracker events, 0004 ingestion, pgvector, and admin, 0005 resume matcher, 0006 demo users, 0007
-career boards and cached insights, 0008 the `kv_store` session table, 0009 `resumes.preferences` (what the student is looking for). Two subtleties:
+career boards and cached insights, 0008 the `kv_store` session table, 0009 `resumes.preferences` (what the student is looking for), 0010 `postings.country`, `grad_years`, `fields_of_study` and the `smartrecruiters` adapter type. Two subtleties:
 - Generated columns may only call IMMUTABLE functions. `array_to_string()` is only STABLE, so 0001 creates the
   wrapper `coopradar_skills_text()`. The model attaches the same function so `create_all()` (used by tests) works.
 - Every index exists in **both** the migration and the model's `__table_args__`. CI runs `alembic check` to prove
@@ -178,7 +178,7 @@ career boards and cached insights, 0008 the `kv_store` session table, 0009 `resu
 | `app/services/*.py` | The logic behind each router (see section 6). |
 | `app/ingest/` | `base.py` (`RawPosting`, `BaseAdapter`), `boards.py` (Greenhouse / Lever / Ashby adapters, location filter + parser, HTML to text), `json_api.py`, `rss.py`, `registry.py` (adapter_type → class), `runner.py` (one ingest pass, estimated deadlines), `dedup.py` (difflib title similarity), `skill_match.py` (context-aware skill detection), `extract.py` (skills/term/work mode, then Claude if the owner set a key), `embed.py` (OpenAI + backfill CLI; skipped without a key), `csv_validator.py`. |
 | `app/agent/resume_qa.py` | The streaming, citation-grounded Q&A. |
-| `seed/` | `python -m seed`: skills (always; aliases updated on re-run), `job_boards.py` (27 employers), sample postings, and two fixture sources, each behind a `SEED_*` flag. Idempotent. |
+| `seed/` | `python -m seed`: skills (always; aliases updated on re-run), `job_boards.py` (~120 employers; a board that moved systems is repointed), sample postings, and two fixture sources, each behind a `SEED_*` flag. Idempotent. |
 | `app/services/insights.py` | Free insights (skills found, in-demand skills missing via `unnest … GROUP BY`) and the cached AI review. |
 
 ---
@@ -232,10 +232,16 @@ flowchart TD
     I --> E["after commit: jobs.enqueue('embed_posting') per new posting"]
 ```
 
-**Career boards (the main source):** `seed/job_boards.py` lists 27 employers as `(company, adapter_type, board)`,
-with adapter types `greenhouse`, `lever`, and `ashby`. These official public job-board APIs exist for syndicating a
-company's openings. `boards.py` keeps only locations matching `INGEST_LOCATION_FILTER` (Canada by default; for
-multi-location jobs it picks the first matching one), parses `City, Province`, and maps work mode. Most boards
+**Career boards (the main source):** `seed/job_boards.py` lists ~120 employers as `(company, adapter_type, board)`,
+with adapter types `greenhouse`, `lever`, `ashby` and `smartrecruiters`. These official public job-board APIs exist
+for syndicating a company's openings. `boards.py → choose_location()` keeps every location matching
+`INGEST_LOCATION_FILTER` (Canada; "Vancouver, WA" is excluded by its state code) and, per `INGEST_US_JOBS`, US jobs
+(default: only titles matching the student pattern). It parses `City, Province` / `City, State` (work-mode words like
+"Hybrid - New York" are ignored) and maps work mode. Greenhouse and SmartRecruiters list jobs without descriptions
+and fetch descriptions only for kept jobs, six at a time (`_details`), because some boards are 30 MB with them.
+The runner also stores `fields_of_study` and `grad_years` from the description (`services/education.py`: only
+sentences with a degree cue count for fields; years come from the 90 characters after "graduating" / "class of"),
+and refreshes them, the location and the country on every re-import. Most boards
 publish no deadline, so the runner sets an *estimated* apply-by date 45 days out, flags it in
 `low_confidence_fields`, and pushes it forward on each run while the job is still listed. To add an employer,
 append a tuple and redeploy (or insert an `ingest_sources` row). For other feeds use `adapter_type='json_api'` with
@@ -249,14 +255,17 @@ a `field_map`, or write an adapter (see recipes). Always check the site's terms 
 2. **Upload**: the extension must be `.pdf`/`.docx` and the file ≤ 5 MB. Text comes out via pypdf/python-docx, and
    empty text gives 422. The old resume is deleted (its matches cascade), and the new one is stored with the
    `preferences` form field (or the old resume's preferences when none is sent).
-   **Preferences** (`JobPreferences`): `preference_filters()` turns job types (`services/categories.py`, title regexes),
-   province/city (remote always passes), work modes and level into `WHERE` clauses for both shortlists, and
-   keywords add +0.3 in `_student_fit` via `websearch_to_tsquery`. `PUT /api/resume/preferences` saves them and
+   **Preferences** (`JobPreferences`): `effective_preferences()` fills a blank program / degree / graduation year
+   from `detect_education(resume_text)`. `preference_filters()` turns job types (chosen, or the program's
+   `PROGRAMS[...].categories`), countries, province/city (remote always passes), work modes, level, and graduation
+   year (`grad_year_clause`: no years listed, or this one) into `WHERE` clauses for both shortlists.
+   `_student_fit` weights: skills 65, student title 15, field of study named 10, graduation year named 5, wanted term
+   5, keywords +20 (`websearch_to_tsquery`), capped at 100. `fit_notes()` builds the "why it fits" lines. `PUT /api/resume/preferences` saves them and
    re-matches, using only the visitor's own key, never the owner's quota.
 3. **Stage 1, recall (`find_candidates`)**: by default, `skills_in_text` finds which posting skills appear in the
    resume (`skill_match.mentions`: whole-word, so "C" ≠ "C++", plus context rules for C/R/Go/Spring), and SQL ranks
    open postings by coverage = matched ÷ `greatest(cardinality(skills), 3)`, adjusted by `_student_fit` (×0.5 for
-   `SENIOR_TITLE_PATTERN`, +0.25 for `STUDENT_TITLE_PATTERN`, capped at 1). No AI, no cost. If the owner set
+   `SENIOR_TITLE_PATTERN`, then the weights above, capped at 1). No AI, no cost. If the owner set
    `OPENAI_API_KEY`, pgvector cosine similarity (with the same student fit) is used instead. Without AI the top 20
    are stored with a skill reason ("You have Python, SQL; it also asks for Go.").
 4. **Stage 2, precision (`rank_with_ai`)**: one call through `ai.complete()` to the visitor's provider/model scores
@@ -339,14 +348,23 @@ same origin (see `docs/DEPLOY.md`).
   matcher · `perf/` the 10k-row latency budget (`-m perf`). `api/test_store_and_jobs.py` covers the Postgres
   session store (expiry, counters) and the background jobs.
 
-**Frontend** (`frontend/tests/`, 27 tests): FilterBar, PostingsTable (incl. Live badge, location formatting),
-DemoButton, ResumePage (guest-then-upload flow, file validation), RichText, the AI key store + page, and the API
-client, using Vitest + Testing Library in jsdom.
+**Frontend** (`frontend/tests/`, 42 tests): FilterBar (incl. country, program, graduation year), PostingsTable and
+PostingCard (role badge, US location, selected job), DemoButton, ResumePage (guest-then-upload flow with studies and
+preferences, file validation), RichText, the AI key store + page, and the API client, using Vitest + Testing
+Library in jsdom.
+
+**End-to-end** (`frontend/e2e/`, Playwright, 7 tests): against the running site, in a real browser: search with no
+results, quick filters and the All filters panel, the details panel beside the list, uploading a generated PDF
+resume and seeing the detected program and graduation year, file validation, and the phone layout. Files end in
+`.e2e.ts` so Vitest ignores them; run with `npm run test:e2e` (`E2E_BASE_URL`, `E2E_CHANNEL=msedge` to reuse an
+installed browser).
 
 **CI** (`.github/workflows/ci.yml`) on every push runs ruff → mypy --strict → migrations up/down/up →
 `alembic check` → pytest → perf for the backend, eslint → tsc → vitest → `vite build` for the frontend, then runs the
-Render build command and `python start.py --hosted` against a fresh Postgres and smoke-tests the site, the resume
-page, the API (incl. `students_only`), demo and guest accounts, and that a guest session works on the next request.
+Render build command and `python start.py --hosted` against a fresh Postgres with the sample postings,
+smoke-tests the site, the resume page, the API (incl. `students_only`), demo and guest accounts, and that a guest
+session works on the next request, then runs the Playwright tests against it. `refresh-jobs.yml` wakes the hosted
+site every 6 hours when the `SITE_URL` repository variable is set.
 
 ---
 
@@ -438,7 +456,7 @@ is a classic bug class:
 - **Spec 004 remainder**: a tool-use assistant (search/compare/save with a UI confirmation step),
   an MCP server exposing the same tools, `agent_runs` logging (tokens, latency, cost), and a YAML eval runner that
   gates CI at 80%. The `agent-tools` skill describes the intended design.
-- **More sources**: 27 employer boards today; add more employers, and schools' public feeds where terms allow.
+- **More sources**: ~120 employer boards today; add more employers, and schools' public feeds where terms allow.
 - **Admin UX**: creating sources is SQL-only; there's no UI to add sources or review `low_confidence_fields`.
 - **Fit breakdown**: the spec's "60% required skills / 25% similarity / 15% eligibility" breakdown isn't shown; the
   score is a single number with a reason.

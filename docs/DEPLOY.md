@@ -4,7 +4,8 @@ This guide puts CoopRadar on the internet so anyone can use it from a link: clas
 reviewing your portfolio. No Docker anywhere: the host installs Python and Node.js packages, builds the site, and
 runs one command.
 
-> Just want the short version for non-developers? See the [User Guide](USER_GUIDE.md#put-your-own-copy-online-no-coding).
+> The short, step-by-step free setup (Render + Neon + GitHub Actions, optional Vercel) is in the
+> [README](../README.md#host-it-for-free). This page has the details and other hosts.
 
 **What gets deployed:** one web service plus one PostgreSQL database. Every host runs the same two commands:
 
@@ -15,38 +16,46 @@ runs one command.
 
 `start.py --hosted` then:
 1. applies database migrations (`alembic upgrade head`)
-2. seeds the skills list and the **27 employer career boards** (safe to repeat)
+2. seeds the skills list and the **~120 employer career boards** (safe to repeat)
 3. starts the web server on `$PORT`, serving the React site and the API from one address
 4. inside that server, a background scheduler imports real jobs from the boards right away, then every 6 hours
 
-It needs **PostgreSQL 16 with the `pgvector` extension available** (Render, Neon, Supabase, Railway and most
+It needs **PostgreSQL 16 with the `pgvector` extension available** (Neon, Supabase, Render, Railway and most
 managed Postgres hosts have it). Redis is **optional**: without `REDIS_URL`, login sessions and rate limits are
-kept in a small Postgres table.
+kept in a small Postgres table. The database is about 50 MB with ~2,800 open jobs.
 
 ---
 
-## Option A: Render, one click (recommended to start)
+## Option A: Render + Neon, free (recommended)
 
-[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/mbendari7/COOP-Radar)
+`render.yaml` is a **Blueprint**: Render reads it and creates the website (native Python runtime, which includes
+Node.js for the build), then redeploys on every push to `main`. The database is on **Neon**, whose free plan doesn't
+expire (Render's free Postgres is deleted 30 days after it's created).
 
-`render.yaml` is a **Blueprint**. Render reads it and creates the website (native Python runtime, which includes
-Node.js for the build) and a Postgres database, then redeploys on every push to `main`.
-
-1. Sign up at https://render.com with **GitHub**.
-2. Click the button above (or **New → Blueprint** and pick the repo).
-3. Review the two resources and plans, then click **Apply**.
-4. Leave `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` **blank**. Visitors bring their own AI key.
-5. The first build takes about 5–10 minutes. Your site is at `https://coopradar-xxxx.onrender.com`. Add your own
+1. **Neon**: sign up at https://neon.tech, create a project, click **Connect**, turn *Connection pooling* off and
+   copy the connection string (`postgresql://...neon.tech/neondb?sslmode=require&channel_binding=require`). The app
+   converts it for asyncpg itself (`sslmode` becomes `ssl`, `channel_binding` is dropped).
+2. **Render**: sign up at https://render.com with **GitHub**, then **New → Blueprint** and pick the repo.
+3. Paste the Neon string into `DATABASE_URL`. Leave `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` **blank**: visitors
+   bring their own AI key. Click **Apply**.
+4. The first build takes about 5–10 minutes. Your site is at `https://coopradar-xxxx.onrender.com`. Add your own
    domain under **Settings → Custom Domains** if you like.
-6. Within a couple of minutes of going live, roughly 700–800 Canadian jobs are imported. Refresh **Jobs** to see them.
+5. Within a few minutes of going live, about 2,800 jobs are imported. Refresh **Find jobs** to see them.
+6. **Keep jobs fresh**: in GitHub, **Settings → Secrets and variables → Actions → Variables**, add `SITE_URL` with
+   your Render address. `.github/workflows/refresh-jobs.yml` then wakes the site every 6 hours and keeps it up for
+   about 20 minutes so every board is re-imported. It's free for public repositories.
 
-**Free plan caveats** (check Render's pricing page, since these change):
-- The free web service **sleeps after about 15 minutes idle**. The first visit after that takes about a minute.
-  The importer only runs while the site is awake and catches up when it wakes. Logins survive the sleep because
-  sessions are stored in the database.
-- The free Postgres database is **time-limited** (about 30 days at the time of writing). Upgrade it before then,
-  or point `DATABASE_URL` at a free [Neon](https://neon.tech) or [Supabase](https://supabase.com) database instead.
-- For a pitch or interview, upgrade the web service to a paid instance (always on) or open the site a minute early.
+**Free plan caveats** (check the providers' pricing pages, since these change):
+- The free Render web service **sleeps after about 15 minutes idle**. The first visit after that takes about a
+  minute. Logins survive the sleep because sessions are stored in the database.
+- Neon's free plan has 0.5 GB of storage and a monthly compute allowance; its database also sleeps after 5 idle
+  minutes and wakes in about a second. CoopRadar uses a small fraction of both.
+- For a pitch or interview, open the site a minute early, or upgrade the Render service to a paid instance
+  (always on).
+
+Already deployed with Render's own database? Create the Neon project, change `DATABASE_URL` in the Render
+dashboard (**Environment**), and redeploy; the site migrates and re-imports jobs by itself. Accounts and saved jobs
+from the old database aren't copied (use `pg_dump` / `psql` if you need them).
 
 ---
 
@@ -55,7 +64,7 @@ Node.js for the build) and a Postgres database, then redeploys on every push to 
 Vercel is great at serving websites, but its servers only run for a moment per request, while CoopRadar's API keeps
 running: it imports jobs every 6 hours and needs a Postgres database. So the split is:
 
-- **Render** runs the API and database (Option A).
+- **Render** runs the API, with the database on Neon (Option A).
 - **Vercel** serves the React pages from its CDN and forwards `/api/*` to Render (`vercel.json`). The browser only
   ever sees the Vercel address, so login cookies stay first-party and no CORS setup is needed.
 
@@ -68,8 +77,8 @@ Steps:
 
 Notes: `vercel.json` turns off Vercel caching for `/api` because answers are per visitor. The Render free plan
 still sleeps after about 15 minutes, so the first request after a quiet spell waits for it to wake. Running the
-whole thing on Vercel alone would mean swapping the background importer for Vercel Cron and using a hosted Postgres
-such as Neon; that's possible but not set up here.
+whole thing on Vercel alone would mean replacing the in-process importer with Vercel Cron jobs (which have short
+time limits per run, while a full import takes several minutes); that's possible but not set up here.
 
 ---
 
@@ -129,21 +138,23 @@ repo and `Environment=PORT=8000`.
 | `SEED_JOB_BOARDS` / `SEED_SAMPLE_POSTINGS` / `SEED_DEV_SOURCES` | | `true` / `false` / `false` | What the seed loads: real boards, made-up postings, Admin-page fixtures |
 | `INGEST_INTERVAL_HOURS` | | `6` | How often each career board is re-imported |
 | `INGEST_LOCATION_FILTER` | | Canada | Regex on job location. Empty means Canada; `.*` means everywhere. |
+| `INGEST_US_JOBS` | | `students` | US jobs: `students` (co-op / intern / new grad titles), `all`, or `none` |
 | `BACKGROUND_JOBS` | | `true` | Run the importer inside the web server |
 | `COOKIE_SECURE` | | `true` | Keep `true` on HTTPS |
 | `PORT` | | `8000` | Port to listen on (hosts set this) |
 
-**Adding or removing employers:** edit `backend/seed/job_boards.py` (company, `greenhouse`/`lever`/`ashby`,
-board name from the careers URL) and redeploy. Admins can also pause sources on the **Admin** page.
+**Adding or removing employers:** edit `backend/seed/job_boards.py` (company,
+`greenhouse`/`lever`/`ashby`/`smartrecruiters`, board name from the careers URL) and redeploy. Admins can also pause sources on the **Admin** page.
 
 ---
 
 ## Before you share the link
 
-1. Open the site in a **private window**. The home page shows the hero, and **Jobs** lists real postings with
-   **Live** badges.
-2. Go to **My resume** and drop in a resume. Skills found, in-demand skills, and 20 matches appear with no key.
-3. Click **AI key** and add a free Gemini key. Then click **Get my AI review** and, on a match, **Tailor my resume**.
+1. Open the site in a **private window**. **Find jobs** lists real postings; clicking one shows its details beside
+   the list.
+2. Go to **Match my resume** and drop in a resume. Its program and graduation year are read, and 20 matches with
+   "why it fits" notes appear with no key.
+3. Click **AI key** and add a free Gemini key. Then click **Review my resume** (Resume feedback tab) and, on a match, **Tailor my resume**.
 4. Click **Keep my account**, add an email and password, sign out, and sign back in. Your resume should still be there.
 5. Click **Try the demo** in another private window. You should see a filled tracker and resume page.
 6. Add the link to the top of the README ("Live site" line) and to your pitch slides.

@@ -63,13 +63,30 @@ filters, filter meta with job type counts, employers and open-job total (counts 
 proxies `/api` to Render. Verified: backend 255 passed (perf p95 34 ms), migrations round-trip + `alembic check`,
 frontend 36 passed + lint/tsc/build, real upload with preferences in Edge. Not verified: an actual Vercel deploy.
 
+## Job-board look, co-op matching by program and graduation year, more jobs, free hosting (2026-10-12)
+
+Look: job-board layout (What / Where search band, quick filters for level, country and work mode, an *All filters*
+drawer, results list beside a details panel, `?job=` in the URL), one blue accent on white and neutral greys.
+Defaults: co-op & internships in Canada. Jobs: ~120 employer boards (was 27), new SmartRecruiters adapter, US
+student roles (`INGEST_US_JOBS`), Greenhouse descriptions fetched only for kept jobs; 2,904 open jobs locally.
+Matching: `services/education.py` reads programs of study and graduation years from postings (migration 0010:
+`country`, `fields_of_study`, `grad_years`) and program / degree / graduation year from resumes; preferences gained
+program, degree, grad year, term, countries; job types default to the program's; jobs for other grad years are
+filtered out; scoring rebalanced (skills 65, student 15, program 10, grad year 5, term 5, keywords +20); each
+match has "why it fits" notes. Docs: `guides/using-coopradar/` (visitors), `guides/how-it-works/` (stack +
+interview prep), README rewritten (screenshots, free hosting: Render + Neon + `refresh-jobs.yml`, optional Vercel).
+`render.yaml` no longer creates a Render database. Playwright e2e (7 tests) added to CI. Verified: backend 292
+passed (perf p95 47 ms), migrations round-trip + `alembic check`, frontend 42 passed + lint/tsc/build, Playwright
+7/7 against the local site, screenshots in Edge. Not verified: Render + Neon deploy, the CI Playwright job on
+GitHub, the refresh workflow.
+
 ## Open work
 
 1. ~~Merge everything into `main`~~ (done 2026-10-10).
 2. First live run with real API keys; run `python -m app.ingest.embed` so matching has vectors to search.
 3. Add a real public job-board source (check its terms + robots.txt; document it in the plan).
 4. Remaining spec-004 scope: agent tools + MCP server + `agent_runs` + YAML eval runner (see the agent-tools skill).
-5. Deploy it (`docs/DEPLOY.md`) and put the live link at the top of the README.
+5. Deploy it (README "Host it for free": Render + Neon) and put the live link at the top of the README.
 6. Observability: error tracking and a small usage dashboard.
 
 ## History

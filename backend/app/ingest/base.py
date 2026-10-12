@@ -30,6 +30,7 @@ class RawPosting:
     # Optional extras some sources provide (career-board APIs do; feeds often don't)
     province: str | None = None
     posted_at: datetime | None = None
+    country: str = "CA"  # "CA" or "US"
 
 
 class BaseAdapter(ABC):

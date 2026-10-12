@@ -27,6 +27,12 @@ export type FilterMeta = Schemas['FilterMeta']
 export type CategoryCount = Schemas['CategoryCount']
 /** Job type keys ("software", "data", ...) inferred from job titles on the server */
 export type CategoryKey = CategoryCount['key']
+/** Programs of study a student can pick ("computer_science", "business", ...) */
+export type ProgramOption = Schemas['ProgramOption']
+export type ProgramKey = ProgramOption['key']
+export type CountryCode = 'CA' | 'US'
+/** Co-op, internship, new-grad or regular job, from the title */
+export type RoleType = PostingListItem['role']
 export type SearchMode = 'keyword' | 'semantic'
 
 export type SortField = 'posted_at' | 'deadline' | 'company' | 'title'
@@ -45,6 +51,12 @@ export interface PostingListParams {
   company?: string[]
   /** Only jobs posted in the last N days (1, 3, 7, 14 or 30) */
   posted_within?: number
+  /** Countries to include; none = all */
+  country?: CountryCode[]
+  /** Jobs for a program of study (named in the description, or fitting its job types) */
+  program?: ProgramKey
+  /** Hide jobs asking for a different graduation year */
+  grad_year?: number
   show_expired?: boolean
   show_closed?: boolean
   /** Only intern / co-op / student / new-grad roles */
@@ -77,6 +89,9 @@ function buildQueryString(params: PostingListParams): string {
   params.category?.forEach((c) => sp.append('category', c))
   params.company?.forEach((c) => sp.append('company', c))
   if (params.posted_within) sp.set('posted_within', String(params.posted_within))
+  params.country?.forEach((c) => sp.append('country', c))
+  if (params.program) sp.set('program', params.program)
+  if (params.grad_year) sp.set('grad_year', String(params.grad_year))
   if (params.show_expired) sp.set('show_expired', 'true')
   if (params.show_closed) sp.set('show_closed', 'true')
   if (params.students_only) sp.set('students_only', 'true')

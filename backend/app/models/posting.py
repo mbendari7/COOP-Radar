@@ -63,7 +63,9 @@ class Posting(Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     company: Mapped[str] = mapped_column(Text, nullable=False)
     city: Mapped[str] = mapped_column(Text, nullable=False)
+    # Province (Canada) or state (United States) code
     province: Mapped[str] = mapped_column(String(2), nullable=False)
+    country: Mapped[str] = mapped_column(String(2), nullable=False, server_default="CA")
     work_mode: Mapped[WorkMode] = mapped_column(
         Enum(WorkMode, name="work_mode_enum"), nullable=False
     )
@@ -113,6 +115,15 @@ class Posting(Base):
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
 
+    # Read from the description at import time (app/services/education.py):
+    # graduation years the job asks for, and programs of study it names. Empty = not stated.
+    grad_years: Mapped[list[int]] = mapped_column(
+        ARRAY(SmallInteger), nullable=False, server_default=text("'{}'::smallint[]")
+    )
+    fields_of_study: Mapped[list[str]] = mapped_column(
+        ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
+    )
+
     __table_args__ = (
         CheckConstraint(
             "duration_months IN (4, 8, 12, 16)", name="ck_duration_months"
@@ -127,6 +138,7 @@ class Posting(Base):
         Index("idx_postings_title", "title"),
         Index("idx_postings_city", "city"),
         Index("idx_postings_province", "province"),
+        Index("idx_postings_country", "country"),
         Index("idx_postings_term", "term"),
         Index("idx_postings_work_mode", "work_mode"),
         Index("idx_postings_duration", "duration_months"),

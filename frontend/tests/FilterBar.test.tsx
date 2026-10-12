@@ -10,7 +10,7 @@ import type { FilterMeta } from '../src/api/postings'
 
 const META: FilterMeta = {
   cities: ['Toronto', 'Waterloo'],
-  provinces: ['ON', 'BC'],
+  provinces: ['ON', 'BC', 'TX'],
   terms: ['Summer 2027', 'Winter 2027'],
   skills: ['Python', 'React', 'SQL'],
   companies: ['Lyft', 'Shopify'],
@@ -20,6 +20,19 @@ const META: FilterMeta = {
     { key: 'design', label: 'Design & UX', count: 0 },
   ],
   open_jobs: 17,
+  countries: [
+    { code: 'CA', label: 'Canada', count: 15 },
+    { code: 'US', label: 'United States', count: 2 },
+  ],
+  work_modes: [
+    { key: 'onsite', count: 9 },
+    { key: 'hybrid', count: 5 },
+    { key: 'remote', count: 3 },
+  ],
+  programs: [
+    { key: 'computer_science', label: 'Computer Science' },
+    { key: 'business', label: 'Business / Commerce' },
+  ],
 }
 
 function renderBar(filters: Filters = EMPTY_FILTERS, onChange = vi.fn(), onClearAll = vi.fn()) {
@@ -80,6 +93,37 @@ describe('FilterBar', () => {
     for (const d of [4, 8, 12, 16]) expect(screen.getByLabelText(`${d} months`)).toBeInTheDocument()
   })
 
+  it('lists provinces for Canada and states only once the US is chosen', () => {
+    const { unmount } = renderBar()
+    expect(screen.queryByRole('option', { name: 'Texas' })).not.toBeInTheDocument()
+    unmount()
+    renderBar({ ...EMPTY_FILTERS, country: 'all' })
+    expect(screen.getByRole('option', { name: 'Texas' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Province or state')).toBeInTheDocument()
+  })
+
+  it('changing country clears the province and city', () => {
+    const onChange = vi.fn()
+    renderBar({ ...EMPTY_FILTERS, province: 'ON' }, onChange)
+    fireEvent.click(screen.getByLabelText(/Canada and US/))
+    expect(onChange).toHaveBeenCalledWith({ country: 'all', province: '', city: '' })
+  })
+
+  it('sets the program and graduation year', () => {
+    const onChange = vi.fn()
+    renderBar(EMPTY_FILTERS, onChange)
+    fireEvent.change(screen.getByLabelText('Program or major'), { target: { value: 'business' } })
+    expect(onChange).toHaveBeenCalledWith({ program: 'business' })
+    const year = new Date().getFullYear() + 1
+    fireEvent.change(screen.getByLabelText('Graduating in'), { target: { value: String(year) } })
+    expect(onChange).toHaveBeenCalledWith({ grad_year: year })
+  })
+
+  it('shows work mode counts', () => {
+    renderBar()
+    expect(screen.getByRole('checkbox', { name: /remote\s*3/i })).toBeInTheDocument()
+  })
+
   it('adds a company from the list', () => {
     const onChange = vi.fn()
     renderBar(EMPTY_FILTERS, onChange)
@@ -95,7 +139,12 @@ describe('ActiveFilterChips', () => {
   })
 
   it('shows a chip for each active filter', () => {
-    renderChips({ ...EMPTY_FILTERS, city: 'Waterloo', skills: ['Python'], category: ['data'], posted_within: 7 })
+    renderChips({
+      ...EMPTY_FILTERS, city: 'Waterloo', skills: ['Python'], category: ['data'], posted_within: 7,
+      program: 'computer_science', grad_year: 2028,
+    })
+    expect(screen.getByText('Program: Computer Science')).toBeInTheDocument()
+    expect(screen.getByText('Graduating 2028')).toBeInTheDocument()
     expect(screen.getByText(/City: Waterloo/)).toBeInTheDocument()
     expect(screen.getByText('Python')).toBeInTheDocument()
     expect(screen.getByText('Data & AI')).toBeInTheDocument()

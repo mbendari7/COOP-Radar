@@ -119,7 +119,7 @@ jobs:
   # Runs the site exactly the way the host does (`python start.py --hosted`):
   # migrations, seed data, built React site, and API all served on one port.
   website:
-    name: Website (build · start · smoke test)
+    name: Website (build · start · smoke test · Playwright)
     runs-on: ubuntu-latest
     needs: [backend, frontend]
 
@@ -143,8 +143,9 @@ jobs:
       PORT: "8080"
       # Plain http in CI; on a real host cookies stay Secure
       COOKIE_SECURE: "false"
-      # Don't call real career boards from CI
+      # Don't call real career boards from CI; use the made-up sample postings instead
       SEED_JOB_BOARDS: "false"
+      SEED_SAMPLE_POSTINGS: "true"
       BACKGROUND_JOBS: "false"
 
     steps:
@@ -185,6 +186,22 @@ jobs:
           curl -fsS -c jar -X POST http://localhost:8080/api/auth/guest | grep -q '"is_demo":true'
           # The guest session lives in Postgres (no Redis) and works on the next request
           curl -fsS -b jar http://localhost:8080/api/me | grep -q '"is_demo":true'
+
+      - name: End-to-end tests (Playwright, real browser)
+        working-directory: frontend
+        env:
+          E2E_BASE_URL: http://localhost:8080
+        run: |
+          npx playwright install --with-deps chromium
+          npx playwright test
+
+      - name: Keep the Playwright traces of failed tests
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: frontend/test-results/
+          if-no-files-found: ignore
 
       - name: Show logs on failure
         if: failure()

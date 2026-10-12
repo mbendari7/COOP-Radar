@@ -126,7 +126,7 @@ async def test_keywords_rank_matching_jobs_higher(
     after = res.json()["matches"]
 
     assert score(before, "Marketing Coordinator") == 0  # none of its skills on the resume
-    assert score(after, "Marketing Coordinator") == 30
+    assert score(after, "Marketing Coordinator") == 20
 
 
 async def test_new_resume_version_keeps_preferences(

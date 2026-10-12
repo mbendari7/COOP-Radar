@@ -54,13 +54,16 @@ describe('ResumePage', () => {
     expect(calls.indexOf('POST /api/auth/guest')).toBeLessThan(calls.indexOf('POST /api/resume'))
   })
 
-  it('sends the job preferences picked in step 1 with the resume', async () => {
+  it('sends what the student picked (studies and job preferences) with the resume', async () => {
     localStorage.clear()
     let sent: FormData | undefined
     const meta = {
-      cities: [], provinces: ['ON'], terms: [], skills: [], companies: [], open_jobs: 3,
+      cities: [], provinces: ['ON', 'TX'], terms: [], skills: [], companies: [], open_jobs: 3,
       categories: [{ key: 'data', label: 'Data & AI', count: 3 }],
+      countries: [], work_modes: [],
+      programs: [{ key: 'computer_science', label: 'Computer Science' }],
     }
+    const gradYear = new Date().getFullYear() + 2
     vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
       if (url === '/api/config') return Promise.resolve(json(CONFIG))
       if (url === '/api/me') return Promise.resolve(json({ detail: 'Not signed in', code: 'UNAUTHENTICATED' }, 401))
@@ -75,15 +78,22 @@ describe('ResumePage', () => {
     renderPage()
 
     fireEvent.click(await screen.findByRole('button', { name: /Data & AI/ }))
+    // Only Canadian provinces until the United States is ticked
+    expect(screen.queryByRole('option', { name: 'Texas' })).not.toBeInTheDocument()
     fireEvent.change(screen.getByLabelText('Where'), { target: { value: 'ON' } })
-    fireEvent.click(screen.getByLabelText('Co-op & intern only'))
+    fireEvent.change(screen.getByLabelText('Program or major'), { target: { value: 'computer_science' } })
+    fireEvent.change(screen.getByLabelText('Graduating in'), { target: { value: String(gradYear) } })
+    fireEvent.click(screen.getByLabelText('Co-op, internship or entry-level'))
     fireEvent.change(screen.getByLabelText(/drop your resume here/i), {
       target: { files: [new File(['%PDF-1.4'], 'cv.pdf', { type: 'application/pdf' })] },
     })
 
     await waitFor(() => expect(sent).toBeDefined())
     const prefs = JSON.parse(String(sent?.get('preferences')))
-    expect(prefs).toMatchObject({ categories: ['data'], province: 'ON', level: 'students' })
+    expect(prefs).toMatchObject({
+      categories: ['data'], province: 'ON', level: 'entry', program: 'computer_science',
+      grad_year: gradYear, countries: ['CA'],
+    })
   })
 
   it('rejects files that are not PDF or DOCX before uploading', async () => {

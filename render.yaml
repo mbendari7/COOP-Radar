@@ -1,11 +1,17 @@
-# Render Blueprint: one-click hosting on https://render.com (no Docker needed).
-# Dashboard → New → Blueprint → pick this repo. Render creates the website and a Postgres
-# database, and redeploys on every push to main.
-# You'll be asked for two AI keys — leave both blank: visitors bring their own key
-# (Claude, ChatGPT, or Gemini) on the site's "AI key" page. See docs/DEPLOY.md.
-# On first start the site imports real Canadian jobs from ~27 employers' career boards
-# (takes a minute or two), then refreshes them every 6 hours.
-# Plans/pricing change over time — review them on the Blueprint screen before applying.
+# Render Blueprint: free hosting on https://render.com (no Docker needed).
+# Dashboard → New → Blueprint → pick this repo. Render creates the website and redeploys on
+# every push to main. Full walkthrough: README.md "Host it for free", or docs/DEPLOY.md.
+#
+# The database lives on Neon's free plan (https://neon.tech), which doesn't expire. Render's
+# own free database is deleted after 30 days, so it isn't used here.
+# When Render asks, paste:
+#   DATABASE_URL       your Neon connection string (Neon dashboard → Connect; the direct one,
+#                      not "pooled"; postgresql://...?sslmode=require is fine as it is)
+#   ANTHROPIC_API_KEY  leave blank: visitors bring their own AI key on the site's "AI key" page
+#   OPENAI_API_KEY     leave blank (only needed for smart search)
+# On first start the site imports real jobs from ~120 employers' career boards (a few minutes),
+# then refreshes them every 6 hours while it's awake. Plans and prices change over time:
+# review them on the Blueprint screen before applying.
 
 services:
   - type: web
@@ -24,9 +30,7 @@ services:
       - key: NODE_VERSION
         value: "22"
       - key: DATABASE_URL
-        fromDatabase:
-          name: coopradar-db
-          property: connectionString
+        sync: false
       - key: ANTHROPIC_API_KEY
         sync: false
       - key: OPENAI_API_KEY
@@ -37,8 +41,3 @@ services:
         value: "20"
       - key: INGEST_INTERVAL_HOURS
         value: "6"
-
-databases:
-  - name: coopradar-db
-    plan: free
-    postgresMajorVersion: "16"

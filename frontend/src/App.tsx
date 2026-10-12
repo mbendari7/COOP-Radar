@@ -42,9 +42,10 @@ function AddPostingsPage() {
   )
 }
 
+/** Job-board style tabs: the current page is underlined in the accent colour. */
 function navClass({ isActive }: { isActive: boolean }): string {
-  return `text-sm font-medium px-2.5 py-1.5 rounded-md ${
-    isActive ? 'text-gray-900 bg-gray-100' : 'text-gray-600 hover:text-gray-900'
+  return `flex h-16 items-center border-b-2 px-2.5 text-sm font-medium ${
+    isActive ? 'border-blue-600 text-gray-900' : 'border-transparent text-gray-600 hover:text-gray-900'
   }`
 }
 
@@ -55,7 +56,7 @@ function Header() {
   const [authOpen, setAuthOpen] = useState(false)
 
   return (
-    <header className="bg-white/95 backdrop-blur border-b border-gray-200 sticky top-0 z-30">
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-30">
       <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between gap-4">
         <Link to="/" className="flex items-center gap-2 shrink-0" aria-label="CoopRadar home">
           <LogoMark />
@@ -63,8 +64,8 @@ function Header() {
         </Link>
 
         {/* Scrolls sideways on narrow phones instead of overflowing the page */}
-        <nav className="flex items-center gap-1 sm:gap-2 overflow-x-auto whitespace-nowrap" aria-label="Main">
-          <NavLink to="/" end className={navClass}>Jobs</NavLink>
+        <nav className="flex h-16 items-center gap-1 sm:gap-2 overflow-x-auto whitespace-nowrap" aria-label="Main">
+          <NavLink to="/" end className={navClass}>Find jobs</NavLink>
           <NavLink to="/resume" className={navClass}>Match my resume</NavLink>
           {me && <NavLink to="/saved" className={navClass}>Tracker</NavLink>}
           <NavLink
@@ -91,7 +92,7 @@ function Header() {
               </NavLink>
               <button
                 onClick={() => logout.mutate()}
-                className="text-sm text-gray-500 hover:text-gray-700 px-3 py-1.5 border border-gray-200 rounded-lg hover:bg-gray-50"
+                className="text-sm text-gray-700 hover:text-gray-900 px-3 py-1.5 border border-gray-300 rounded-md hover:bg-gray-50"
               >
                 Sign out
               </button>
@@ -101,7 +102,7 @@ function Header() {
               <DemoButton variant="header" />
               <button
                 onClick={() => setAuthOpen(true)}
-                className="text-sm font-medium px-3 py-1.5 bg-blue-700 text-white rounded-lg hover:bg-blue-800"
+                className="text-sm font-semibold px-3.5 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700"
               >
                 Sign in
               </button>
@@ -142,7 +143,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto px-4 py-6 flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-between text-sm text-gray-500">
           <p>CoopRadar. Jobs come from employers' public career pages. Always apply on the employer's site.</p>
           <nav className="flex gap-4" aria-label="Footer">
-            <Link to="/" className="hover:text-gray-800">Jobs</Link>
+            <Link to="/" className="hover:text-gray-800">Find jobs</Link>
             <Link to="/resume" className="hover:text-gray-800">Match my resume</Link>
             <Link to="/ai-key" className="hover:text-gray-800">AI key</Link>
           </nav>

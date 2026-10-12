@@ -1,11 +1,13 @@
 # CoopRadar
 
-Resume-first co-op website: imports real Canadian jobs from employers' public career boards (Greenhouse, Lever,
-Ashby) into Postgres; a student drops in a resume (no sign-up: temporary account) and gets skills found, in-demand
-skills missing, and student-ranked matches for free in SQL, plus bring-your-own-key AI (review, re-rank, tailor,
-cover letter, cited Q&A). Also search/filter and an application tracker.
+Co-op job board: imports real jobs (all of Canada, plus US student roles) from ~120 employers' public career boards
+(Greenhouse, Lever, Ashby, SmartRecruiters) into Postgres, reading each description for the programs of study and
+graduation years it asks for. A student drops in a resume (no sign-up: temporary account); their program, degree and
+graduation year are read from it, and open jobs are filtered and scored in SQL (skills, student role, program, grad
+year, term) with "why it fits" notes, plus bring-your-own-key AI (review, re-rank, tailor, cover letter, cited Q&A).
+Also job-board search (list + details panel, all filters) and an application tracker.
 
-Docs: `README.md` (technical), `docs/USER_GUIDE.md` (simple: use, run, put online, AI keys, tips), `docs/HOW_IT_WORKS.md` (overview + how to explain), `docs/PROJECT_GUIDE.md` (every module), `docs/DEPLOY.md` (hosting).
+Docs: `README.md` (technical + free hosting), `guides/using-coopradar/` (simple: for visitors), `guides/how-it-works/` (stack, flow, how to explain it), `docs/PROJECT_GUIDE.md` (every module), `docs/DEPLOY.md` (other hosts).
 
 ## Stack
 - Backend: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0 async (typed `Mapped[]`), Alembic
@@ -17,23 +19,26 @@ Docs: `README.md` (technical), `docs/USER_GUIDE.md` (simple: use, run, put onlin
 - AI: **bring your own key** — visitors' Claude / ChatGPT / Gemini keys via `app/ai.py` (official `anthropic`,
   `openai`, `google-genai` SDKs). Optional owner keys: `ANTHROPIC_API_KEY` fallback (`AGENT_MODEL`/`FAST_MODEL`)
   and `OPENAI_API_KEY` for embeddings (smart search)
-- Frontend: React 18 + TypeScript + Vite 6, TanStack Query/Table, React Router, Tailwind, dnd-kit
+- Frontend: React 18 + TypeScript + Vite 6, TanStack Query/Table, React Router, Tailwind, dnd-kit; Playwright e2e
 - Infra: **no Docker**. `start.py` (one command: venv, packages, site build, DB, migrate, seed, serve),
-  Render Blueprint on the native Python runtime, optional Vercel front (`vercel.json`: CDN pages, `/api` proxied
-  to Render), GitHub Actions CI
+  Render Blueprint (native Python runtime; database on Neon's free plan via `DATABASE_URL`), optional Vercel front
+  (`vercel.json`: CDN pages, `/api` proxied to Render), GitHub Actions CI + `refresh-jobs.yml` (wakes the free site
+  every 6 h when the `SITE_URL` variable is set)
 
 ## Layout
 - `backend/app/` — `api/` routers · `services/` business logic + SQL · `schemas/` Pydantic · `models/` ORM ·
   `ingest/` career-board + feed adapters, runner, dedup, skill matching, extraction, embeddings ·
   `agent/` streamed tailor / cover letter / Q&A · `llm.py` Claude helpers ·
   `deps.py` auth deps · `store.py` session store · `jobs.py` background jobs
-- `backend/alembic/versions/` migrations (0001–0009) · `backend/seed/` skills, 27 career boards (`job_boards.py`),
+- `backend/alembic/versions/` migrations (0001–0010) · `backend/seed/` skills, ~120 career boards (`job_boards.py`),
   sample postings (`SEED_*` flags) · `backend/tests/` pytest
-- `frontend/src/` — `api/` (`client.ts` + query hooks) · `pages/` · `components/` · `frontend/tests/` vitest
+- `frontend/src/` — `api/` (`client.ts` + query hooks) · `pages/` · `components/` · `frontend/tests/` vitest ·
+  `frontend/e2e/` Playwright (`*.e2e.ts`, run against a started site)
 - `specs/NNN-*/` Spec Kit feature specs · `.specify/` Spec Kit config, templates, constitution
 - `.claude/skills/` — `speckit-*` workflow skills + project skills (api-conventions, frontend-tables,
   agent-tools, db-migration, log-agentic-work)
-- `docs/` — USER_GUIDE, HOW_IT_WORKS, DEPLOY, PROJECT_GUIDE, agentic-workflow, progress, speckit-prompts, history/
+- `guides/` — using-coopradar (visitors), how-it-works (builder / interviews)
+- `docs/` — DEPLOY, PROJECT_GUIDE, images/, agentic-workflow, progress, speckit-prompts, history/
 - Production: `render.yaml` builds with `pip install -e backend && npm ci/build --prefix frontend`, starts with
   `python start.py --hosted` (migrate → seed → uvicorn on $PORT). `app/main.py → mount_frontend` serves the built site.
 
@@ -44,6 +49,7 @@ Docs: `README.md` (technical), `docs/USER_GUIDE.md` (simple: use, run, put onlin
   `ruff check . && mypy app && pytest -q -m 'not perf' && alembic check`
 - Perf budget: `pytest -q -m perf -s`
 - Frontend checks: `cd frontend && npm run lint && npm run typecheck && npm test && npm run build`
+- Browser tests: start the site, then `cd frontend && npm run test:e2e` (`E2E_BASE_URL`, `E2E_CHANNEL=msedge`)
 - New migration: use the `/db-migration` skill (autogenerate → review → round-trip → `alembic check`)
 
 ## Rules

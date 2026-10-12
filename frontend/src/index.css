@@ -8,6 +8,6 @@
     -moz-osx-font-smoothing: grayscale;
   }
   body {
-    @apply bg-[#f8f7f4] text-gray-900;
+    @apply bg-[#f3f2f1] text-gray-900;
   }
 }

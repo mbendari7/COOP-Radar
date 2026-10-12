@@ -5,9 +5,9 @@
  * This component just renders what the API returns and reports user
  * interactions (column header clicks) back to the parent via callbacks.
  *
- * view="cards" (the default on the jobs page) shows a PostingCard list at every width;
- * view="table" shows the sortable table on wide screens. Phones always get cards, so
- * nothing needs horizontal scrolling.
+ * view="cards" (the default on the jobs page) shows a PostingCard list at every width, with
+ * the selected job highlighted for the details panel beside it; view="table" shows the
+ * sortable table on wide screens. Phones always get cards, so nothing scrolls sideways.
  */
 
 import {
@@ -45,7 +45,7 @@ const columns = [
   col.accessor('city', {
     id: 'city',
     header: 'Location',
-    cell: (info) => formatLocation(info.getValue(), info.row.original.province),
+    cell: (info) => formatLocation(info.getValue(), info.row.original.province, info.row.original.country),
     enableSorting: false,
   }),
   col.accessor('work_mode', {
@@ -92,6 +92,9 @@ interface Props {
   /** Shown as a "Clear all filters" button inside the empty state */
   onClearFilters?: () => void
   view?: 'cards' | 'table'
+  /** The job shown in the details panel, and how to pick another (cards view) */
+  selectedId?: string | null
+  onSelect?: (id: string) => void
 }
 
 export default function PostingsTable({
@@ -105,6 +108,8 @@ export default function PostingsTable({
   showBookmarks = false,
   onClearFilters,
   view = 'table',
+  selectedId = null,
+  onSelect,
 }: Props) {
   const navigate = useNavigate()
 
@@ -170,11 +175,17 @@ export default function PostingsTable({
   return (
     <>
       {/* Cards: always on phones, at every width in card view */}
-      <div className={`${view === 'cards' ? '' : 'md:hidden'} space-y-3`}>
+      <div className={`${view === 'cards' ? '' : 'md:hidden'} space-y-2`}>
         {isLoading
           ? Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
           : data.map((posting) => (
-              <PostingCard key={posting.id} posting={posting} showBookmark={showBookmarks} />
+              <PostingCard
+                key={posting.id}
+                posting={posting}
+                showBookmark={showBookmarks}
+                selected={view === 'cards' && posting.id === selectedId}
+                onSelect={view === 'cards' ? onSelect : undefined}
+              />
             ))
         }
       </div>

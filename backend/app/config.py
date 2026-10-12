@@ -1,4 +1,6 @@
+import re
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -66,6 +68,9 @@ class Settings(BaseSettings):
     # province codes are matched case-sensitively). Empty = the Canada default below.
     # Set to ".*" to keep every location.
     ingest_location_filter: str = CANADA_LOCATION_FILTER
+    # Jobs in the United States: "students" keeps only co-op / intern / student / new-grad roles
+    # (many Canadian students do a US co-op term), "all" keeps every US job, "none" skips them.
+    ingest_us_jobs: Literal["students", "all", "none"] = "students"
 
     @field_validator("ingest_location_filter")
     @classmethod
@@ -77,11 +82,15 @@ class Settings(BaseSettings):
     def _asyncpg_url(cls, v: str) -> str:
         """
         Accept the URL formats hosting providers hand out (postgres://, postgresql://,
-        ?sslmode=require) and convert them to what SQLAlchemy + asyncpg expect.
+        ?sslmode=require) and convert them to what SQLAlchemy + asyncpg expect. Neon adds
+        &channel_binding=require, which asyncpg doesn't accept, so it's dropped.
         """
         for prefix in ("postgres://", "postgresql://"):
             if v.startswith(prefix):
                 v = "postgresql+asyncpg://" + v[len(prefix):]
+        v = re.sub(r"[?&]channel_binding=[^&]*", "", v)
+        if "?" not in v and "&" in v:  # the dropped parameter was the first one
+            v = v.replace("&", "?", 1)
         return v.replace("sslmode=", "ssl=")
 
     @property

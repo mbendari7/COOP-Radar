@@ -832,6 +832,18 @@ export interface components {
             /** New Password */
             new_password: string;
         };
+        /** CountryCount */
+        CountryCount: {
+            /**
+             * Code
+             * @enum {string}
+             */
+            code: "CA" | "US";
+            /** Count */
+            count: number;
+            /** Label */
+            label: string;
+        };
         /**
          * CsvUploadResult
          * @description Response from POST /api/postings/upload.
@@ -866,6 +878,30 @@ export interface components {
             skill: string;
         };
         /**
+         * DetectedEducation
+         * @description What was read from the resume's education section (blank when not found).
+         */
+        DetectedEducation: {
+            /**
+             * Degree
+             * @default
+             * @enum {string}
+             */
+            degree: "" | "diploma" | "bachelors" | "masters" | "phd";
+            /** Grad Year */
+            grad_year?: number | null;
+            /**
+             * Program
+             * @default
+             */
+            program: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science") | "";
+            /**
+             * Program Label
+             * @default
+             */
+            program_label: string;
+        };
+        /**
          * EventCreateIn
          * @description Body for POST /api/saved/{id}/events — record a status change with optional note.
          */
@@ -896,16 +932,31 @@ export interface components {
              */
             companies: string[];
             /**
+             * Countries
+             * @default []
+             */
+            countries: components["schemas"]["CountryCount"][];
+            /**
              * Open Jobs
              * @default 0
              */
             open_jobs: number;
+            /**
+             * Programs
+             * @default []
+             */
+            programs: components["schemas"]["ProgramOption"][];
             /** Provinces */
             provinces: string[];
             /** Skills */
             skills: string[];
             /** Terms */
             terms: string[];
+            /**
+             * Work Modes
+             * @default []
+             */
+            work_modes: components["schemas"]["WorkModeCount"][];
         };
         /** HTTPValidationError */
         HTTPValidationError: {
@@ -990,6 +1041,21 @@ export interface components {
              */
             city: string;
             /**
+             * Countries
+             * @default [
+             *       "CA"
+             *     ]
+             */
+            countries: ("CA" | "US")[];
+            /**
+             * Degree
+             * @default
+             * @enum {string}
+             */
+            degree: "" | "diploma" | "bachelors" | "masters" | "phd";
+            /** Grad Year */
+            grad_year?: number | null;
+            /**
              * Keywords
              * @default
              */
@@ -1001,10 +1067,20 @@ export interface components {
              */
             level: "entry" | "students" | "all";
             /**
+             * Program
+             * @default
+             */
+            program: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science") | "";
+            /**
              * Province
              * @default
              */
             province: string;
+            /**
+             * Term
+             * @default
+             */
+            term: string;
             /**
              * Work Modes
              * @default []
@@ -1063,8 +1139,18 @@ export interface components {
             city: string;
             /** Company */
             company: string;
+            /**
+             * Country
+             * @default CA
+             */
+            country: string;
             /** Deadline */
             deadline: string;
+            /**
+             * Fit Notes
+             * @default []
+             */
+            fit_notes: string[];
             /**
              * Matched Skills
              * @default []
@@ -1098,6 +1184,7 @@ export interface components {
         };
         /** MatchesResponse */
         MatchesResponse: {
+            education?: components["schemas"]["DetectedEducation"] | null;
             /** Items */
             items: components["schemas"]["MatchResultOut"][];
             preferences?: components["schemas"]["JobPreferences"] | null;
@@ -1126,6 +1213,11 @@ export interface components {
             /** Company */
             company: string;
             /**
+             * Country
+             * @default CA
+             */
+            country: string;
+            /**
              * Deadline
              * Format: date
              */
@@ -1134,6 +1226,16 @@ export interface components {
             description: string;
             /** Duration Months */
             duration_months: number;
+            /**
+             * Fields Of Study
+             * @default []
+             */
+            fields_of_study: string[];
+            /**
+             * Grad Years
+             * @default []
+             */
+            grad_years: number[];
             /**
              * Id
              * Format: uuid
@@ -1152,6 +1254,11 @@ export interface components {
             posted_at: string;
             /** Province */
             province: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            readonly role: "coop" | "internship" | "new_grad" | "job";
             /** Skills */
             skills: string[];
             /** Source Id */
@@ -1177,12 +1284,27 @@ export interface components {
             /** Company */
             company: string;
             /**
+             * Country
+             * @default CA
+             */
+            country: string;
+            /**
              * Deadline
              * Format: date
              */
             deadline: string;
             /** Duration Months */
             duration_months: number;
+            /**
+             * Fields Of Study
+             * @default []
+             */
+            fields_of_study: string[];
+            /**
+             * Grad Years
+             * @default []
+             */
+            grad_years: number[];
             /**
              * Id
              * Format: uuid
@@ -1197,6 +1319,11 @@ export interface components {
             posted_at: string;
             /** Province */
             province: string;
+            /**
+             * Role
+             * @enum {string}
+             */
+            readonly role: "coop" | "internship" | "new_grad" | "job";
             /** Skills */
             skills: string[];
             /** Source Id */
@@ -1208,6 +1335,16 @@ export interface components {
             /** Title */
             title: string;
             work_mode: components["schemas"]["WorkMode"];
+        };
+        /** ProgramOption */
+        ProgramOption: {
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science";
+            /** Label */
+            label: string;
         };
         /**
          * PublicConfig
@@ -1425,8 +1562,10 @@ export interface components {
         };
         /** UploadResponse */
         UploadResponse: {
+            education?: components["schemas"]["DetectedEducation"] | null;
             /** Matches */
             matches: components["schemas"]["MatchResultOut"][];
+            preferences?: components["schemas"]["JobPreferences"] | null;
             resume: components["schemas"]["ResumeOut"];
         };
         /**
@@ -1478,6 +1617,12 @@ export interface components {
          * @enum {string}
          */
         WorkMode: "onsite" | "hybrid" | "remote";
+        /** WorkModeCount */
+        WorkModeCount: {
+            /** Count */
+            count: number;
+            key: components["schemas"]["WorkMode"];
+        };
     };
     responses: never;
     parameters: never;
@@ -2003,6 +2148,9 @@ export interface operations {
                 category?: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer")[] | null;
                 company?: string[] | null;
                 posted_within?: number | null;
+                country?: ("CA" | "US")[] | null;
+                program?: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science") | null;
+                grad_year?: number | null;
                 show_expired?: boolean;
                 show_closed?: boolean;
                 students_only?: boolean;

@@ -1,7 +1,12 @@
 """Adapter registry — maps adapter_type string to the appropriate adapter class."""
 
 from app.ingest.base import BaseAdapter
-from app.ingest.boards import AshbyAdapter, GreenhouseAdapter, LeverAdapter
+from app.ingest.boards import (
+    AshbyAdapter,
+    GreenhouseAdapter,
+    LeverAdapter,
+    SmartRecruitersAdapter,
+)
 from app.ingest.json_api import JsonApiAdapter
 from app.ingest.rss import RssAdapter
 
@@ -11,6 +16,7 @@ _ADAPTERS: dict[str, type[BaseAdapter]] = {
     "greenhouse": GreenhouseAdapter,
     "lever": LeverAdapter,
     "ashby": AshbyAdapter,
+    "smartrecruiters": SmartRecruitersAdapter,
 }
 
 

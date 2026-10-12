@@ -1,17 +1,37 @@
 /** Job filter values shared by FilterBar, ActiveFilterChips and the jobs page. */
 
-import type { CategoryKey, WorkMode } from '../api/postings'
+import type { CategoryKey, CountryCode, ProgramKey, WorkMode } from '../api/postings'
 
 export const WORK_MODES: WorkMode[] = ['onsite', 'hybrid', 'remote']
 export const DURATIONS = [4, 8, 12, 16]
 
-export type Level = '' | 'students' | 'all'
+/** '' = co-op & internships (the default: what most students here want) */
+export type Level = '' | 'entry' | 'all'
 
-export const LEVELS: { value: Level; label: string }[] = [
-  { value: '', label: 'Students & entry-level' },
-  { value: 'students', label: 'Co-op & intern only' },
-  { value: 'all', label: 'All levels' },
+export const LEVELS: { value: Level; label: string; short: string }[] = [
+  { value: '', label: 'Co-op & internships', short: 'Co-op & internships' },
+  { value: 'entry', label: 'Students & entry-level', short: 'Entry-level too' },
+  { value: 'all', label: 'All levels', short: 'All levels' },
 ]
+
+/** '' = Canada (the default), 'US', or 'all' for both */
+export type CountryChoice = '' | 'US' | 'all'
+
+export const COUNTRY_CHOICES: { value: CountryChoice; label: string }[] = [
+  { value: '', label: 'Canada' },
+  { value: 'US', label: 'United States' },
+  { value: 'all', label: 'Canada and US' },
+]
+
+export function countriesFor(choice: CountryChoice): CountryCode[] | undefined {
+  if (choice === 'all') return undefined
+  return choice === 'US' ? ['US'] : ['CA']
+}
+
+/** This year and the next six, for "Graduating in" selects. */
+export function gradYears(now: Date = new Date()): number[] {
+  return Array.from({ length: 7 }, (_, i) => now.getFullYear() + i)
+}
 
 export const POSTED_WITHIN: { value: number; label: string }[] = [
   { value: 0, label: 'Any time' },
@@ -25,6 +45,9 @@ export const POSTED_WITHIN: { value: number; label: string }[] = [
 export interface Filters {
   category: CategoryKey[]
   level: Level
+  country: CountryChoice
+  program: ProgramKey | ''
+  grad_year: number
   province: string
   city: string
   work_mode: WorkMode | ''
@@ -37,15 +60,16 @@ export interface Filters {
 }
 
 export const EMPTY_FILTERS: Filters = {
-  category: [], level: '', province: '', city: '', work_mode: '', posted_within: 0,
-  term: '', duration: [], company: [], skills: [], show_expired: false,
+  category: [], level: '', country: '', program: '', grad_year: 0, province: '', city: '',
+  work_mode: '', posted_within: 0, term: '', duration: [], company: [], skills: [],
+  show_expired: false,
 }
 
 /** How many filters differ from the defaults (shown on the phone "Filters" button). */
 export function countActive(f: Filters): number {
   return (
     f.category.length + f.duration.length + f.company.length + f.skills.length +
-    [f.level, f.province, f.city, f.work_mode, f.term].filter(Boolean).length +
-    (f.posted_within ? 1 : 0) + (f.show_expired ? 1 : 0)
+    [f.level, f.country, f.program, f.province, f.city, f.work_mode, f.term].filter(Boolean).length +
+    (f.grad_year ? 1 : 0) + (f.posted_within ? 1 : 0) + (f.show_expired ? 1 : 0)
   )
 }

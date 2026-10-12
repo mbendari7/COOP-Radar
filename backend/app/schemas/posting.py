@@ -7,14 +7,37 @@ PostingListParams is the full query-param model — Pydantic validates and coerc
 so the router stays thin and the service never sees invalid input.
 """
 
+import re
 from datetime import date, datetime
 from typing import Literal, TypeVar
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
 from app.models.posting import WorkMode
 from app.services.categories import CategoryKey
+from app.services.education import ProgramKey
+
+CountryCode = Literal["CA", "US"]
+RoleType = Literal["coop", "internship", "new_grad", "job"]
+
+# Python twins of the title patterns in app/services/postings.py, for the role badge
+_COOP_TITLE = re.compile(r"(?i)\b(co-?op|stagiaire)\b")
+_INTERN_TITLE = re.compile(r"(?i)\b(intern|interns|internship|student|apprentice)\b")
+_NEW_GRAD_TITLE = re.compile(
+    r"(?i)\b(new grad(uate)?|university grad(uate)?|early career|graduate program)\b"
+)
+
+
+def role_of(title: str) -> RoleType:
+    """Co-op, internship, new-grad or regular job, from the title."""
+    if _COOP_TITLE.search(title):
+        return "coop"
+    if _INTERN_TITLE.search(title):
+        return "internship"
+    if _NEW_GRAD_TITLE.search(title):
+        return "new_grad"
+    return "job"
 
 T = TypeVar("T")
 
@@ -37,6 +60,7 @@ class PostingListItem(BaseModel):
     company: str
     city: str
     province: str
+    country: str = "CA"
     work_mode: WorkMode
     term: str
     duration_months: int
@@ -44,11 +68,19 @@ class PostingListItem(BaseModel):
     posted_at: datetime
     skills: list[str]
     source_url: str | None
+    # What the description asks for: graduation years and programs of study (empty = not stated)
+    grad_years: list[int] = []
+    fields_of_study: list[str] = []
     closed_at: datetime | None = None
     # Set for postings imported from a live employer career board (None = sample/manual/CSV)
     source_id: UUID | None = None
     # Populated for authenticated requests only; None means unauthenticated
     is_saved: bool | None = None
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def role(self) -> RoleType:
+        return role_of(self.title)
 
 
 class PostingDetail(PostingListItem):
@@ -81,6 +113,22 @@ class CategoryCount(BaseModel):
     count: int
 
 
+class CountryCount(BaseModel):
+    code: CountryCode
+    label: str
+    count: int
+
+
+class WorkModeCount(BaseModel):
+    key: WorkMode
+    count: int
+
+
+class ProgramOption(BaseModel):
+    key: ProgramKey
+    label: str
+
+
 class FilterMeta(BaseModel):
     """
     Distinct values available for each filter dropdown.
@@ -95,6 +143,10 @@ class FilterMeta(BaseModel):
     categories: list[CategoryCount] = []
     # Open postings in total (job types overlap, so their counts don't add up to this)
     open_jobs: int = 0
+    countries: list[CountryCount] = []
+    work_modes: list[WorkModeCount] = []
+    # Programs of study a student can pick (see app/services/education.py)
+    programs: list[ProgramOption] = []
 
 
 # ── Query params ──────────────────────────────────────────────────────────────
@@ -181,6 +233,12 @@ class PostingListParams(BaseModel):
     company: list[str] | None = None
     # Only postings published in the last N days
     posted_within: int | None = None
+    # Countries (OR'd): CA, US. None = all
+    country: list[CountryCode] | None = None
+    # Jobs for a program of study: they name it in the description or fit its job types
+    program: ProgramKey | None = None
+    # Hide jobs that ask for a different graduation year (jobs that don't say are kept)
+    grad_year: int | None = Field(default=None, ge=2000, le=2100)
     show_expired: bool = False
     show_closed: bool = False
     # Only internships, co-ops, student and new-grad roles (matched on the job title)

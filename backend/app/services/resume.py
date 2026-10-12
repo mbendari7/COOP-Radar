@@ -2,8 +2,12 @@
 Resume upload, text extraction, match pipeline, and delete logic.
 
 Match pipeline (two stages):
-  0. Only open postings that fit the student's preferences (job type, location, work mode,
-     level) are considered; preference keywords ("data analyst") rank fitting postings higher.
+  0. Only open postings that fit the student's preferences (job type, location, country, work
+     mode, level, graduation year) are considered. Program and graduation year come from the
+     preferences or, when blank, from the resume's education section. With no job types picked,
+     the program's job types are used (Mechanical Engineering -> Hardware & engineering).
+     Keywords ("data analyst"), postings that name the student's field or graduation year, and
+     the wanted co-op term rank higher.
   1. Shortlist ~40 of them. Default: by the share of each posting's skills found in the
      resume (pure SQL, no AI key needed). If the site owner set OPENAI_API_KEY, by embedding
      similarity instead.
@@ -15,6 +19,7 @@ Match pipeline (two stages):
 import io
 import json
 import logging
+import re
 from typing import Any
 from uuid import UUID
 
@@ -32,15 +37,23 @@ from app.models.match_result import MatchResult
 from app.models.posting import Posting, WorkMode
 from app.models.posting_embedding import PostingEmbedding
 from app.models.resume import Resume
+from app.schemas.posting import role_of
 from app.schemas.resume import (
+    DetectedEducation,
     JobPreferences,
     MatchesResponse,
     MatchResultOut,
     ResumeOut,
     UploadResponse,
 )
-from app.services.categories import any_category
-from app.services.postings import SENIOR_TITLE_PATTERN, STUDENT_TITLE_PATTERN
+from app.services.categories import any_category, title_fits
+from app.services.education import FIELD_LABELS, PROGRAMS, detect_education
+from app.services.postings import (
+    SENIOR_TITLE_PATTERN,
+    STUDENT_TITLE_PATTERN,
+    grad_year_clause,
+    has_grad_year,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -108,24 +121,80 @@ _RERANK_PROMPT = (
     '[{"posting_id": "<uuid>", "score": <int 0-100>, "reason": "<one sentence>"}]'
 )
 
+# Everything ranking and the "why it fits" notes need from each candidate posting
+_CANDIDATE_COLUMNS = (
+    Posting.id, Posting.title, Posting.company, Posting.city, Posting.province, Posting.term,
+    Posting.deadline, Posting.description, Posting.skills, Posting.work_mode, Posting.country,
+    Posting.grad_years, Posting.fields_of_study,
+)
 _MIN_SKILLS = 3  # a posting listing 1 skill shouldn't score 100 on one match
 _OPEN = (Posting.closed_at.is_(None), Posting.deadline >= func.current_date())
 
 
 
+def effective_preferences(
+    prefs: JobPreferences | None, resume_text: str | None
+) -> JobPreferences | None:
+    """The preferences, with a blank program / degree / graduation year read from the resume."""
+    if resume_text is None:
+        return prefs
+    found = detect_education(resume_text)
+    base = prefs or JobPreferences()
+    return base.model_copy(update={
+        "program": base.program or found.program,
+        "degree": base.degree or found.degree,
+        "grad_year": base.grad_year or found.grad_year,
+    })
+
+
+def detected_education(resume_text: str) -> DetectedEducation:
+    found = detect_education(resume_text)
+    return DetectedEducation(
+        program=found.program,
+        program_label=PROGRAMS[found.program].label if found.program else "",
+        degree=found.degree,
+        grad_year=found.grad_year,
+    )
+
+
+def _job_types(prefs: JobPreferences) -> list[str]:
+    """The job types chosen, or the ones the student's program leads to."""
+    if prefs.categories:
+        return list(prefs.categories)
+    if prefs.program:
+        return list(PROGRAMS[prefs.program].categories)
+    return []
+
+
+# How much each part of a match counts (out of 1). Skills carry most of it; the rest rewards
+# what makes a job right for this student. Only a job that fits on every count reaches 100.
+_W_SKILLS = 0.65      # share of the posting's skills on the resume (senior titles count half)
+_W_STUDENT = 0.15     # a co-op / intern / student / new-grad title
+_W_PROGRAM = 0.10     # the description names the student's field of study
+_W_GRAD_YEAR = 0.05   # ... or their graduation year
+_W_TERM = 0.05        # the co-op term they want
+_W_KEYWORDS = 0.20    # matches the keywords they typed ("data analyst")
+
+
 def _student_fit(similarity: Any, prefs: JobPreferences | None = None) -> Any:
     """
-    Adjust a 0-1 relevance for a student: senior titles count half, co-op / intern /
-    new-grad titles get a +25 boost, and postings matching the preference keywords +30.
+    A 0-1 match score for a student from a 0-1 skill relevance, using the weights above.
     Capped at 1.
     """
     seniority = case((Posting.title.op("~*")(SENIOR_TITLE_PATTERN), 0.5), else_=1.0)
-    student = case((Posting.title.op("~*")(STUDENT_TITLE_PATTERN), 0.25), else_=0.0)
-    adjusted = similarity * seniority + student
+    student = case((Posting.title.op("~*")(STUDENT_TITLE_PATTERN), _W_STUDENT), else_=0.0)
+    adjusted = similarity * seniority * _W_SKILLS + student
     if prefs is not None and prefs.keywords.strip():
         # websearch_to_tsquery takes the keywords as a bound parameter, never as SQL
         query = func.websearch_to_tsquery("english", prefs.keywords.strip())
-        adjusted = adjusted + case((Posting.search_vector.op("@@")(query), 0.3), else_=0.0)
+        adjusted = adjusted + case((Posting.search_vector.op("@@")(query), _W_KEYWORDS), else_=0.0)
+    if prefs is not None and prefs.program:
+        fields = list(PROGRAMS[prefs.program].fields)
+        adjusted = adjusted + case((Posting.fields_of_study.overlap(fields), _W_PROGRAM), else_=0.0)
+    if prefs is not None and prefs.grad_year:
+        adjusted = adjusted + case((has_grad_year(prefs.grad_year), _W_GRAD_YEAR), else_=0.0)
+    if prefs is not None and prefs.term.strip():
+        adjusted = adjusted + case((Posting.term.ilike(prefs.term.strip()), _W_TERM), else_=0.0)
     return func.least(adjusted, 1.0)
 
 
@@ -135,8 +204,14 @@ def preference_filters(prefs: JobPreferences | None) -> list[Any]:
         return []
     remote = Posting.work_mode == WorkMode.remote
     clauses: list[Any] = []
-    if prefs.categories:
-        clauses.append(any_category(prefs.categories))
+    job_types = _job_types(prefs)
+    if job_types:
+        clauses.append(any_category(job_types))
+    if prefs.countries:
+        clauses.append(Posting.country.in_(prefs.countries))
+    if prefs.grad_year:
+        # Jobs asking for other graduation years are left out; most don't say, and stay in
+        clauses.append(grad_year_clause(prefs.grad_year))
     # Remote jobs can be done from anywhere, so they always count as "in" a location
     if prefs.province:
         clauses.append(or_(Posting.province.ilike(prefs.province), remote))
@@ -183,9 +258,7 @@ async def _candidates_by_skills(
     similarity = _student_fit(coverage, prefs).label("similarity")
     stmt = (
         select(
-            Posting.id, Posting.title, Posting.company, Posting.city, Posting.province,
-            Posting.term, Posting.deadline, Posting.description, Posting.skills,
-            Posting.work_mode, similarity,
+            *_CANDIDATE_COLUMNS, similarity,
         )
         .where(*_OPEN, *preference_filters(prefs))
         .order_by(similarity.desc(), Posting.deadline, Posting.id)
@@ -213,9 +286,7 @@ async def _candidates_by_embedding(
     distance = PostingEmbedding.embedding.cosine_distance(resume_vec)
     stmt = (
         select(
-            Posting.id, Posting.title, Posting.company, Posting.city, Posting.province,
-            Posting.term, Posting.deadline, Posting.description, Posting.skills,
-            Posting.work_mode, _student_fit(1 - distance, prefs).label("similarity"),
+            *_CANDIDATE_COLUMNS, _student_fit(1 - distance, prefs).label("similarity"),
         )
         .join(PostingEmbedding, PostingEmbedding.posting_id == Posting.id)
         .where(*_OPEN, *preference_filters(prefs))
@@ -299,6 +370,60 @@ def _work_mode_text(value: Any) -> str:
     return str(value.value if isinstance(value, WorkMode) else value or "")
 
 
+_IN_SCHOOL = re.compile(
+    r"(?i)(returning to (school|studies|university|your studies)|currently enrolled"
+    r"|enrolled in an? (accredited )?(co-?op|post-secondary|university|college)"
+    r"|must be (a )?(current|full-time) student|co-?op program)"
+)
+
+
+def fit_notes(
+    row: Any, prefs: JobPreferences | None, have: list[str], total_skills: int
+) -> list[str]:
+    """
+    Plain reasons this job fits the student, all read from the posting: the kind of role, the
+    field of study and graduation years it names, the term, and how many of its skills they have.
+    """
+    notes: list[str] = []
+    role = role_of(str(row["title"]))
+    if role == "coop":
+        notes.append("Co-op role")
+    elif role == "internship":
+        notes.append("Internship")
+    elif role == "new_grad":
+        notes.append("New grad role")
+
+    fields = list(row.get("fields_of_study") or [])
+    if prefs is not None and prefs.program:
+        program = PROGRAMS[prefs.program]
+        named = [f for f in program.fields if f in fields]
+        if named:
+            notes.append(f"Asks for {FIELD_LABELS[named[0]]}, which fits your program")
+        elif any(title_fits(c, str(row["title"])) for c in program.categories):
+            notes.append(f"A common role for {program.label} students")
+    elif fields:
+        notes.append("Asks for " + ", ".join(FIELD_LABELS[f] for f in fields[:2]))
+
+    years = list(row.get("grad_years") or [])
+    if years and prefs is not None and prefs.grad_year in years:
+        notes.append(f"For students graduating in {prefs.grad_year}, like you")
+    elif years:
+        notes.append("For students graduating in " + " or ".join(str(y) for y in years))
+
+    term = str(row.get("term") or "")
+    if term and term != "Open":
+        if prefs is not None and prefs.term and term.lower() == prefs.term.strip().lower():
+            notes.append(f"{term} term, the one you want")
+        else:
+            notes.append(f"{term} term")
+
+    if _IN_SCHOOL.search(str(row.get("description") or "")):
+        notes.append("For students still in school")
+    if total_skills:
+        notes.append(f"{len(have)} of {total_skills} listed skills on your resume")
+    return notes
+
+
 async def embed_and_rank(
     db: AsyncSession,
     extracted_text: str,
@@ -309,6 +434,7 @@ async def embed_and_rank(
     Run both stages and return up to 20 results, best first. Without AI credentials the
     free skill-overlap ranking is used (stage 1 only).
     """
+    prefs = effective_preferences(prefs, extracted_text)
     rows = await find_candidates(db, extracted_text, prefs)
     if not rows:
         return []
@@ -350,6 +476,8 @@ async def embed_and_rank(
                 work_mode=_work_mode_text(row.get("work_mode")),
                 matched_skills=have,
                 missing_skills=[s for s in posting_skills if s not in have],
+                country=str(row.get("country") or "CA"),
+                fit_notes=fit_notes(row, prefs, have, len(posting_skills)),
             )
         )
 
@@ -431,7 +559,16 @@ async def upload_resume(
 
     matches = await embed_and_rank(db, extracted, creds, prefs)
     await _store_matches(db, resume, matches)
-    return UploadResponse(resume=ResumeOut.model_validate(resume), matches=matches)
+    return _upload_response(resume, matches)
+
+
+def _upload_response(resume: Resume, matches: list[MatchResultOut]) -> UploadResponse:
+    return UploadResponse(
+        resume=ResumeOut.model_validate(resume),
+        matches=matches,
+        preferences=stored_preferences(resume),
+        education=detected_education(resume.extracted_text),
+    )
 
 
 def stored_preferences(resume: Resume) -> JobPreferences | None:
@@ -445,7 +582,7 @@ async def rematch_resume(
     matches = await embed_and_rank(db, resume.extracted_text, creds, stored_preferences(resume))
     await db.execute(delete(MatchResult).where(MatchResult.resume_id == resume.id))
     await _store_matches(db, resume, matches)
-    return UploadResponse(resume=ResumeOut.model_validate(resume), matches=matches)
+    return _upload_response(resume, matches)
 
 
 async def update_preferences(
@@ -509,7 +646,8 @@ async def get_matches(db: AsyncSession, user_id: UUID) -> MatchesResponse:
         """
         SELECT mr.posting_id, mr.score, mr.reason,
                p.title, p.company, p.city, p.province, p.term, p.deadline::text,
-               p.work_mode::text AS work_mode, p.skills
+               p.work_mode::text AS work_mode, p.skills, p.country, p.grad_years,
+               p.fields_of_study, p.description
         FROM match_results mr
         JOIN postings p ON p.id = mr.posting_id
         WHERE mr.resume_id = :resume_id
@@ -519,6 +657,7 @@ async def get_matches(db: AsyncSession, user_id: UUID) -> MatchesResponse:
     )
     rows = (await db.execute(sql, {"resume_id": str(resume.id)})).mappings().all()
 
+    prefs = effective_preferences(stored_preferences(resume), resume.extracted_text)
     items = []
     for row in rows:
         posting_skills = list(row["skills"] or [])
@@ -537,6 +676,8 @@ async def get_matches(db: AsyncSession, user_id: UUID) -> MatchesResponse:
                 work_mode=row["work_mode"] or "",
                 matched_skills=have,
                 missing_skills=[s for s in posting_skills if s not in have],
+                country=row["country"] or "CA",
+                fit_notes=fit_notes(row, prefs, have, len(posting_skills)),
             )
         )
 
@@ -544,4 +685,5 @@ async def get_matches(db: AsyncSession, user_id: UUID) -> MatchesResponse:
         items=items,
         resume=ResumeOut.model_validate(resume),
         preferences=stored_preferences(resume),
+        education=detected_education(resume.extracted_text),
     )

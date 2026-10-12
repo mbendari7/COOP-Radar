@@ -1,11 +1,14 @@
 /**
  * ResumePage: /resume, the heart of CoopRadar.
  *
- *   1. What you're looking for: job types, keywords, location, work mode, level
+ *   1. About you and what you're looking for: program, degree, graduation year, co-op or
+ *      new grad, term, countries, then job types, keywords, location and work mode.
+ *      Program, degree and graduation year are read from the resume when left blank.
  *   2. Your resume (no account needed: a private temporary account is created)
  *   3. Results, in two tabs:
- *      - Matching jobs: ranked for this resume within the preferences, with the skills
- *        each job wants that the resume shows or lacks, plus tailor / cover letter tools
+ *      - Matching jobs: ranked for this resume within the preferences, each with why it fits
+ *        (role, the program and graduation year the posting names, term, skills), the skills
+ *        it wants that the resume shows or lacks, plus tailor / cover letter tools
  *      - Resume feedback: skills found, in-demand skills missing (free) and an AI review
  *        (visitor's own key)
  *
@@ -20,7 +23,7 @@ import { providerName, useAiKey } from '../api/aiKey'
 import { guestLogin, useMe } from '../api/auth'
 import { ApiError } from '../api/client'
 import { usePublicConfig } from '../api/meta'
-import { useFilterMeta, type CategoryKey, type WorkMode } from '../api/postings'
+import { useFilterMeta, type CategoryKey, type CountryCode, type WorkMode } from '../api/postings'
 import { useSavePosting } from '../api/saved'
 import {
   DEFAULT_PREFERENCES,
@@ -32,6 +35,8 @@ import {
   useUpdatePreferences,
   useUploadResume,
   type AIInsights,
+  type Degree,
+  type DetectedEducation,
   type JobPreferences,
   type MatchResultOut,
   type ResumeOut,
@@ -41,17 +46,40 @@ import ConversationPanel from '../components/ConversationPanel'
 import {
   ArrowRightIcon, CheckIcon, ExternalIcon, FileIcon, PinIcon, TrendIcon, UploadIcon,
 } from '../components/Icons'
+import { gradYears } from '../components/filters'
 import { CompanyInitial } from '../components/PostingCard'
-import { formatDate, formatLocation, provinceName, workModeLabel } from '../utils/format'
+import { formatDate, formatLocation, isProvince, provinceName, workModeLabel } from '../utils/format'
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024
 const PREFS_KEY = 'coopradar.preferences'
 const WORK_MODES: WorkMode[] = ['onsite', 'hybrid', 'remote']
 const LEVELS: { value: JobPreferences['level']; label: string }[] = [
-  { value: 'entry', label: 'Students & entry-level' },
-  { value: 'students', label: 'Co-op & intern only' },
-  { value: 'all', label: 'All levels' },
+  { value: 'students', label: 'Co-op or internship' },
+  { value: 'entry', label: 'Co-op, internship or entry-level' },
+  { value: 'all', label: 'Any level' },
 ]
+const DEGREES: { value: Degree; label: string }[] = [
+  { value: 'diploma', label: 'College diploma' },
+  { value: 'bachelors', label: "Bachelor's" },
+  { value: 'masters', label: "Master's" },
+  { value: 'phd', label: 'PhD' },
+]
+const COUNTRIES: { value: CountryCode; label: string }[] = [
+  { value: 'CA', label: 'Canada' },
+  { value: 'US', label: 'United States' },
+]
+
+/** The next six co-op terms (Winter = Jan, Summer = May, Fall = Sep). */
+function upcomingTerms(now: Date = new Date()): string[] {
+  const seasons = [['Winter', 0], ['Summer', 4], ['Fall', 8]] as const
+  const terms: string[] = []
+  for (let year = now.getFullYear(); terms.length < 6; year++) {
+    for (const [name, month] of seasons) {
+      if (new Date(year, month, 1) > now && terms.length < 6) terms.push(`${name} ${year}`)
+    }
+  }
+  return terms
+}
 
 function useCanUseAi(): boolean {
   const aiKey = useAiKey()
@@ -129,6 +157,138 @@ function Toggle({
   )
 }
 
+const fieldClass =
+  'mt-1.5 w-full rounded-md border border-gray-400 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600'
+
+function AboutYou({
+  prefs, onChange, education,
+}: {
+  prefs: JobPreferences
+  onChange: (p: JobPreferences) => void
+  education: DetectedEducation | null
+}) {
+  const { data: meta } = useFilterMeta()
+  const programs = meta?.programs ?? []
+  const found = education && (education.program || education.degree || education.grad_year) ? education : null
+  const fromResume = (text: string) => `From your resume: ${text}`
+  const degreeLabel = DEGREES.find((d) => d.value === education?.degree)?.label
+
+  return (
+    <div className="space-y-5">
+      {found && (
+        <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">
+          We read your resume:{' '}
+          {[found.program_label, degreeLabel, found.grad_year ? `graduating ${found.grad_year}` : '']
+            .filter(Boolean).join(', ')}.
+          {' '}Change anything that's wrong.
+        </p>
+      )}
+
+      <div className="grid gap-4 sm:grid-cols-3">
+        <div className="sm:col-span-3 md:col-span-1">
+          <label htmlFor="pref-program" className="text-sm font-semibold text-gray-900">Program or major</label>
+          <select
+            id="pref-program"
+            value={prefs.program}
+            onChange={(e) => onChange({ ...prefs, program: e.target.value as JobPreferences['program'] })}
+            className={fieldClass}
+          >
+            <option value="">{found?.program_label ? fromResume(found.program_label) : 'Read it from my resume'}</option>
+            {programs.map((p) => <option key={p.key} value={p.key}>{p.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="pref-degree" className="text-sm font-semibold text-gray-900">Degree</label>
+          <select
+            id="pref-degree"
+            value={prefs.degree}
+            onChange={(e) => onChange({ ...prefs, degree: e.target.value as Degree })}
+            className={fieldClass}
+          >
+            <option value="">{degreeLabel ? fromResume(degreeLabel) : 'Read it from my resume'}</option>
+            {DEGREES.map((d) => <option key={d.value} value={d.value}>{d.label}</option>)}
+          </select>
+        </div>
+        <div>
+          <label htmlFor="pref-grad" className="text-sm font-semibold text-gray-900">Graduating in</label>
+          <select
+            id="pref-grad"
+            value={prefs.grad_year ?? ''}
+            onChange={(e) => onChange({ ...prefs, grad_year: e.target.value ? Number(e.target.value) : null })}
+            className={fieldClass}
+          >
+            <option value="">{found?.grad_year ? fromResume(String(found.grad_year)) : 'Read it from my resume'}</option>
+            {gradYears().map((y) => <option key={y} value={y}>{y}</option>)}
+          </select>
+        </div>
+      </div>
+
+      <fieldset>
+        <legend className="text-sm font-semibold text-gray-900">Looking for</legend>
+        <div className="mt-1.5 inline-flex flex-wrap rounded-md border border-gray-400 bg-gray-50 p-1">
+          {LEVELS.map((l) => (
+            <label
+              key={l.value}
+              className={`cursor-pointer rounded px-3 py-1.5 text-sm ${
+                prefs.level === l.value ? 'bg-white font-semibold text-gray-900 shadow-sm ring-1 ring-gray-300' : 'text-gray-700 hover:text-gray-900'
+              }`}
+            >
+              <input
+                type="radio"
+                name="pref-level"
+                className="sr-only"
+                checked={prefs.level === l.value}
+                onChange={() => onChange({ ...prefs, level: l.value })}
+              />
+              {l.label}
+            </label>
+          ))}
+        </div>
+      </fieldset>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div>
+          <label htmlFor="pref-term" className="text-sm font-semibold text-gray-900">
+            Co-op term <span className="font-normal text-gray-500">(optional)</span>
+          </label>
+          <select
+            id="pref-term"
+            value={prefs.term}
+            onChange={(e) => onChange({ ...prefs, term: e.target.value })}
+            className={fieldClass}
+          >
+            <option value="">Any term</option>
+            {upcomingTerms().map((t) => <option key={t} value={t}>{t}</option>)}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">Jobs for this term are ranked higher.</p>
+        </div>
+        <fieldset>
+          <legend className="text-sm font-semibold text-gray-900">Countries</legend>
+          <div className="mt-2.5 flex flex-wrap gap-4">
+            {COUNTRIES.map((c) => (
+              <label key={c.value} className="flex cursor-pointer items-center gap-2 text-sm text-gray-800">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 rounded border-gray-400 text-blue-600 focus:ring-blue-600"
+                  checked={prefs.countries.includes(c.value)}
+                  onChange={(e) => {
+                    const next = e.target.checked
+                      ? [...prefs.countries, c.value]
+                      : prefs.countries.filter((x) => x !== c.value)
+                    onChange({ ...prefs, countries: next.length ? next : ['CA'], province: '', city: '' })
+                  }}
+                />
+                {c.label}
+              </label>
+            ))}
+          </div>
+          <p className="mt-1.5 text-xs text-gray-500">US jobs here are internships and new grad roles.</p>
+        </fieldset>
+      </div>
+    </div>
+  )
+}
+
 function PreferencesForm({
   prefs, onChange, hasResume, saved,
 }: {
@@ -141,7 +301,10 @@ function PreferencesForm({
   const { data: meta } = useFilterMeta()
   const update = useUpdatePreferences()
   const categories = meta?.categories ?? []
-  const dirty = hasResume && !samePrefs(prefs, saved ?? DEFAULT_PREFERENCES)
+  const dirty = hasResume && !samePrefs(prefs, { ...DEFAULT_PREFERENCES, ...(saved ?? {}) })
+  const regions = (meta?.provinces ?? []).filter((p) =>
+    prefs.countries.includes(isProvince(p) ? 'CA' : 'US'),
+  )
 
   const toggle = <T,>(list: T[], value: T) =>
     list.includes(value) ? list.filter((v) => v !== value) : [...list, value]
@@ -150,7 +313,9 @@ function PreferencesForm({
     <div className="space-y-6">
       <fieldset>
         <legend className="text-sm font-semibold text-gray-900">Job type</legend>
-        <p className="mb-2.5 text-sm text-gray-500">Pick any that interest you. Leave empty to see everything.</p>
+        <p className="mb-2.5 text-sm text-gray-500">
+          Pick any that interest you. Leave empty and we'll use the usual job types for your program.
+        </p>
         <div className="flex flex-wrap gap-2">
           {categories.map((c) => (
             <Toggle
@@ -177,7 +342,7 @@ function PreferencesForm({
           value={prefs.keywords}
           onChange={(e) => onChange({ ...prefs, keywords: e.target.value })}
           placeholder="For example: data analyst, frontend, marketing"
-          className="mt-1.5 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm placeholder-gray-500 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+          className={`${fieldClass} placeholder-gray-500`}
         />
         <p className="mt-1 text-xs text-gray-500">Jobs that mention these are ranked higher.</p>
       </div>
@@ -189,10 +354,10 @@ function PreferencesForm({
             id="pref-province"
             value={prefs.province}
             onChange={(e) => onChange({ ...prefs, province: e.target.value, city: '' })}
-            className="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+            className={fieldClass}
           >
-            <option value="">Anywhere in Canada</option>
-            {(meta?.provinces ?? []).map((p) => <option key={p} value={p}>{provinceName(p)}</option>)}
+            <option value="">Anywhere</option>
+            {regions.map((p) => <option key={p} value={p}>{provinceName(p)}</option>)}
           </select>
           <p className="mt-1 text-xs text-gray-500">Remote jobs are always included.</p>
         </div>
@@ -212,29 +377,6 @@ function PreferencesForm({
           </div>
         </fieldset>
       </div>
-
-      <fieldset>
-        <legend className="text-sm font-semibold text-gray-900">Experience level</legend>
-        <div className="mt-1.5 inline-flex flex-wrap rounded-lg border border-gray-300 bg-gray-50 p-1">
-          {LEVELS.map((l) => (
-            <label
-              key={l.value}
-              className={`cursor-pointer rounded-md px-3 py-1.5 text-sm ${
-                prefs.level === l.value ? 'bg-white font-medium text-gray-900 shadow-sm ring-1 ring-gray-200' : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              <input
-                type="radio"
-                name="pref-level"
-                className="sr-only"
-                checked={prefs.level === l.value}
-                onChange={() => onChange({ ...prefs, level: l.value })}
-              />
-              {l.label}
-            </label>
-          ))}
-        </div>
-      </fieldset>
 
       {hasResume && (
         <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 pt-5">
@@ -450,7 +592,7 @@ function MatchCard({ match, rank }: { match: MatchResultOut; rank: number }) {
                 {match.company}
                 <span className="mx-1.5 text-gray-300" aria-hidden="true">|</span>
                 <PinIcon className="mr-0.5 inline h-3.5 w-3.5 -translate-y-px text-gray-400" />
-                {formatLocation(match.city, match.province)}
+                {formatLocation(match.city, match.province, match.country)}
                 {match.work_mode ? ` · ${workModeLabel(match.work_mode)}` : ''}
                 {match.term && match.term !== 'Open' ? ` · ${match.term}` : ''}
               </p>
@@ -466,6 +608,20 @@ function MatchCard({ match, rank }: { match: MatchResultOut; rank: number }) {
           {/* The free ranking's reason only repeats the skill lists below, so show AI reasons only */}
           {!(hasSkills && /^(You have|None of its listed skills)/.test(match.reason)) && (
             <p className="mt-3 text-sm text-gray-700">{match.reason}</p>
+          )}
+
+          {match.fit_notes.length > 0 && (
+            <div className="mt-3">
+              <p className="mb-1.5 text-xs font-medium text-gray-500">Why it fits</p>
+              <ul className="grid gap-x-4 gap-y-1 text-sm text-gray-800 sm:grid-cols-2" role="list">
+                {match.fit_notes.map((n) => (
+                  <li key={n} className="flex items-start gap-1.5">
+                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-green-700" />
+                    {n}
+                  </li>
+                ))}
+              </ul>
+            </div>
           )}
 
           {hasSkills && (
@@ -525,7 +681,7 @@ function MatchesTab({ items, prefs }: { items: MatchResultOut[]; prefs: JobPrefe
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-sm text-gray-600">
           {items.length > 0
-            ? 'Best fits first. Scores compare the skills each job asks for with the ones on your resume.'
+            ? 'Best fits first. Scores weigh your skills, your program and graduation year, and the term you want.'
             : null}
         </p>
         {canUseAi && items.length > 0 && (
@@ -546,7 +702,7 @@ function MatchesTab({ items, prefs }: { items: MatchResultOut[]; prefs: JobPrefe
           <p className="font-medium text-gray-900">No open jobs fit yet</p>
           <p className="mt-1 text-sm text-gray-600">
             {narrowed
-              ? 'Try adding more job types, choosing "Anywhere in Canada", or "All levels" above.'
+              ? 'Try more job types, "Anywhere", adding the United States, or "Co-op, internship or entry-level" above.'
               : 'New jobs are imported every few hours.'}{' '}
             You can also <Link to="/" className="font-medium text-blue-700 hover:underline">browse all jobs</Link>.
           </p>
@@ -716,6 +872,7 @@ export default function ResumePage() {
   const { data, isLoading } = useMatches(Boolean(me))
   const resume = data?.resume ?? null
   const savedPrefs = data?.preferences ?? null
+  const education = data?.education ?? null
   const [prefs, setPrefs] = useState<JobPreferences>(loadLocalPrefs)
   const [tab, setTab] = useState<'jobs' | 'feedback'>('jobs')
 
@@ -736,16 +893,26 @@ export default function ResumePage() {
   return (
     <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:py-8">
       <header>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Match your resume to real jobs</h1>
+        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Find co-op jobs that fit you</h1>
         <p className="mt-2 max-w-2xl text-gray-600">
-          Tell us what you're looking for, upload your resume, and see the openings it fits best, with
-          the skills each one wants.
+          Tell us about your studies and what you want, upload your resume, and see the jobs you're a
+          good fit for: matched to your program, graduation year and skills, using what each job
+          description asks for.
         </p>
       </header>
 
       <StepCard
         step={1}
-        title="What are you looking for?"
+        title="About you"
+        subtitle="Leave these on 'Read it from my resume' and we'll find them for you."
+        done={Boolean(resume)}
+      >
+        <AboutYou prefs={prefs} onChange={changePrefs} education={education} />
+      </StepCard>
+
+      <StepCard
+        step={2}
+        title="What kind of job?"
         subtitle="Matches only include jobs that fit these. You can change them any time."
         done={Boolean(resume)}
       >
@@ -753,9 +920,9 @@ export default function ResumePage() {
       </StepCard>
 
       <StepCard
-        step={2}
+        step={3}
         title="Your resume"
-        subtitle={resume ? undefined : 'We read the skills on it and rank open jobs for you.'}
+        subtitle={resume ? undefined : 'We read your skills and studies, and rank open jobs for you.'}
         done={Boolean(resume)}
       >
         {meLoading || (me && isLoading) ? (

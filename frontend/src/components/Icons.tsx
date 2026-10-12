@@ -27,9 +27,9 @@ type P = { className?: string }
 
 export const LogoMark = ({ className = 'h-7 w-7' }: P) => (
   <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
-    <rect width="32" height="32" rx="7" fill="#245840" />
-    <circle cx="16" cy="16" r="9" fill="none" stroke="#bbdcc9" strokeWidth="2" />
-    <circle cx="16" cy="16" r="4.5" fill="none" stroke="#bbdcc9" strokeWidth="2" />
+    <rect width="32" height="32" rx="7" fill="#1f4a8f" />
+    <circle cx="16" cy="16" r="9" fill="none" stroke="#b9d0f0" strokeWidth="2" />
+    <circle cx="16" cy="16" r="4.5" fill="none" stroke="#b9d0f0" strokeWidth="2" />
     <path d="M16 16 L23 9" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
     <circle cx="16" cy="16" r="2" fill="#fff" />
   </svg>

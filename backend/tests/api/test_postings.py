@@ -399,3 +399,73 @@ async def test_filter_meta_lists_job_types_and_employers(
     assert counts["software"] == 2
     assert counts["design"] == 0
     assert body["categories"][0]["label"] == "Software & web"
+
+
+# --- Country, program of study, graduation year --------------------------------
+
+async def test_country_filter_and_role(client: AsyncClient, db_session: AsyncSession) -> None:
+    await add(
+        db_session,
+        make_posting(title="Data Co-op", city="Toronto", province="ON"),
+        make_posting(title="Software Engineer Intern", city="Austin", province="TX", country="US"),
+    )
+
+    ca = (await client.get("/api/postings?country=CA")).json()
+    both = (await client.get("/api/postings?country=CA&country=US")).json()
+
+    assert [p["title"] for p in ca["items"]] == ["Data Co-op"]
+    assert both["total"] == 2
+    roles = {p["title"]: (p["role"], p["country"]) for p in both["items"]}
+    assert roles == {"Data Co-op": ("coop", "CA"), "Software Engineer Intern": ("internship", "US")}
+    assert (await client.get("/api/postings?country=FR")).status_code == 422
+
+
+async def test_program_filter_uses_named_fields_or_job_types(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await add(
+        db_session,
+        # names Mechanical Engineering in the description
+        make_posting(title="Operations Co-op", fields_of_study=["mechanical", "engineering"]),
+        # a hardware title, nothing named
+        make_posting(title="Embedded Firmware Intern"),
+        make_posting(title="Account Executive"),
+    )
+
+    body = (await client.get("/api/postings?program=mechanical_engineering")).json()
+
+    assert {p["title"] for p in body["items"]} == {"Operations Co-op", "Embedded Firmware Intern"}
+    assert (await client.get("/api/postings?program=astrology")).status_code == 422
+
+
+async def test_grad_year_filter_keeps_jobs_that_do_not_say(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await add(
+        db_session,
+        make_posting(title="For 2027 grads", grad_years=[2027]),
+        make_posting(title="For 2028 grads", grad_years=[2028, 2029]),
+        make_posting(title="Not stated"),
+    )
+
+    body = (await client.get("/api/postings?grad_year=2028")).json()
+
+    assert {p["title"] for p in body["items"]} == {"For 2028 grads", "Not stated"}
+
+
+async def test_filter_meta_counts_countries_and_work_modes(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await add(
+        db_session,
+        make_posting(title="A", work_mode=WorkMode.remote),
+        make_posting(title="B Intern", country="US", province="CA", city="San Francisco"),
+    )
+
+    body = (await client.get("/api/postings/meta/filters")).json()
+
+    assert {c["code"]: c["count"] for c in body["countries"]} == {"CA": 1, "US": 1}
+    assert {m["key"]: m["count"] for m in body["work_modes"]} == {
+        "onsite": 0, "hybrid": 1, "remote": 1,
+    }
+    assert {"key": "computer_science", "label": "Computer Science"} in body["programs"]

@@ -5,7 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { aiHeaders } from './aiKey'
 import { API_BASE, apiFetch, toApiError } from './client'
-import type { CategoryKey, WorkMode } from './postings'
+import type { CategoryKey, CountryCode, ProgramKey, WorkMode } from './postings'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -30,6 +30,19 @@ export interface MatchResultOut {
   /** The posting's skills that the resume shows, and the ones it doesn't */
   matched_skills: string[]
   missing_skills: string[]
+  country: string
+  /** Why the job fits, read from its description: role, program, graduation year, term, skills */
+  fit_notes: string[]
+}
+
+export type Degree = '' | 'diploma' | 'bachelors' | 'masters' | 'phd'
+
+/** What was read from the resume's education section ('' / null when not found) */
+export interface DetectedEducation {
+  program: ProgramKey | ''
+  program_label: string
+  degree: Degree
+  grad_year: number | null
 }
 
 /** What the student is looking for; matching only considers jobs that fit. */
@@ -41,21 +54,32 @@ export interface JobPreferences {
   work_modes: WorkMode[]
   /** entry: students + entry-level · students: co-op/intern only · all */
   level: 'entry' | 'students' | 'all'
+  /** About the student; blank = read from the resume */
+  program: ProgramKey | ''
+  degree: Degree
+  grad_year: number | null
+  /** Co-op term they want, e.g. "Summer 2027" */
+  term: string
+  countries: CountryCode[]
 }
 
 export const DEFAULT_PREFERENCES: JobPreferences = {
-  categories: [], keywords: '', province: '', city: '', work_modes: [], level: 'entry',
+  categories: [], keywords: '', province: '', city: '', work_modes: [], level: 'students',
+  program: '', degree: '', grad_year: null, term: '', countries: ['CA'],
 }
 
 export interface UploadResponse {
   resume: ResumeOut
   matches: MatchResultOut[]
+  preferences?: JobPreferences | null
+  education?: DetectedEducation | null
 }
 
 export interface MatchesResponse {
   items: MatchResultOut[]
   resume: ResumeOut | null
   preferences?: JobPreferences | null
+  education?: DetectedEducation | null
 }
 
 export interface DemandSkill {

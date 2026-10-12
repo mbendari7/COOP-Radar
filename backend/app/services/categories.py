@@ -7,6 +7,7 @@ can belong to more than one type ("Data Engineer" is both software and data).
 Postgres regex: \\m = start of word, \\M = end of word.
 """
 
+import re
 from collections.abc import Sequence
 from typing import Any, Literal
 
@@ -83,6 +84,12 @@ CATEGORIES: dict[str, tuple[str, str]] = {
 def category_clause(key: str) -> Any:
     """SQL condition: the posting's title fits this job type."""
     return Posting.title.op("~*")(CATEGORIES[key][1])
+
+
+def title_fits(key: str, title: str) -> bool:
+    """The same check as category_clause, in Python (Postgres \\m and \\M become \\b)."""
+    pattern = CATEGORIES[key][1].replace(r"\m", r"\b").replace(r"\M", r"\b")
+    return re.search(pattern, title, re.IGNORECASE) is not None
 
 
 def any_category(keys: Sequence[str]) -> Any:
