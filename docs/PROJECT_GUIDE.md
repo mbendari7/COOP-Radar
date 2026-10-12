@@ -23,15 +23,19 @@ Start with the shorter guides if you haven't: **[USER_GUIDE.md](USER_GUIDE.md)**
 
 ## 1. The big picture
 
-CoopRadar is a **monorepo** with a Python API, a React single-page app, and five Docker containers:
+CoopRadar is a **monorepo** with a Python API and a React single-page app. It runs as **one server process plus
+one PostgreSQL database**. No Docker, no Redis, no separate worker are required:
 
-| Container | What it is | Why it exists |
+| Piece | What it is | Why it exists |
 |---|---|---|
-| `db` | PostgreSQL 16 (`pgvector/pgvector:pg16` image) | Single source of truth. Also does keyword search (`tsvector`), skill-overlap ranking (array `unnest`), and optional vector search (`pgvector`), so there's no separate search engine to run. |
-| `redis` | Redis 7 | Three jobs: login sessions, rate-limit counters, and the RQ job queue. |
-| `api` | FastAPI on Uvicorn, port 8000 | Every HTTP endpoint. Runs `alembic upgrade head` on start. |
-| `worker` | `python -m app.worker` (same image as `api`) | Executes background jobs (ingesting feeds, generating embeddings) and schedules ingest runs every 6 hours. |
-| `web` | Vite dev server, port 5173 | Serves the React app with hot reload and **proxies `/api` to `api`**, so the browser only ever talks to one origin. |
+| Database | PostgreSQL 16 + `pgvector` (on your computer `start.py` runs one from the `pgserver` pip package; online, any managed Postgres) | Single source of truth. Also does keyword search (`tsvector`), skill-overlap ranking (array `unnest`), optional vector search (`pgvector`), and holds login sessions (`kv_store`), so there's no search engine or cache to run. |
+| API | FastAPI on Uvicorn, port 8000 | Every HTTP endpoint, plus the built React site (`mount_frontend`), so one address serves everything. |
+| Background jobs | asyncio tasks inside the API process (`app/jobs.py`) | Import career boards every 6 hours and generate embeddings, without making requests wait. |
+| Session store | `app/store.py` | Login sessions and rate-limit counters: the Postgres `kv_store` table, or Redis when `REDIS_URL` is set. |
+| Vite dev server | port 5173, only with `python start.py --dev` | Hot reload while editing; **proxies `/api` to the API**, so the browser only ever talks to one origin. |
+
+`start.py` ties it together: it creates `backend/.venv`, installs packages, builds the site, starts the database,
+runs `alembic upgrade head` and the seed, then starts Uvicorn.
 
 Three external services are optional: **Anthropic** (Claude) for re-ranking, extraction, and Q&A; **OpenAI** for
 embeddings; and **public job feeds** for postings. Without API keys the app still works; the AI features degrade
@@ -48,11 +52,12 @@ The guiding rules (from `.specify/memory/constitution.md`) explain most design d
 ## 2. Your first run (and what to check)
 
 ```bash
-cp .env.example .env              # set POSTGRES_PASSWORD; add ANTHROPIC_API_KEY / OPENAI_API_KEY if you have them
-docker compose up --build         # wait for "Application startup complete" from api
-docker compose exec api python -m seed            # 55 postings, 106 skills, 2 demo sources
-docker compose exec api python -m app.ingest.embed  # vectors for semantic search + matching (OpenAI key)
+python start.py --dev     # site with hot reload on http://localhost:5173, API docs on http://localhost:8000/docs
 ```
+
+Optional: copy `.env.example` to `.env` to add `ANTHROPIC_API_KEY` / `OPENAI_API_KEY`, or set
+`SEED_SAMPLE_POSTINGS=true` for 55 made-up postings and `SEED_DEV_SOURCES=true` for two Admin-page demo sources.
+With an OpenAI key, missing embeddings are generated in the background on start.
 
 Then walk through the app and check that each piece works. This doubles as your manual test plan:
 
@@ -140,11 +145,13 @@ erDiagram
 | `ingest_runs` | status (`running`/`success`/`partial`/`failed`), added/updated/closed/errors, error_log | |
 | `skills` | name (unique), aliases `text[]`, category | The taxonomy used by extraction (`seed/skills.py`). |
 | `posting_embeddings` | posting_id (PK), embedding `vector(1536)`, model | HNSW index with `vector_cosine_ops` for fast `<=>` queries. |
-| `resumes` | user_id (unique: one per user), filename, file_size, extracted_text | The file itself is never stored. |
+| `resumes` | user_id (unique: one per user), filename, file_size, extracted_text, insights `jsonb`, preferences `jsonb` | The file itself is never stored. `preferences` (job types, keywords, location, work modes, level) limits matching. |
 | `match_results` | resume_id, posting_id (unique together), score 0–100, reason | Replaced on every upload. |
+| `kv_store` | key (PK), fields `jsonb`, counter, expires_at | Login sessions and rate-limit counters when Redis isn't configured (`app/store.py`). Expired rows are ignored and purged by the scheduler. |
 
 **Migrations** (`backend/alembic/versions/`) build this schema step by step: 0001 postings, 0002 auth and saved
-postings, 0003 tracker events, 0004 ingestion, pgvector, and admin, 0005 resume matcher. Two subtleties:
+postings, 0003 tracker events, 0004 ingestion, pgvector, and admin, 0005 resume matcher, 0006 demo users, 0007
+career boards and cached insights, 0008 the `kv_store` session table, 0009 `resumes.preferences` (what the student is looking for). Two subtleties:
 - Generated columns may only call IMMUTABLE functions. `array_to_string()` is only STABLE, so 0001 creates the
   wrapper `coopradar_skills_text()`. The model attaches the same function so `create_all()` (used by tests) works.
 - Every index exists in **both** the migration and the model's `__table_args__`. CI runs `alembic check` to prove
@@ -156,14 +163,14 @@ postings, 0003 tracker events, 0004 ingestion, pgvector, and admin, 0005 resume 
 
 | File | Responsibility |
 |---|---|
-| `app/main.py` | `create_app()`: lifespan (checks the DB, opens the Redis pool), CORS, the flat error handler, routers under `/api`, and `/api/health`. |
+| `app/main.py` | `create_app()`: lifespan (checks the DB, opens the session store, starts the background scheduler), CORS, the flat error handler, routers under `/api`, and `/api/health`. |
 | `app/config.py` | `Settings` (pydantic-settings) reads every env var once (`get_settings()` is cached). AI keys and models live here. |
 | `app/db.py` | Async engine (`pool_pre_ping`), `AsyncSessionLocal`, and the `get_db` dependency (one session per request). |
-| `app/redis.py` | Creates the async Redis pool at startup; `get_redis` dependency. |
-| `app/deps.py` | `get_current_user` (cookie → Redis `session:<token>` → `users` row; refreshes the 7-day TTL; 401/503), `get_optional_user` (same, but `None` instead of 401), `get_admin_user` (403 unless `is_admin`). |
+| `app/store.py` | The `Store` protocol (`hget/hset/incr/expire/delete`), `PostgresStore` on the `kv_store` table, `create_store()` (Redis when `REDIS_URL` is set), and the `get_store` dependency. |
+| `app/deps.py` | `get_current_user` (cookie → store `session:<token>` → `users` row; refreshes the 7-day TTL; 401/503), `get_optional_user` (same, but `None` instead of 401), `get_admin_user` (403 unless `is_admin`). |
 | `app/llm.py` | `get_client()` builds the Anthropic client from settings; `response_text()` joins text blocks and skips thinking blocks; `parse_json()` tolerates code fences and prose. |
-| `app/worker.py` | RQ worker plus a scheduler thread that enqueues due ingest sources every 10 minutes. Also `create_queue()`, used by the API to enqueue jobs. |
-| `app/api/postings.py` | List, detail, similar, filter metadata, CSV upload (rate-limited 3/hour per user via a Redis counter), manual create. |
+| `app/jobs.py` | `enqueue(name, *args)` runs a registered job (`run_source`, `embed_posting`) as an asyncio task, at most 3 at a time; `scheduler()` imports due sources one by one every 10 minutes and purges expired sessions. |
+| `app/api/postings.py` | List, detail, similar, filter metadata, CSV upload (rate-limited 3/hour per user via a store counter), manual create. |
 | `app/api/auth.py`, `me.py` | Register, login (5 failed attempts / 15 min → 429), logout, demo + guest temporary accounts, profile, change password, delete account, claim (keep) a temporary account. |
 | `app/api/saved.py` | Tracker CRUD, status changes (each one writes an event), CSV export. |
 | `app/api/resume.py` | Upload (AI optional)/get/delete a resume, list matches, AI re-rank, insights (GET free + cached / POST AI review), and the SSE assistant (`mode`: question · tailor · cover_letter). |
@@ -193,11 +200,11 @@ postings, 0003 tracker events, 0004 ingestion, pgvector, and admin, 0005 resume 
 - The perf test inserts 10,000 postings and checks p95 latency < 300 ms (measured: ~55 ms).
 
 ### 6.2 Auth and sessions (`services/auth.py`, `deps.py`)
-1. Register/login → argon2id hash/verify → `secrets.token_hex(32)` → Redis `HSET session:<token> user_id …` with a
+1. Register/login → argon2id hash/verify → `secrets.token_hex(32)` → store `hset session:<token> user_id …` with a
    7-day TTL.
 2. The cookie `session=<token>` is HttpOnly (JS can't read it), SameSite=Lax (CSRF protection), and Secure.
 3. Every authenticated request runs `get_current_user`, which also resets the TTL (a sliding session).
-4. Logout deletes the Redis key, so the session dies immediately. Unknown email and wrong password return the same
+4. Logout deletes the store key, so the session dies immediately. Unknown email and wrong password return the same
    401 (no account enumeration), and an unknown email still runs a dummy hash so response timing matches.
 
 ### 6.3 Application tracker (`services/saved_postings.py`)
@@ -207,13 +214,13 @@ postings, 0003 tracker events, 0004 ingestion, pgvector, and admin, 0005 resume 
   `deadlines_this_week` (postings due in the next 7 days that aren't offer/rejected/withdrawn).
 - Every query is scoped by `user_id`. Another user's saved ID returns 404, never 403, so you can't probe for IDs.
 
-### 6.4 Ingestion pipeline (`ingest/`, `worker.py`)
+### 6.4 Ingestion pipeline (`ingest/`, `jobs.py`)
 
 ```mermaid
 flowchart TD
-    T["Scheduler thread (every 10 min:<br/>sources not run in 6 h)"] --> Q[(RQ queue 'ingest')]
-    A["Admin: Run now<br/>(creates IngestRun 'running')"] --> Q
-    Q --> R["runner.run_source(source_id, run_id?)"]
+    T["Scheduler task (every 10 min:<br/>sources not run in 6 h, one at a time)"] --> R
+    A["Admin: Run now<br/>(commits IngestRun 'running', then jobs.enqueue)"] --> R
+    R["runner.run_source(source_id, run_id?)"]
     R --> AD["adapter_for(source).fetch()<br/>json_api (httpx, retries) or rss (feedparser)"]
     AD --> L{"for each RawPosting"}
     L -->|"same source + source_ref exists"| U["update fields, re-open → updated++"]
@@ -222,7 +229,7 @@ flowchart TD
     X --> I["insert → added++"]
     L --> C["postings from this source missing from the feed → closed_at = now"]
     C --> F["3 consecutive failures → auto_paused"]
-    I --> E["after commit: enqueue run_embed_job per new posting"]
+    I --> E["after commit: jobs.enqueue('embed_posting') per new posting"]
 ```
 
 **Career boards (the main source):** `seed/job_boards.py` lists 27 employers as `(company, adapter_type, board)`,
@@ -240,7 +247,12 @@ a `field_map`, or write an adapter (see recipes). Always check the site's terms 
    applies via `services/usage.py`). Upload uses `ai_credentials("rank", optional=True)`: with no key at all it gets
    `None` and ranks for free. AI-only endpoints (`rematch`, insights `POST`, `ask`) return 400 `AI_KEY_REQUIRED`.
 2. **Upload**: the extension must be `.pdf`/`.docx` and the file ≤ 5 MB. Text comes out via pypdf/python-docx, and
-   empty text gives 422. The old resume is deleted (its matches cascade), and the new one is stored.
+   empty text gives 422. The old resume is deleted (its matches cascade), and the new one is stored with the
+   `preferences` form field (or the old resume's preferences when none is sent).
+   **Preferences** (`JobPreferences`): `preference_filters()` turns job types (`services/categories.py`, title regexes),
+   province/city (remote always passes), work modes and level into `WHERE` clauses for both shortlists, and
+   keywords add +0.3 in `_student_fit` via `websearch_to_tsquery`. `PUT /api/resume/preferences` saves them and
+   re-matches, using only the visitor's own key, never the owner's quota.
 3. **Stage 1, recall (`find_candidates`)**: by default, `skills_in_text` finds which posting skills appear in the
    resume (`skill_match.mentions`: whole-word, so "C" ≠ "C++", plus context rules for C/R/Go/Spring), and SQL ranks
    open postings by coverage = matched ÷ `greatest(cardinality(skills), 3)`, adjusted by `_student_fit` (×0.5 for
@@ -303,37 +315,38 @@ the visitor per posting. SQL narrows thousands of postings to 40, then one LLM c
 | SSE reader | `api/resume.ts → askAboutPosting` | Reads `res.body` with a stream reader, splits on lines, and parses `data:` events. |
 
 In development the browser only talks to `localhost:5173`; Vite forwards `/api/*` to the API (`API_PROXY_TARGET`).
-The cookie is therefore first-party and CORS never comes into play. In production there's no proxy at all: the
-root `Dockerfile` copies the built site into the API image and `main.py → mount_frontend` serves it from the same
-origin (see `docs/DEPLOY.md`).
+The cookie is therefore first-party and CORS never comes into play. Without `--dev` (and on a host) there's no proxy at all:
+`start.py` points `STATIC_DIR` at `frontend/dist` and `main.py → mount_frontend` serves the built site from the
+same origin (see `docs/DEPLOY.md`).
 
 ---
 
 ## 8. Testing: how it works and why
 
-**Backend** (`backend/tests/`, 234 tests):
+**Backend** (`backend/tests/`, 244 tests):
 - `conftest.py` rebuilds the schema once per session (`drop_all`/`create_all`, after enabling `vector`). Each
   test then runs inside an outer transaction with
   `join_transaction_mode="create_savepoint"`, so a service's `commit()` only releases a savepoint and everything
   rolls back after the test. Tests are isolated yet exercise the real commit paths.
-- `client` is an httpx client on the real app with `get_db`/`get_redis` overridden. It keeps cookies, so
+- `client` is an httpx client on the real app with `get_db`/`get_store` overridden (an in-memory store). It keeps cookies, so
   "register then call a protected endpoint" just works. The test env sets `COOKIE_SECURE=false` because httpx
   won't send Secure cookies over `http://test`.
-- `fake_queue` (autouse) replaces RQ. `mock_claude_create`, `mock_claude_stream`, and `mock_embedding` replace AI
+- `fake_queue` (autouse) stops background jobs from starting (assert on `fake_queue.enqueue`). `mock_claude_create`, `mock_claude_stream`, and `mock_embedding` replace AI
   calls, so **no test touches the network**.
 - Folders: `api/` endpoints (incl. guest/claim, students-only, free matching, student fit) · `ingest/` career-board
   adapters (respx-mocked recorded responses), location parsing, skill matching, runner, dedup, extraction, admin ·
   `resume/` upload, matching, insights, tailor/cover-letter modes, Q&A · `eval/` output-handling cases for the
-  matcher · `perf/` the 10k-row latency budget (`-m perf`).
+  matcher · `perf/` the 10k-row latency budget (`-m perf`). `api/test_store_and_jobs.py` covers the Postgres
+  session store (expiry, counters) and the background jobs.
 
 **Frontend** (`frontend/tests/`, 27 tests): FilterBar, PostingsTable (incl. Live badge, location formatting),
 DemoButton, ResumePage (guest-then-upload flow, file validation), RichText, the AI key store + page, and the API
 client, using Vitest + Testing Library in jsdom.
 
 **CI** (`.github/workflows/ci.yml`) on every push runs ruff → mypy --strict → migrations up/down/up →
-`alembic check` → pytest → perf for the backend, eslint → tsc → vitest → `vite build` for the frontend, then builds
-the production image with `docker-compose.prod.yml` and smoke-tests the site, the resume page, the API (incl.
-`students_only`), and demo and guest accounts.
+`alembic check` → pytest → perf for the backend, eslint → tsc → vitest → `vite build` for the frontend, then runs the
+Render build command and `python start.py --hosted` against a fresh Postgres and smoke-tests the site, the resume
+page, the API (incl. `students_only`), demo and guest accounts, and that a guest session works on the next request.
 
 ---
 
@@ -369,10 +382,10 @@ The project was built **spec-first** with [Spec Kit](https://github.com/github/s
 
 ## 10. Recipes: common changes, step by step
 
-**Add a filter (e.g. `company`)**
-1. `schemas/posting.py`: add `company: str | None = None` to `PostingListParams`.
-2. `services/postings.py`: `if params.company: stmt = stmt.where(Posting.company.ilike(params.company))`.
-3. The index already exists (`idx_postings_company`). For a new column, add it to the model *and* a migration.
+**Add a filter (e.g. `team`)** (`company`, `category` and `posted_within` are worked examples)
+1. `schemas/posting.py`: add `team: list[str] | None = None` to `PostingListParams` (validate allowed values).
+2. `services/postings.py`: `if params.team: stmt = stmt.where(Posting.team.in_(params.team))`.
+3. Add an index for a new column. For a new column, add it to the model *and* a migration.
 4. Test in `tests/api/test_postings.py`: two postings, filter, assert one.
 5. Frontend: add to `PostingListParams`/`buildQueryString` in `api/postings.ts`, a URL param in
    `PostingsListPage`, and a control in `FilterBar` (+ a vitest).
@@ -387,7 +400,7 @@ plus an error) → TS type + hook → UI. The `api-conventions` skill has the ch
 3. Add a recorded response under `tests/fixtures/ingest/` and a test with `respx` (no live network).
 4. Insert a source row and click **Run now** in Admin.
 
-**Change AI models**: set `AGENT_MODEL` / `FAST_MODEL` in `.env` and restart `api` and `worker`. No code changes.
+**Change AI models**: set `AGENT_MODEL` / `FAST_MODEL` in `.env` and restart `start.py`. No code changes.
 
 **Change a prompt**: edit `_SYSTEM_PROMPT` (Q&A), `_RERANK_PROMPT` (matching), or the prompt in
 `ingest/extract.py`. Run `pytest tests/resume tests/eval`, then spot-check real answers with a key.
@@ -408,7 +421,7 @@ is a classic bug class:
 | SQL injection via `?skills=` | `text(f"ARRAY{skills!r}")` put user input into SQL | Use ORM operators or bound parameters; never f-strings in SQL. |
 | CSV/manual postings vanished | The service called `flush()` but never `commit()` | Tests that share one session hide this. Assert on a fresh read. |
 | Re-running ingestion closed every posting | Dedup ran before the source_ref check, so seen refs were never recorded | Order of checks matters; test the "run twice" case. |
-| Admin "Run now" blocked forever | It created a `running` row the worker never finished | Pass IDs between producer and consumer. |
+| Admin "Run now" blocked forever | It created a `running` row the background job never finished | Pass IDs between producer and consumer. |
 | No embeddings were ever generated | `enqueue_embed_job` was defined but never called | Trace a feature end to end, not just its unit tests. |
 | Q&A/re-rank would break on current models | `content[0].text` assumed the first block is text; current models emit thinking blocks first | Read responses by block type (`app/llm.py`). |
 | Tests never ran | Secure cookies over http, mismatched error shapes, removed pytest-asyncio API | A suite that hasn't run proves nothing; run it in CI. |
@@ -438,13 +451,14 @@ is a classic bug class:
 
 | Symptom | Fix |
 |---|---|
-| My resume shows no matches | No open postings yet. On a fresh site the worker imports the career boards within a few minutes (`docker compose logs worker`), or click **Run now** on the Admin page. |
-| No jobs at all after deploy | Check the worker started (`RUN_WORKER=true`) and outbound internet is allowed; check `ingest_runs.error_log` on the Admin page. |
+| My resume shows no matches | No open postings yet. On a fresh site the scheduler imports the career boards within a few minutes (watch the `start.py` terminal), or click **Run now** on the Admin page. |
+| No jobs at all after deploy | Check `BACKGROUND_JOBS` isn't `false` and outbound internet is allowed; check `ingest_runs.error_log` on the Admin page. |
 | A resume shows "We couldn't spot any listed skills" | The PDF is an image, or it has no skills the postings mention. Try a text-based PDF with a Skills line. |
 | AI buttons say "Add your own AI key…" | Expected without a key: add one on **AI key** (or set the owner's `ANTHROPIC_API_KEY`). |
-| Logged in but still treated as logged out | You're calling the API on another origin. Use the app at `localhost:5173` (proxy), or set `VITE_API_URL` **and** `CORS_ORIGINS`. |
-| "Run now" returns 503 `QUEUE_UNAVAILABLE` | Redis or the worker isn't running: `docker compose ps`, then `docker compose logs worker`. |
+| Logged in but still treated as logged out | You're calling the API on another origin. Use the app at `localhost:8000` (or `:5173` with `--dev`), or set `VITE_API_URL` **and** `CORS_ORIGINS`. |
+| "Run now" returns 503 `QUEUE_UNAVAILABLE` | The background job couldn't start; check the server log for the error. |
 | A source shows "Auto-paused" | 3 consecutive failures. Fix the URL/config, then click **Re-enable**. |
 | `alembic check` fails after editing a model | Generate a migration (`/db-migration`). |
-| Tests fail with `extension "vector" is not available` | Point `DATABASE_URL` at the pgvector image, not plain Postgres. |
-| Start over | `docker compose down -v && docker compose up --build`, then re-seed. |
+| Tests fail with `extension "vector" is not available` | Point `DATABASE_URL` at a Postgres with pgvector installed (e.g. one started with `pgserver`), not plain Postgres. |
+| `start.py` says the database wasn't shut down cleanly | Normal after a crash or a closed window: Postgres repairs itself in under a minute and `start.py` waits for it. |
+| Start over | Stop `start.py`, delete the `.coopradar` folder in your home folder, run `python start.py` again. |

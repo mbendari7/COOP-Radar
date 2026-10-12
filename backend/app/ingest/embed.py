@@ -4,7 +4,7 @@ Embedding generation and storage (OpenAI text-embedding-3-small, 1536 dims).
 generate_embedding  — calls OpenAI and returns a list[float].
 store_embedding     — upserts the vector into posting_embeddings (no commit).
 embed_posting       — builds the text for one posting, embeds it, and stores it.
-enqueue_embed_job   — pushes an embedding job to the RQ queue (best effort).
+enqueue_embed_job   — embeds a posting in the background (best effort).
 backfill            — embeds every posting that has no vector yet.
 
 Postings need embeddings for semantic search, "similar postings", and resume
@@ -81,30 +81,26 @@ async def embed_posting(db: AsyncSession, posting_id: UUID) -> bool:
 
 def enqueue_embed_job(posting_id: UUID) -> None:
     """
-    Push an embedding job to the RQ queue so the request that created the posting
-    doesn't wait on OpenAI. Failures are logged, never raised: a posting without a
+    Embed the posting in the background so the request that created it doesn't wait
+    on OpenAI. Failures are logged, never raised: a posting without a
     vector still works for keyword search and can be backfilled later.
-    Skipped when the site has no OPENAI_API_KEY (smart search off), so failing jobs never
-    pile up in Redis.
+    Skipped when the site has no OPENAI_API_KEY (smart search off), so no job is started
+    only to fail.
     """
     from app.config import get_settings
 
     if not get_settings().openai_api_key:
         return
     try:
-        from app.worker import create_queue
+        from app import jobs
 
-        create_queue().enqueue("app.ingest.embed.run_embed_job", str(posting_id))
+        jobs.enqueue("embed_posting", str(posting_id))
     except Exception as exc:  # noqa: BLE001
         logger.warning("Could not enqueue embedding job for %s: %s", posting_id, exc)
 
 
-def run_embed_job(posting_id_str: str) -> None:
-    """RQ job entry point (RQ workers are synchronous)."""
-    asyncio.run(_run_embed_async(UUID(posting_id_str)))
-
-
-async def _run_embed_async(posting_id: UUID) -> None:
+async def embed_one(posting_id: UUID) -> None:
+    """Background job entry point: embed one posting and commit."""
     from app.db import AsyncSessionLocal
 
     async with AsyncSessionLocal() as db:

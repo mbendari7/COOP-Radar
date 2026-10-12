@@ -10,7 +10,7 @@ export function SearchModeToggle({ value, onChange }: SearchModeToggleProps) {
     <div
       role="group"
       aria-label="Search mode"
-      className="inline-flex rounded-md border border-gray-300 overflow-hidden"
+      className="inline-flex rounded-lg border border-gray-300 overflow-hidden bg-white"
     >
       <button
         type="button"

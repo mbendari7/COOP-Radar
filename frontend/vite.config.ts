@@ -7,7 +7,7 @@ export default defineConfig({
     port: 5173,
     // The browser calls /api on this same origin and Vite forwards it to FastAPI,
     // so session cookies are first-party and no CORS is involved.
-    // docker-compose sets API_PROXY_TARGET=http://api:8000 (the container name).
+    // `python start.py --dev` sets API_PROXY_TARGET to the API server it starts.
     proxy: {
       '/api': {
         target: process.env.API_PROXY_TARGET ?? 'http://localhost:8000',

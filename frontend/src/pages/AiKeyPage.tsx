@@ -74,7 +74,7 @@ export default function AiKeyPage() {
         <h1 className="text-2xl font-bold text-gray-900">Your AI key</h1>
         <p className="mt-2 text-gray-600">
           The free features (skills found, in-demand skills, skill-based job matches) need no key. The AI
-          extras — a full resume review, smarter job ranking, tailoring tips, and cover letter openers — run
+          extras (a full resume review, smarter job ranking, tailoring tips and cover letter openers) run
           on <strong>your own</strong> AI account. Gemini has a free tier: pick a provider, get a key in a
           couple of minutes, and paste it here.
         </p>
@@ -91,7 +91,7 @@ export default function AiKeyPage() {
         <section className="rounded-xl border border-green-200 bg-green-50 p-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <p className="text-sm font-semibold text-green-900">
-              ✓ Using your {providerName(saved.provider)} key ({mask(saved.apiKey)})
+              Using your {providerName(saved.provider)} key ({mask(saved.apiKey)})
             </p>
             <p className="text-sm text-green-800">
               Model: <code>{saved.model}</code> · {saved.remember ? 'remembered on this device' : 'until you close this tab'}
@@ -172,7 +172,7 @@ export default function AiKeyPage() {
             disabled={apiKey.trim().length < 8 || check.isPending}
             className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
           >
-            {check.isPending ? 'Checking…' : 'Check key'}
+            {check.isPending ? 'Checking...' : 'Check key'}
           </button>
         </form>
         {check.isError && (
@@ -182,7 +182,7 @@ export default function AiKeyPage() {
         {checked && (
           <div className="mt-4 rounded-xl border border-gray-200 bg-white p-4 space-y-3">
             <p className="text-sm text-green-700 font-medium">
-              ✓ Key works — {checked.models.length} model{checked.models.length === 1 ? '' : 's'} available.
+              Key works. {checked.models.length} model{checked.models.length === 1 ? '' : 's'} available.
             </p>
             {checked.models.length > 0 ? (
               <>
@@ -227,7 +227,7 @@ export default function AiKeyPage() {
       <section className="rounded-xl bg-gray-100 p-4 text-sm text-gray-600 space-y-1">
         <h2 className="font-semibold text-gray-800">Is my key safe?</h2>
         <p>Your key is kept in <strong>this browser only</strong>. It's sent with AI requests, over HTTPS, so our
-          server can pass it to {providerName(provider)} for that one request — it's never saved or logged on the
+          server can pass it to {providerName(provider)} for that one request. It's never saved or logged on the
           server.</p>
         <p>Good habits: create a key just for CoopRadar, set a spending limit in your provider's dashboard, and
           delete the key there when you're done.</p>

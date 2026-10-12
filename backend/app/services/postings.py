@@ -7,7 +7,8 @@ results directly; no business logic lives in the router.
 """
 
 import io
-from datetime import date
+import time
+from datetime import date, timedelta
 from uuid import UUID
 
 from fastapi import HTTPException
@@ -16,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.posting import Posting, WorkMode
 from app.schemas.posting import (
+    CategoryCount,
     CsvUploadResult,
     FilterMeta,
     ManualPostingIn,
@@ -27,6 +29,7 @@ from app.schemas.posting import (
     SimilarPostingOut,
     SimilarPostingsResponse,
 )
+from app.services.categories import CATEGORIES, any_category, category_clause
 
 # Maps the whitelisted sort param values to their ORM column.
 # Using a dict means we never interpolate user input into SQL —
@@ -134,6 +137,15 @@ async def list_postings(
         # list sent as a bound parameter — user input never touches the SQL string.
         stmt = stmt.where(Posting.skills.contains(params.skills))
 
+    if params.category:
+        stmt = stmt.where(any_category(params.category))
+
+    if params.company:
+        stmt = stmt.where(Posting.company.in_(params.company))
+
+    if params.posted_within:
+        stmt = stmt.where(Posting.posted_at >= func.now() - timedelta(days=params.posted_within))
+
     # --- Total count (before pagination) ---
     # We run this as a subquery so it sees the same WHERE clauses.
     count_stmt = select(func.count()).select_from(stmt.subquery())
@@ -230,7 +242,52 @@ async def get_filter_meta(db: AsyncSession) -> FilterMeta:
     )
     skills = [r for (r,) in skills_result.all() if r]
 
-    return FilterMeta(cities=cities, provinces=provinces, terms=terms, skills=skills)
+    open_postings = (Posting.closed_at.is_(None), Posting.deadline >= date.today())
+    companies_result = await db.execute(
+        select(Posting.company).where(*open_postings).distinct().order_by(Posting.company)
+    )
+    companies = [r for (r,) in companies_result.all() if r]
+
+    open_jobs, categories = await _category_counts(db)
+    return FilterMeta(
+        cities=cities, provinces=provinces, terms=terms, skills=skills,
+        companies=companies, categories=categories, open_jobs=open_jobs,
+    )
+
+
+# Job type counts run nine title regexes over every open posting (~250 ms at 10k rows), and
+# jobs only change every few hours, so the result is kept for a couple of minutes.
+_COUNTS_TTL = 120.0
+_counts_cache: tuple[float, int, list[CategoryCount]] | None = None
+
+
+def clear_category_counts_cache() -> None:
+    global _counts_cache
+    _counts_cache = None
+
+
+async def _category_counts(db: AsyncSession) -> tuple[int, list[CategoryCount]]:
+    """Open postings in total, and how many fit each job type (one pass over the table)."""
+    global _counts_cache
+    if _counts_cache is not None and time.monotonic() - _counts_cache[0] < _COUNTS_TTL:
+        return _counts_cache[1], _counts_cache[2]
+    counts = (
+        await db.execute(
+            select(
+                func.count().label("open_jobs"),
+                *(
+                    func.count().filter(category_clause(key)).label(key)
+                    for key in CATEGORIES
+                ),
+            ).where(Posting.closed_at.is_(None), Posting.deadline >= date.today())
+        )
+    ).one()
+    categories = [
+        CategoryCount(key=key, label=label, count=int(getattr(counts, key)))
+        for key, (label, _) in CATEGORIES.items()
+    ]
+    _counts_cache = (time.monotonic(), int(counts.open_jobs), categories)
+    return _counts_cache[1], categories
 
 
 def _clean(value: object) -> str:

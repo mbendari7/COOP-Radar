@@ -43,7 +43,7 @@ export default function PostingDetailPage() {
           onClick={() => navigate(-1)}
           className="text-brand-600 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500"
         >
-          ← Back to postings
+          ← Back to jobs
         </button>
       </div>
     )
@@ -58,7 +58,7 @@ export default function PostingDetailPage() {
         className="text-sm text-brand-600 hover:underline mb-6 focus:outline-none focus:ring-2 focus:ring-brand-500 rounded"
         aria-label="Back to postings list"
       >
-        ← Back to postings
+        ← Back to jobs
       </button>
 
       <article className="md:col-span-2">

@@ -25,7 +25,7 @@ function StatusBadge({ status }: { status: string | null }) {
 function RunHistoryPanel({ sourceId }: { sourceId: string }) {
   const { data, isLoading } = useRunHistory(sourceId)
 
-  if (isLoading) return <p className="text-xs text-gray-500 py-2">Loading history…</p>
+  if (isLoading) return <p className="text-xs text-gray-500 py-2">Loading history...</p>
   if (!data?.items.length) return <p className="text-xs text-gray-500 py-2">No runs yet.</p>
 
   return (
@@ -115,7 +115,7 @@ function SourceCard({ source }: { source: IngestSourceOut }) {
               disabled={isRunning || trigger.isPending || !source.enabled}
               className="rounded-md bg-blue-600 px-3 py-1.5 text-xs text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {isRunning ? 'Running…' : 'Run now'}
+              {isRunning ? 'Running...' : 'Run now'}
             </button>
           )}
           <button

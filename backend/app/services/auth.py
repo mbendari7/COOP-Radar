@@ -3,7 +3,7 @@ Authentication business logic.
 
 All auth operations live here — routers stay thin and just call these
 functions.  Session tokens are 32 random bytes (256-bit entropy) stored
-in Redis as `session:<hex-token>` hashes with a 7-day rolling TTL.
+in the session store (app/store.py) as `session:<hex-token>` hashes with a 7-day rolling TTL.
 
 Password hashing uses argon2id via argon2-cffi with library defaults:
   time_cost=2, memory_cost=65536 (64 MB), parallelism=1
@@ -13,7 +13,6 @@ These are adequate for a web app at this scale (Constitution III).
 import secrets
 from uuid import UUID
 
-import redis.asyncio as aioredis
 from argon2 import PasswordHasher
 from argon2.exceptions import VerifyMismatchError
 from fastapi import HTTPException, Response, status
@@ -22,25 +21,26 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import get_settings
 from app.models.user import User
+from app.store import Store
 
 _ph = PasswordHasher()  # singleton — thread-safe, cheap to keep
 _SESSION_TTL = 60 * 60 * 24 * 7  # 7 days
 
 # ── Login rate limiting ────────────────────────────────────────────────────────
 # 5 failed attempts per email within a 15-minute window triggers a 429.
-# Counter lives in Redis alongside sessions (same pool).
+# Counter lives in the session store alongside sessions.
 _RATE_PREFIX = "login_attempts:"
 _MAX_ATTEMPTS = 5
 _RATE_WINDOW = 60 * 15  # 15 minutes in seconds
 
 
-async def _check_login_rate_limit(redis: aioredis.Redis, email: str) -> None:
+async def _check_login_rate_limit(store: Store, email: str) -> None:
     """Increment the attempt counter for this email; raise 429 if over limit."""
     key = f"{_RATE_PREFIX}{email}"
-    count = await redis.incr(key)
+    count = await store.incr(key)
     if count == 1:
         # First attempt in this window — set the TTL
-        await redis.expire(key, _RATE_WINDOW)
+        await store.expire(key, _RATE_WINDOW)
     if count > _MAX_ATTEMPTS:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -51,9 +51,9 @@ async def _check_login_rate_limit(redis: aioredis.Redis, email: str) -> None:
         )
 
 
-async def _clear_login_rate_limit(redis: aioredis.Redis, email: str) -> None:
+async def _clear_login_rate_limit(store: Store, email: str) -> None:
     """Remove the attempt counter after a successful login."""
-    await redis.delete(f"{_RATE_PREFIX}{email}")
+    await store.delete(f"{_RATE_PREFIX}{email}")
 
 
 # ── Cookie helpers ────────────────────────────────────────────────────────────
@@ -88,12 +88,12 @@ def clear_session_cookie(response: Response) -> None:
 
 # ── Session helpers ───────────────────────────────────────────────────────────
 
-async def _create_session(redis: aioredis.Redis, user_id: UUID) -> str:
-    """Create a new Redis session and return the token."""
+async def _create_session(store: Store, user_id: UUID) -> str:
+    """Create a new session and return the token."""
     token = secrets.token_hex(32)  # 256 bits of entropy
     key = f"session:{token}"
-    await redis.hset(key, "user_id", str(user_id))
-    await redis.expire(key, _SESSION_TTL)
+    await store.hset(key, "user_id", str(user_id))
+    await store.expire(key, _SESSION_TTL)
     return token
 
 
@@ -101,7 +101,7 @@ async def _create_session(redis: aioredis.Redis, user_id: UUID) -> str:
 
 async def register(
     db: AsyncSession,
-    redis: aioredis.Redis,
+    store: Store,
     email: str,
     password: str,
 ) -> tuple[User, str]:
@@ -131,13 +131,13 @@ async def register(
     await db.commit()
     await db.refresh(user)
 
-    token = await _create_session(redis, user.id)
+    token = await _create_session(store, user.id)
     return user, token
 
 
 async def login(
     db: AsyncSession,
-    redis: aioredis.Redis,
+    store: Store,
     email: str,
     password: str,
 ) -> tuple[User, str]:
@@ -152,7 +152,7 @@ async def login(
     normalised = email.lower().strip()
 
     # Check rate limit before any DB work (prevents enumeration via timing too)
-    await _check_login_rate_limit(redis, normalised)
+    await _check_login_rate_limit(store, normalised)
 
     invalid = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -174,20 +174,20 @@ async def login(
         raise invalid from None
 
     # Successful login — clear the rate limit counter
-    await _clear_login_rate_limit(redis, normalised)
+    await _clear_login_rate_limit(store, normalised)
 
     # Re-hash if argon2 parameters have changed (argon2-cffi handles this automatically)
     if _ph.check_needs_rehash(user.hashed_password):
         user.hashed_password = _ph.hash(password)
         await db.commit()
 
-    token = await _create_session(redis, user.id)
+    token = await _create_session(store, user.id)
     return user, token
 
 
-async def logout(redis: aioredis.Redis, token: str) -> None:
+async def logout(store: Store, token: str) -> None:
     """Invalidate a session immediately — next request with this cookie gets 401."""
-    await redis.delete(f"session:{token}")
+    await store.delete(f"session:{token}")
 
 
 async def change_password(
@@ -214,7 +214,7 @@ async def change_password(
 
 async def delete_account(
     db: AsyncSession,
-    redis: aioredis.Redis,
+    store: Store,
     user: User,
     token: str,
     password: str,
@@ -223,7 +223,7 @@ async def delete_account(
     Permanently delete a user account and all associated data.
 
     ON DELETE CASCADE in the DB removes saved_postings automatically.
-    The Redis session is deleted first so the user can't make requests
+    The session is deleted first so the user can't make requests
     in the tiny window between the cookie being cleared and the DB delete.
     Raises HTTP 401 if password is wrong.
     """
@@ -236,6 +236,6 @@ async def delete_account(
         ) from exc
 
     # Invalidate session before deleting the row
-    await redis.delete(f"session:{token}")
+    await store.delete(f"session:{token}")
     await db.delete(user)
     await db.commit()

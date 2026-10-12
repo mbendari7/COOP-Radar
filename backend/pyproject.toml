@@ -17,9 +17,8 @@ dependencies = [
     "httpx>=0.27",           # JSON API ingestion adapter + test client
     "greenlet>=3.0",         # required by SQLAlchemy async
     "argon2-cffi>=23.1",     # argon2id password hashing (OWASP-recommended)
-    "redis>=5.0",            # sessions/rate limits (redis.asyncio) + RQ queue
+    "redis>=5.0",            # optional: sessions/rate limits in Redis when REDIS_URL is set
     "pandas>=2.2",           # CSV upload parsing + tracker CSV export
-    "rq>=1.16",              # background job queue (ingest + embedding jobs)
     "openai>=1.30",          # embeddings (smart search) + ChatGPT for visitors' own keys
     "pgvector>=0.3",         # pgvector SQLAlchemy integration
     "python-multipart>=0.0.9", # FastAPI file upload support
@@ -38,6 +37,11 @@ dev = [
     "ruff>=0.4",
     "mypy>=1.10",
     "respx>=0.21",           # httpx request mocking for ingest tests
+]
+# `python start.py` on your own computer: a private PostgreSQL (with pgvector) that runs
+# from a pip package, so you don't have to install a database yourself.
+local = [
+    "pgserver>=0.1.4",
 ]
 
 [tool.setuptools.packages.find]
@@ -72,7 +76,7 @@ exclude = ["alembic/"]      # generated migration files don't need strict typing
 
 [[tool.mypy.overrides]]
 # Third-party packages without type hints
-module = ["pgvector.*", "feedparser.*", "docx.*", "rq.*", "pandas.*"]
+module = ["pgvector.*", "feedparser.*", "docx.*", "pandas.*"]
 ignore_missing_imports = true
 
 # --- pytest ---

@@ -5,40 +5,44 @@ Ashby) into Postgres; a student drops in a resume (no sign-up: temporary account
 skills missing, and student-ranked matches for free in SQL, plus bring-your-own-key AI (review, re-rank, tailor,
 cover letter, cited Q&A). Also search/filter and an application tracker.
 
-Docs: `README.md` (technical), `docs/USER_GUIDE.md` (simple: use, deploy without Docker, AI keys, tips), `docs/HOW_IT_WORKS.md` (overview + how to explain), `docs/PROJECT_GUIDE.md` (every module), `docs/DEPLOY.md` (hosting).
+Docs: `README.md` (technical), `docs/USER_GUIDE.md` (simple: use, run, put online, AI keys, tips), `docs/HOW_IT_WORKS.md` (overview + how to explain), `docs/PROJECT_GUIDE.md` (every module), `docs/DEPLOY.md` (hosting).
 
 ## Stack
 - Backend: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0 async (typed `Mapped[]`), Alembic
-- DB: PostgreSQL 16 + pgvector (optional embeddings), image `pgvector/pgvector:pg16`
-- Jobs: Redis + RQ (`app/worker.py`: ingest + embedding jobs, built-in 6-hourly scheduler)
-- Auth: argon2id passwords, HTTP-only session cookie → Redis `session:<token>` (7-day rolling TTL)
+- DB: PostgreSQL 16 + pgvector (optional embeddings). Locally `start.py` runs one from the `pgserver` pip package
+- Jobs: in-process asyncio background jobs (`app/jobs.py`: `enqueue(name, *args)`, max 3 concurrent,
+  6-hourly import scheduler started in the app lifespan). No separate worker or queue.
+- Auth: argon2id passwords, HTTP-only session cookie → `session:<token>` in the store (`app/store.py`:
+  Postgres `kv_store` table by default, Redis if `REDIS_URL` is set; 7-day rolling TTL)
 - AI: **bring your own key** — visitors' Claude / ChatGPT / Gemini keys via `app/ai.py` (official `anthropic`,
   `openai`, `google-genai` SDKs). Optional owner keys: `ANTHROPIC_API_KEY` fallback (`AGENT_MODEL`/`FAST_MODEL`)
   and `OPENAI_API_KEY` for embeddings (smart search)
 - Frontend: React 18 + TypeScript + Vite 6, TanStack Query/Table, React Router, Tailwind, dnd-kit
-- Infra: Docker Compose (db, redis, api, worker, web), GitHub Actions CI
+- Infra: **no Docker**. `start.py` (one command: venv, packages, site build, DB, migrate, seed, serve),
+  Render Blueprint on the native Python runtime, optional Vercel front (`vercel.json`: CDN pages, `/api` proxied
+  to Render), GitHub Actions CI
 
 ## Layout
 - `backend/app/` — `api/` routers · `services/` business logic + SQL · `schemas/` Pydantic · `models/` ORM ·
   `ingest/` career-board + feed adapters, runner, dedup, skill matching, extraction, embeddings ·
   `agent/` streamed tailor / cover letter / Q&A · `llm.py` Claude helpers ·
-  `deps.py` auth deps · `worker.py` RQ worker
-- `backend/alembic/versions/` migrations (0001–0007) · `backend/seed/` skills, 27 career boards (`job_boards.py`),
+  `deps.py` auth deps · `store.py` session store · `jobs.py` background jobs
+- `backend/alembic/versions/` migrations (0001–0009) · `backend/seed/` skills, 27 career boards (`job_boards.py`),
   sample postings (`SEED_*` flags) · `backend/tests/` pytest
 - `frontend/src/` — `api/` (`client.ts` + query hooks) · `pages/` · `components/` · `frontend/tests/` vitest
 - `specs/NNN-*/` Spec Kit feature specs · `.specify/` Spec Kit config, templates, constitution
 - `.claude/skills/` — `speckit-*` workflow skills + project skills (api-conventions, frontend-tables,
   agent-tools, db-migration, log-agentic-work)
 - `docs/` — USER_GUIDE, HOW_IT_WORKS, DEPLOY, PROJECT_GUIDE, agentic-workflow, progress, speckit-prompts, history/
-- Production: root `Dockerfile` (site + API in one image), `docker-compose.prod.yml`, `render.yaml`,
-  `backend/scripts/start.sh` (migrate → seed → worker → uvicorn). `app/main.py → mount_frontend` serves the built site.
+- Production: `render.yaml` builds with `pip install -e backend && npm ci/build --prefix frontend`, starts with
+  `python start.py --hosted` (migrate → seed → uvicorn on $PORT). `app/main.py → mount_frontend` serves the built site.
 
 ## Commands
-- Dev stack: `docker compose up --build` → http://localhost:5173 (API docs: http://localhost:8000/docs)
-- Website mode (as hosted): `docker compose -f docker-compose.prod.yml up --build` → http://localhost:8080
-- Seed dev data: `docker compose exec api python -m seed`, then embeddings: `docker compose exec api python -m app.ingest.embed`
-- Backend checks: `docker compose exec api sh -c "ruff check . && mypy app && pytest -q -m 'not perf' && alembic check"`
-- Perf budget: `docker compose exec api pytest -q -m perf -s`
+- Run the site: `python start.py` → http://localhost:8000 (first run sets up `backend/.venv`, builds the site,
+  creates a local DB in `~/.coopradar`). `--dev` = Vite HMR on :5173 + uvicorn --reload. `--hosted` = host mode.
+- Backend checks (in `backend/`, venv active, `pip install -e ".[dev]"`, `DATABASE_URL` = throwaway Postgres+pgvector):
+  `ruff check . && mypy app && pytest -q -m 'not perf' && alembic check`
+- Perf budget: `pytest -q -m perf -s`
 - Frontend checks: `cd frontend && npm run lint && npm run typecheck && npm test && npm run build`
 - New migration: use the `/db-migration` skill (autogenerate → review → round-trip → `alembic check`)
 

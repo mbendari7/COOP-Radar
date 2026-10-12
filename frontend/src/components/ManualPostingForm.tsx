@@ -83,7 +83,7 @@ export function ManualPostingForm() {
             onChange={set('work_mode')}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">— Select —</option>
+            <option value="">Select</option>
             <option value="onsite">Onsite</option>
             <option value="hybrid">Hybrid</option>
             <option value="remote">Remote</option>
@@ -113,7 +113,7 @@ export function ManualPostingForm() {
             value={form.source_url ?? ''}
             onChange={set('source_url')}
             className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            placeholder="https://…"
+            placeholder="https://"
           />
         </div>
 
@@ -122,7 +122,7 @@ export function ManualPostingForm() {
           disabled={mutation.isPending}
           className="w-full flex justify-center py-2 px-4 rounded-md bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
         >
-          {mutation.isPending ? 'Saving…' : 'Add posting'}
+          {mutation.isPending ? 'Saving...' : 'Add posting'}
         </button>
       </form>
 

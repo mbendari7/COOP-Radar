@@ -53,7 +53,7 @@ export default function SavedPostingsPage() {
   const unsave = useUnsavePosting()
 
   if (meLoading) {
-    return <div className="flex justify-center items-center h-64 text-gray-500">Loading…</div>
+    return <div className="flex justify-center items-center h-64 text-gray-500">Loading...</div>
   }
 
   if (!me) {
@@ -104,7 +104,7 @@ export default function SavedPostingsPage() {
             className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-600 hover:bg-gray-50 flex items-center gap-1"
             aria-label="Export tracker as CSV"
           >
-            ↓ CSV
+            Download CSV
           </button>
         </div>
       </div>
@@ -127,7 +127,7 @@ export default function SavedPostingsPage() {
       {view === 'board' && (
         <>
           {isLoading && (
-            <div className="h-48 flex items-center justify-center text-gray-500">Loading…</div>
+            <div className="h-48 flex items-center justify-center text-gray-500">Loading...</div>
           )}
           {isError && (
             <p className="text-red-600 text-sm">Failed to load. <button onClick={() => refetch()} className="underline">Retry</button></p>
@@ -186,8 +186,8 @@ export default function SavedPostingsPage() {
           {!isLoading && !isError && data?.total === 0 && (
             <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center">
               <p className="text-gray-500">
-                You haven't saved any postings yet —{' '}
-                <Link to="/" className="text-blue-600 hover:underline">browse postings to get started</Link>.
+                You haven't saved any jobs yet.{' '}
+                <Link to="/" className="text-blue-600 hover:underline">Browse jobs</Link> or <Link to="/resume" className="text-blue-600 hover:underline">match your resume</Link> to get started.
               </p>
             </div>
           )}

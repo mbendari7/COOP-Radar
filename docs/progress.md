@@ -39,6 +39,30 @@ overlap, so it works without embeddings. Verified: backend 177 tests, frontend 2
 keys against the real Anthropic, OpenAI, and Google APIs (all reported as "key rejected", key never echoed).
 Not verified: a full answer from each provider with a real key (needs paid/free keys).
 
+## No Docker: one command (2026-10-11)
+
+Docker, Redis, and the separate RQ worker are no longer needed. `python start.py` sets up `backend/.venv`, builds
+the site, runs a private PostgreSQL + pgvector (`pgserver` package, data in `~/.coopradar`), migrates, seeds, and
+serves everything on http://localhost:8000. Sessions and rate limits live in a Postgres `kv_store` table (Redis is
+optional via `REDIS_URL`); imports and embeddings run as in-process background jobs (`app/jobs.py`). Render
+deploys on its native Python runtime (`python start.py --hosted`). All Dockerfiles and compose files are removed.
+Verified on Windows: first run from scratch, 791 real jobs imported in the background, guest session across
+requests, restart in ~12 s, recovery after a hard kill, `--dev` mode, clean database shutdown; backend 244 tests
+(incl. perf), frontend 29 tests. Not verified here: the Render build itself and the new CI `website` job (run on push).
+
+## Redesign, job preferences, detailed filters, Vercel option (2026-10-12)
+
+New look: one pine-green accent on warm neutrals (Tailwind palette remap), Public Sans, flat bordered cards, SVG
+icons instead of emoji, no em dashes in UI copy. Jobs page: filter sidebar (job type with counts, level, province
+and city, work mode, date posted, term and length, company, skills, past deadlines), sort dropdown, cards or table,
+removable chips. Resume page: step 1 "What are you looking for?" (job types, keywords, province, work modes,
+level), step 2 upload, then tabs "Jobs that fit your resume" (skills on your resume / worth adding) and "Resume
+feedback". Backend: job types inferred from titles (`services/categories.py`), `category`/`company`/`posted_within`
+filters, filter meta with job type counts, employers and open-job total (counts cached 2 min), `resumes.preferences`
+(migration 0009) applied in matching, `PUT /api/resume/preferences`. `vercel.json` serves the site from Vercel and
+proxies `/api` to Render. Verified: backend 255 passed (perf p95 34 ms), migrations round-trip + `alembic check`,
+frontend 36 passed + lint/tsc/build, real upload with preferences in Edge. Not verified: an actual Vercel deploy.
+
 ## Open work
 
 1. ~~Merge everything into `main`~~ (done 2026-10-10).

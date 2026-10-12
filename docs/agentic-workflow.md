@@ -190,3 +190,60 @@ three return `AI_KEY_INVALID` with the key never echoed (this caught Google's 40
 handled and tested). Not run: real answers from each provider with valid keys.
 
 **What I reviewed / changed**: _(fill in after reviewing the diff)_
+
+
+---
+
+## 2026-10-11 — No Docker: one-command website (`python start.py`)
+
+**What the AI assistant did**:
+- `start.py` (repo root, stdlib only): creates `backend/.venv` (uv if present, else venv + pip), installs
+  `backend[local]` only when `pyproject.toml` changes, builds the React site only when sources change, starts a
+  private PostgreSQL 16 + pgvector via `pgserver` in `~/.coopradar` (outside OneDrive sync), migrates, seeds, serves
+  site + API on one port, opens the browser. `--dev` adds Vite HMR + uvicorn reload; `--hosted` is the host mode.
+  Waits out Postgres crash recovery; stops the database on exit.
+- `app/store.py`: `Store` protocol + `PostgresStore` on a new `kv_store` table (migration 0008) for sessions and
+  rate-limit/AI-quota counters, with Redis-like expiry; Redis used instead when `REDIS_URL` is set. All routes and
+  services moved from `aioredis.Redis`/`get_redis` to `Store`/`get_store`.
+- `app/jobs.py`: in-process background jobs replace RQ (`enqueue`, max 3 concurrent, errors logged) and a scheduler
+  task in the app lifespan (imports due boards one at a time every 10 min, purges expired sessions, backfills
+  embeddings when an OpenAI key is set). Admin "Run now" now commits the run row *before* starting the job.
+- Removed `Dockerfile`s, `.dockerignore`s, both compose files, `app/worker.py`, `app/redis.py`, `scripts/start.sh`,
+  and the `rq` dependency. Seed defaults: sample postings and dev sources off (real jobs only).
+- `render.yaml` uses the native Python runtime (build: pip + npm; start: `python start.py --hosted`), no Redis
+  service. CI's Docker job became a `website` job that runs the same build/start and smoke-tests it (incl. a
+  guest session on the next request).
+- Tests: `tests/api/test_store_and_jobs.py` (store round-trip, counters, expiry, purge; job run, failure isolation,
+  scheduler). Docs: README, USER_GUIDE, DEPLOY, HOW_IT_WORKS, PROJECT_GUIDE, CLAUDE.md, `.env.example`, skills.
+
+**Results (actual runs)**: ruff + mypy --strict clean; backend 243 passed + perf (p95 44 ms); migrations
+0001→0008 up/down/up and `alembic check` clean; frontend lint/tsc clean, 29 passed; OpenAPI + generated types
+refreshed. `python start.py` on Windows from a clean checkout: venv + packages + build + DB + 791 real jobs
+imported in the background; guest session persisted; restart 12 s; restart after a hard kill OK; `--dev` serves
+:5173 with the API proxied; database stopped cleanly on exit. Not run here: the Render build and the CI `website` job.
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_
+
+
+---
+
+## 2026-10-12 — Redesign, job preferences, detailed filters, Vercel option
+
+**What the AI assistant did**:
+- Visual redesign (palette remap in `tailwind.config.ts`, Public Sans, `components/Icons.tsx`, new header/footer,
+  `WelcomeHero`, `PostingCard`), removed emoji and em dashes from UI text.
+- Jobs page: `FilterBar` sidebar + `ActiveFilterChips` (`components/filters.ts`), sort dropdown, cards/table view.
+- Backend: `services/categories.py` (9 job types from title regexes, tuned against the 791 live titles),
+  `category`/`company`/`posted_within` filters, richer `/meta/filters`, `JobPreferences` saved on the resume
+  (migration 0009), `preference_filters()` + keyword boost in matching, `PUT /api/resume/preferences`, matched /
+  missing skills on each match. Job type counts cached 2 minutes after the perf test caught a 374 ms p95.
+- Resume page rebuilt as steps (preferences, upload) and result tabs. `vercel.json` (Vercel CDN, `/api` → Render).
+- Tests: `tests/resume/test_preferences.py` (7), 4 new postings filter tests, FilterBar tests rewritten, a
+  ResumePage test that preferences are sent with the upload.
+
+**Results (actual runs)**: ruff + mypy clean; backend 255 passed incl. perf (p95 34 ms); 0008↔0009 round-trip and
+`alembic check` clean; frontend lint/tsc/build clean, 36 passed; screenshots in Edge of the jobs page, a filtered
+view, phone width, and a real DOCX upload with Data & AI + Software + Ontario. Not run: a Vercel deploy.
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_
+

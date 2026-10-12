@@ -5,6 +5,8 @@ Keeping app creation in a function (create_app) makes it easy to
 instantiate the app in tests with different settings without side effects.
 """
 
+import asyncio
+import contextlib
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -26,24 +28,33 @@ from app.api.resume import router as resume_router
 from app.api.saved import router as saved_router
 from app.config import get_settings
 from app.db import AsyncSessionLocal
-from app.redis import create_redis_pool
+from app.store import create_store
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
-    Startup: verify the DB is reachable and create the Redis pool.
-    Both checks surface misconfigurations at startup rather than on the first request.
+    Startup: verify the DB is reachable, open the session store, and start the background
+    scheduler that imports jobs from the career boards (app/jobs.py).
     """
     async with AsyncSessionLocal() as session:
         await session.execute(text("SELECT 1"))
 
-    app.state.redis = create_redis_pool()
+    app.state.store = create_store()
+
+    scheduler: asyncio.Task[None] | None = None
+    if get_settings().background_jobs:
+        from app.jobs import scheduler as run_scheduler
+
+        scheduler = asyncio.create_task(run_scheduler(app.state.store))
 
     yield
 
-    # Clean shutdown — close the Redis connection pool
-    await app.state.redis.aclose()
+    if scheduler is not None:
+        scheduler.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await scheduler
+    await app.state.store.aclose()
 
 
 async def http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
@@ -65,7 +76,7 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
 
 def mount_frontend(app: FastAPI, static_dir: Path) -> None:
     """
-    Serve the built React app from the API process, so a single container is the whole
+    Serve the built React app from the API process, so a single server is the whole
     website (same origin: no CORS, first-party cookies). Must run after the API routers.
 
     - /assets/* → hashed JS/CSS bundles
@@ -125,7 +136,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health", tags=["meta"])
     async def health() -> dict[str, str]:
-        """Liveness probe used by Docker/CI — no DB or Redis calls."""
+        """Liveness probe used by the host and CI — no database calls."""
         return {"status": "ok"}
 
     if settings.static_dir:

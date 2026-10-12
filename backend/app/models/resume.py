@@ -42,6 +42,8 @@ class Resume(Base):
     extracted_text: Mapped[str] = mapped_column(Text, nullable=False)
     # Cached AI resume review (strengths, tailoring tips, roles to search); None until requested
     insights: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    # What the student is looking for (JobPreferences); None = no preference, match everything
+    preferences: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now()
     )

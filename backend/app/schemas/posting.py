@@ -14,11 +14,13 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.posting import WorkMode
+from app.services.categories import CategoryKey
 
 T = TypeVar("T")
 
 _DURATIONS = {4, 8, 12, 16}
 _PAGE_SIZES = {10, 25, 50}
+_POSTED_WITHIN = {1, 3, 7, 14, 30}
 
 
 # ── Response schemas ──────────────────────────────────────────────────────────
@@ -72,6 +74,13 @@ PostingsPage = Page[PostingListItem]
 
 # ── Filter metadata ───────────────────────────────────────────────────────────
 
+class CategoryCount(BaseModel):
+    """A job type for the filter list, with how many open postings it has."""
+    key: CategoryKey
+    label: str
+    count: int
+
+
 class FilterMeta(BaseModel):
     """
     Distinct values available for each filter dropdown.
@@ -82,6 +91,10 @@ class FilterMeta(BaseModel):
     provinces: list[str]
     terms: list[str]
     skills: list[str]
+    companies: list[str] = []
+    categories: list[CategoryCount] = []
+    # Open postings in total (job types overlap, so their counts don't add up to this)
+    open_jobs: int = 0
 
 
 # ── Query params ──────────────────────────────────────────────────────────────
@@ -162,6 +175,12 @@ class PostingListParams(BaseModel):
     # duration accepts a list so multiple values can be OR'd (4 and/or 8 months)
     duration: list[int] | None = None
     skills: list[str] | None = None
+    # Job types (OR'd), inferred from the title: see app/services/categories.py
+    category: list[CategoryKey] | None = None
+    # Employers (OR'd), exact names from /meta/filters
+    company: list[str] | None = None
+    # Only postings published in the last N days
+    posted_within: int | None = None
     show_expired: bool = False
     show_closed: bool = False
     # Only internships, co-ops, student and new-grad roles (matched on the job title)
@@ -184,6 +203,13 @@ class PostingListParams(BaseModel):
     def _valid_durations(cls, v: list[int] | None) -> list[int] | None:
         if v is not None and any(d not in _DURATIONS for d in v):
             raise ValueError(f"duration must be one of {sorted(_DURATIONS)}")
+        return v
+
+    @field_validator("posted_within")
+    @classmethod
+    def _valid_posted_within(cls, v: int | None) -> int | None:
+        if v is not None and v not in _POSTED_WITHIN:
+            raise ValueError(f"posted_within must be one of {sorted(_POSTED_WITHIN)}")
         return v
 
     @field_validator("page_size")

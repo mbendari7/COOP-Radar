@@ -24,6 +24,9 @@ export type SimilarPostingOut = Schemas['SimilarPostingOut']
 export type SimilarPostingsResponse = Schemas['SimilarPostingsResponse']
 export type PostingsPage = Schemas['Page_PostingListItem_']
 export type FilterMeta = Schemas['FilterMeta']
+export type CategoryCount = Schemas['CategoryCount']
+/** Job type keys ("software", "data", ...) inferred from job titles on the server */
+export type CategoryKey = CategoryCount['key']
 export type SearchMode = 'keyword' | 'semantic'
 
 export type SortField = 'posted_at' | 'deadline' | 'company' | 'title'
@@ -38,6 +41,10 @@ export interface PostingListParams {
   work_mode?: WorkMode
   duration?: number[]
   skills?: string[]
+  category?: CategoryKey[]
+  company?: string[]
+  /** Only jobs posted in the last N days (1, 3, 7, 14 or 30) */
+  posted_within?: number
   show_expired?: boolean
   show_closed?: boolean
   /** Only intern / co-op / student / new-grad roles */
@@ -67,6 +74,9 @@ function buildQueryString(params: PostingListParams): string {
   if (params.skills?.length) {
     params.skills.forEach((s) => sp.append('skills', s))
   }
+  params.category?.forEach((c) => sp.append('category', c))
+  params.company?.forEach((c) => sp.append('company', c))
+  if (params.posted_within) sp.set('posted_within', String(params.posted_within))
   if (params.show_expired) sp.set('show_expired', 'true')
   if (params.show_closed) sp.set('show_closed', 'true')
   if (params.students_only) sp.set('students_only', 'true')

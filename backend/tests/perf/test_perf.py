@@ -82,7 +82,7 @@ async def test_list_postings_p95_under_300ms(db_engine) -> None:  # type: ignore
         await session.execute(text("ANALYZE postings"))  # fresh planner stats, like production
 
     app = create_app()
-    app.state.redis = MockRedis()  # lifespan doesn't run under ASGITransport
+    app.state.store = MockRedis()  # lifespan doesn't run under ASGITransport
     latencies: list[float] = []
 
     try:

@@ -237,7 +237,7 @@ export interface paths {
         };
         /**
          * Health
-         * @description Liveness probe used by Docker/CI — no DB or Redis calls.
+         * @description Liveness probe used by the host and CI — no database calls.
          */
         get: operations["health_api_health_get"];
         put?: never;
@@ -443,6 +443,7 @@ export interface paths {
          *     store results, and return ranked matches. With the visitor's AI key (X-AI-* headers) the
          *     AI ranks and explains matches; without any key, matches are ranked by skill overlap for
          *     free. Only the site owner's fallback key counts toward the daily AI limit.
+         *     `preferences` (optional) is a JobPreferences JSON object: what the student is looking for.
          */
         post: operations["upload_resume_endpoint_api_resume_post"];
         /**
@@ -514,6 +515,28 @@ export interface paths {
          *     Response is text/event-stream with delta chunks ending in [DONE].
          */
         post: operations["ask_about_posting_api_resume_matches__posting_id__ask_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume/preferences": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Update Preferences Endpoint
+         * @description Save what the student is looking for (job types, location, work mode, level, keywords)
+         *     and re-match the stored resume against it. Uses the visitor's own AI key if they set one;
+         *     otherwise the free ranking, so changing filters never spends the site owner's AI quota.
+         */
+        put: operations["update_preferences_endpoint_api_resume_preferences_put"];
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -781,6 +804,23 @@ export interface components {
         Body_upload_resume_endpoint_api_resume_post: {
             /** File */
             file: string;
+            /** Preferences */
+            preferences?: string | null;
+        };
+        /**
+         * CategoryCount
+         * @description A job type for the filter list, with how many open postings it has.
+         */
+        CategoryCount: {
+            /** Count */
+            count: number;
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer";
+            /** Label */
+            label: string;
         };
         /**
          * ChangePasswordIn
@@ -843,8 +883,23 @@ export interface components {
          *     that has zero postings.
          */
         FilterMeta: {
+            /**
+             * Categories
+             * @default []
+             */
+            categories: components["schemas"]["CategoryCount"][];
             /** Cities */
             cities: string[];
+            /**
+             * Companies
+             * @default []
+             */
+            companies: string[];
+            /**
+             * Open Jobs
+             * @default 0
+             */
+            open_jobs: number;
             /** Provinces */
             provinces: string[];
             /** Skills */
@@ -919,6 +974,44 @@ export interface components {
             name: string;
         };
         /**
+         * JobPreferences
+         * @description What the student is looking for, set before or after uploading. Matching only considers
+         *     open postings that fit these; keywords (e.g. "data analyst") rank fitting postings higher.
+         */
+        JobPreferences: {
+            /**
+             * Categories
+             * @default []
+             */
+            categories: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer")[];
+            /**
+             * City
+             * @default
+             */
+            city: string;
+            /**
+             * Keywords
+             * @default
+             */
+            keywords: string;
+            /**
+             * Level
+             * @default entry
+             * @enum {string}
+             */
+            level: "entry" | "students" | "all";
+            /**
+             * Province
+             * @default
+             */
+            province: string;
+            /**
+             * Work Modes
+             * @default []
+             */
+            work_modes: components["schemas"]["WorkMode"][];
+        };
+        /**
          * LoginIn
          * @description Login payload — password has no min length here (wrong pw → 401, not 422).
          */
@@ -973,6 +1066,16 @@ export interface components {
             /** Deadline */
             deadline: string;
             /**
+             * Matched Skills
+             * @default []
+             */
+            matched_skills: string[];
+            /**
+             * Missing Skills
+             * @default []
+             */
+            missing_skills: string[];
+            /**
              * Posting Id
              * Format: uuid
              */
@@ -987,11 +1090,17 @@ export interface components {
             term: string;
             /** Title */
             title: string;
+            /**
+             * Work Mode
+             * @default
+             */
+            work_mode: string;
         };
         /** MatchesResponse */
         MatchesResponse: {
             /** Items */
             items: components["schemas"]["MatchResultOut"][];
+            preferences?: components["schemas"]["JobPreferences"] | null;
             resume: components["schemas"]["ResumeOut"] | null;
         };
         /** Page[PostingListItem] */
@@ -1891,6 +2000,9 @@ export interface operations {
                 work_mode?: components["schemas"]["WorkMode"] | null;
                 duration?: number[] | null;
                 skills?: string[] | null;
+                category?: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer")[] | null;
+                company?: string[] | null;
+                posted_within?: number | null;
                 show_expired?: boolean;
                 show_closed?: boolean;
                 students_only?: boolean;
@@ -2307,6 +2419,45 @@ export interface operations {
                 };
                 content: {
                     "application/json": unknown;
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    update_preferences_endpoint_api_resume_preferences_put: {
+        parameters: {
+            query?: never;
+            header?: {
+                "x-ai-provider"?: string | null;
+                "x-ai-key"?: string | null;
+                "x-ai-model"?: string | null;
+            };
+            path?: never;
+            cookie?: {
+                session?: string | null;
+            };
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["JobPreferences"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UploadResponse"];
                 };
             };
             /** @description Validation Error */

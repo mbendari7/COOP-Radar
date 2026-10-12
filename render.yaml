@@ -1,6 +1,6 @@
-# Render Blueprint: one-click hosting on https://render.com
-# Dashboard → New → Blueprint → pick this repo. Render creates the website, a Postgres
-# database, and a Redis-compatible store, and redeploys on every push to main.
+# Render Blueprint: one-click hosting on https://render.com (no Docker needed).
+# Dashboard → New → Blueprint → pick this repo. Render creates the website and a Postgres
+# database, and redeploys on every push to main.
 # You'll be asked for two AI keys — leave both blank: visitors bring their own key
 # (Claude, ChatGPT, or Gemini) on the site's "AI key" page. See docs/DEPLOY.md.
 # On first start the site imports real Canadian jobs from ~27 employers' career boards
@@ -10,20 +10,22 @@
 services:
   - type: web
     name: coopradar
-    runtime: docker
-    dockerfilePath: ./Dockerfile
+    runtime: python
     plan: free
+    # Install the API, then build the React site (Render's Python runtime includes Node.js)
+    buildCommand: pip install -e backend && npm ci --prefix frontend && npm run build --prefix frontend
+    # Migrate the database, load the career boards, and serve the site + API on $PORT
+    startCommand: python start.py --hosted
     healthCheckPath: /api/health
     autoDeploy: true
     envVars:
+      - key: PYTHON_VERSION
+        value: "3.12.8"
+      - key: NODE_VERSION
+        value: "22"
       - key: DATABASE_URL
         fromDatabase:
           name: coopradar-db
-          property: connectionString
-      - key: REDIS_URL
-        fromService:
-          type: keyvalue
-          name: coopradar-redis
           property: connectionString
       - key: ANTHROPIC_API_KEY
         sync: false
@@ -33,20 +35,8 @@ services:
         value: "true"
       - key: AI_DAILY_LIMIT
         value: "20"
-      - key: SEED_ON_START
-        value: "true"
-      # Real jobs only: import from employer career boards, skip the made-up sample postings
-      - key: SEED_SAMPLE_POSTINGS
-        value: "false"
-      - key: SEED_DEV_SOURCES
-        value: "false"
       - key: INGEST_INTERVAL_HOURS
         value: "6"
-
-  - type: keyvalue
-    name: coopradar-redis
-    plan: free
-    ipAllowList: []   # reachable only from your Render services
 
 databases:
   - name: coopradar-db

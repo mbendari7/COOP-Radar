@@ -1,10 +1,11 @@
 /**
- * FilterBar tests — renders controls, chip removal, clear-all.
+ * FilterBar tests: the sidebar controls, and the removable chips above the results.
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
-import FilterBar from '../src/components/FilterBar'
+import FilterBar, { ActiveFilterChips } from '../src/components/FilterBar'
+import { EMPTY_FILTERS, type Filters } from '../src/components/filters'
 import type { FilterMeta } from '../src/api/postings'
 
 const META: FilterMeta = {
@@ -12,38 +13,59 @@ const META: FilterMeta = {
   provinces: ['ON', 'BC'],
   terms: ['Summer 2027', 'Winter 2027'],
   skills: ['Python', 'React', 'SQL'],
+  companies: ['Lyft', 'Shopify'],
+  categories: [
+    { key: 'software', label: 'Software & web', count: 12 },
+    { key: 'data', label: 'Data & AI', count: 5 },
+    { key: 'design', label: 'Design & UX', count: 0 },
+  ],
+  open_jobs: 17,
 }
 
-type Filters = React.ComponentProps<typeof FilterBar>['filters']
-
-const EMPTY_FILTERS: Filters = {
-  city: '', province: '', term: '', work_mode: '',
-  duration: [], skills: [],
-}
-
-function renderBar(
-  filters: Filters = EMPTY_FILTERS,
-  onChange = vi.fn(),
-  onClearAll = vi.fn(),
-) {
+function renderBar(filters: Filters = EMPTY_FILTERS, onChange = vi.fn(), onClearAll = vi.fn()) {
   return render(
-    <FilterBar
-      filters={filters}
-      meta={META}
-      metaLoading={false}
-      onChange={onChange}
-      onClearAll={onClearAll}
-    />
+    <FilterBar filters={filters} meta={META} metaLoading={false} onChange={onChange} onClearAll={onClearAll} />,
   )
 }
 
+function renderChips(filters: Filters, onChange = vi.fn(), onClearAll = vi.fn()) {
+  return render(<ActiveFilterChips filters={filters} meta={META} onChange={onChange} onClearAll={onClearAll} />)
+}
+
 describe('FilterBar', () => {
-  it('renders city, province, term, and skill selects', () => {
+  it('renders location, term, company and skill selects', () => {
     renderBar()
-    expect(screen.getByLabelText(/city/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/province/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/term/i)).toBeInTheDocument()
-    expect(screen.getByLabelText(/add skill/i)).toBeInTheDocument()
+    expect(screen.getByLabelText('Province')).toBeInTheDocument()
+    expect(screen.getByLabelText('City')).toBeInTheDocument()
+    expect(screen.getByLabelText('Term')).toBeInTheDocument()
+    expect(screen.getByLabelText(/add a company/i)).toBeInTheDocument()
+    expect(screen.getByLabelText(/add a skill/i)).toBeInTheDocument()
+  })
+
+  it('shows provinces by full name', () => {
+    renderBar()
+    expect(screen.getByRole('option', { name: 'Ontario' })).toBeInTheDocument()
+  })
+
+  it('lists job types with counts and hides empty ones', () => {
+    renderBar()
+    expect(screen.getByLabelText(/Software & web/)).toBeInTheDocument()
+    expect(screen.getByText('12')).toBeInTheDocument()
+    expect(screen.queryByLabelText(/Design & UX/)).not.toBeInTheDocument()
+  })
+
+  it('adds a job type when its box is ticked', () => {
+    const onChange = vi.fn()
+    renderBar(EMPTY_FILTERS, onChange)
+    fireEvent.click(screen.getByLabelText(/Data & AI/))
+    expect(onChange).toHaveBeenCalledWith({ category: ['data'] })
+  })
+
+  it('sets the date posted filter', () => {
+    const onChange = vi.fn()
+    renderBar(EMPTY_FILTERS, onChange)
+    fireEvent.click(screen.getByLabelText('Past week'))
+    expect(onChange).toHaveBeenCalledWith({ posted_within: 7 })
   })
 
   it('renders work mode buttons', () => {
@@ -53,48 +75,53 @@ describe('FilterBar', () => {
     expect(screen.getByRole('checkbox', { name: /remote/i })).toBeInTheDocument()
   })
 
-  it('renders duration checkboxes for 4, 8, 12, 16 months', () => {
+  it('renders length checkboxes for 4, 8, 12, 16 months', () => {
     renderBar()
-    expect(screen.getByLabelText('4 mo')).toBeInTheDocument()
-    expect(screen.getByLabelText('8 mo')).toBeInTheDocument()
-    expect(screen.getByLabelText('12 mo')).toBeInTheDocument()
-    expect(screen.getByLabelText('16 mo')).toBeInTheDocument()
+    for (const d of [4, 8, 12, 16]) expect(screen.getByLabelText(`${d} months`)).toBeInTheDocument()
   })
 
-  it('shows active filter chips when filters are set', () => {
-    renderBar({ ...EMPTY_FILTERS, city: 'Waterloo', skills: ['Python'] })
+  it('adds a company from the list', () => {
+    const onChange = vi.fn()
+    renderBar(EMPTY_FILTERS, onChange)
+    fireEvent.change(screen.getByLabelText(/add a company/i), { target: { value: 'Shopify' } })
+    expect(onChange).toHaveBeenCalledWith({ company: ['Shopify'] })
+  })
+})
+
+describe('ActiveFilterChips', () => {
+  it('shows nothing when no filters are on', () => {
+    const { container } = renderChips(EMPTY_FILTERS)
+    expect(container).toBeEmptyDOMElement()
+  })
+
+  it('shows a chip for each active filter', () => {
+    renderChips({ ...EMPTY_FILTERS, city: 'Waterloo', skills: ['Python'], category: ['data'], posted_within: 7 })
     expect(screen.getByText(/City: Waterloo/)).toBeInTheDocument()
     expect(screen.getByText('Python')).toBeInTheDocument()
+    expect(screen.getByText('Data & AI')).toBeInTheDocument()
+    expect(screen.getByText('Past week')).toBeInTheDocument()
   })
 
   it('calls onClearAll when "Clear all" is clicked', () => {
     const onClearAll = vi.fn()
-    renderBar({ ...EMPTY_FILTERS, city: 'Waterloo' }, vi.fn(), onClearAll)
-
+    renderChips({ ...EMPTY_FILTERS, city: 'Waterloo' }, vi.fn(), onClearAll)
     fireEvent.click(screen.getByRole('button', { name: /clear all/i }))
     expect(onClearAll).toHaveBeenCalledOnce()
   })
 
-  it('calls onChange with empty city when city chip × is clicked', () => {
+  it('calls onChange with empty city when the city chip is removed', () => {
     const onChange = vi.fn()
-    renderBar({ ...EMPTY_FILTERS, city: 'Toronto' }, onChange)
-
+    renderChips({ ...EMPTY_FILTERS, city: 'Toronto' }, onChange)
     fireEvent.click(screen.getByRole('button', { name: /Remove filter: City: Toronto/i }))
     expect(onChange).toHaveBeenCalledWith({ city: '' })
   })
 
   it('keeps keyboard focus on the next chip after removing one', async () => {
-    const { rerender } = renderBar({ ...EMPTY_FILTERS, skills: ['Python', 'SQL'] })
+    const { rerender } = renderChips({ ...EMPTY_FILTERS, skills: ['Python', 'SQL'] })
     fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Python' }))
     // The parent applies the change: re-render without Python
     rerender(
-      <FilterBar
-        filters={{ ...EMPTY_FILTERS, skills: ['SQL'] }}
-        meta={META}
-        metaLoading={false}
-        onChange={vi.fn()}
-        onClearAll={vi.fn()}
-      />,
+      <ActiveFilterChips filters={{ ...EMPTY_FILTERS, skills: ['SQL'] }} meta={META} onChange={vi.fn()} onClearAll={vi.fn()} />,
     )
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Remove filter: SQL' })),

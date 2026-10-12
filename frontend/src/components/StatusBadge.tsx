@@ -50,7 +50,7 @@ export default function StatusBadge({ savedId, status, postingTitle }: Props) {
           ${badgeClass(status)}
         `}
       >
-        <option value="">— No status —</option>
+        <option value="">No status</option>
         {ALL_STATUSES.map((s) => (
           <option key={s} value={s}>{STATUS_LABELS[s]}</option>
         ))}

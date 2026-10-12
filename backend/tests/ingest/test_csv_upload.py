@@ -186,14 +186,14 @@ async def test_manual_entry_is_committed_and_queued_for_embedding(
 
     detail = await client.get(f"/api/postings/{posting_id}")
     assert detail.status_code == 200
-    fake_queue.enqueue.assert_called_with("app.ingest.embed.run_embed_job", posting_id)
+    fake_queue.enqueue.assert_called_with("embed_posting", posting_id)
 
 
 @pytest.mark.asyncio
 async def test_no_embedding_jobs_without_openai_key(
     client: AsyncClient, db_session: AsyncSession, fake_queue, monkeypatch
 ):
-    """With smart search off, nothing is queued (failing jobs would pile up in Redis)."""
+    """With smart search off, no embedding job is started (it could only fail)."""
     from app.config import get_settings
 
     monkeypatch.setattr(get_settings(), "openai_api_key", "")

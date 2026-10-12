@@ -156,5 +156,5 @@ async def test_trigger_run_enqueues_job_with_run_id(
 
     assert resp.status_code == 202
     fake_queue.enqueue.assert_called_once_with(
-        "app.ingest.runner.run_source", source_id, resp.json()["run_id"]
+        "run_source", source_id, resp.json()["run_id"]
     )

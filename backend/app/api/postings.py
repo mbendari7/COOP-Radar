@@ -62,11 +62,11 @@ async def upload_csv_endpoint(
     Bulk-import postings from a CSV file.
     Rate-limited to 3 uploads per user per hour.
     """
-    redis = request.app.state.redis
+    store = request.app.state.store
     rate_key = f"csv_upload:{current_user.id}"
-    count = await redis.incr(rate_key)
+    count = await store.incr(rate_key)
     if count == 1:
-        await redis.expire(rate_key, _CSV_RATE_WINDOW)
+        await store.expire(rate_key, _CSV_RATE_WINDOW)
     if count > _CSV_RATE_LIMIT:
         raise HTTPException(
             status_code=429,

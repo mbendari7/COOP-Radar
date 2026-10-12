@@ -5,12 +5,11 @@ The key is forwarded to the provider once (to list models) and never stored or l
 Rate-limited per IP so the endpoint can't be used to test stolen keys in bulk.
 """
 
-import redis.asyncio as aioredis
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
 
 from app import ai
-from app.redis import get_redis
 from app.schemas.ai import AIKeyCheckIn, AIKeyCheckOut, AIModelOption
+from app.store import Store, get_store
 
 router = APIRouter(prefix="/ai", tags=["ai"])
 
@@ -22,16 +21,16 @@ async def check_key(
     body: AIKeyCheckIn,
     request: Request,
     x_forwarded_for: str | None = Header(default=None),
-    redis: aioredis.Redis = Depends(get_redis),
+    store: Store = Depends(get_store),
 ) -> AIKeyCheckOut:
     """Verify the key with its provider. 400 AI_KEY_INVALID if rejected; 429 when over the limit."""
     ip = (x_forwarded_for or "").split(",")[0].strip() or (
         request.client.host if request.client else "unknown"
     )
     key = f"ai_check:{ip}"
-    count = await redis.incr(key)
+    count = await store.incr(key)
     if count == 1:
-        await redis.expire(key, 3600)
+        await store.expire(key, 3600)
     if count > _CHECKS_PER_HOUR:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,

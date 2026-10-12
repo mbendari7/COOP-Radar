@@ -5,8 +5,9 @@
  * This component just renders what the API returns and reports user
  * interactions (column header clicks) back to the parent via callbacks.
  *
- * Below the `md` breakpoint we switch to PostingCard list instead of a table
- * so the content is usable on mobile without horizontal scrolling.
+ * view="cards" (the default on the jobs page) shows a PostingCard list at every width;
+ * view="table" shows the sortable table on wide screens. Phones always get cards, so
+ * nothing needs horizontal scrolling.
  */
 
 import {
@@ -90,6 +91,7 @@ interface Props {
   showBookmarks?: boolean
   /** Shown as a "Clear all filters" button inside the empty state */
   onClearFilters?: () => void
+  view?: 'cards' | 'table'
 }
 
 export default function PostingsTable({
@@ -102,6 +104,7 @@ export default function PostingsTable({
   onSortChange,
   showBookmarks = false,
   onClearFilters,
+  view = 'table',
 }: Props) {
   const navigate = useNavigate()
 
@@ -134,7 +137,7 @@ export default function PostingsTable({
   if (isError) {
     return (
       <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center">
-        <p className="text-red-700 font-medium">Something went wrong loading postings.</p>
+        <p className="text-red-700 font-medium">The jobs didn't load. Check your connection and try again.</p>
         <button
           onClick={onRetry}
           className="mt-3 px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
@@ -145,11 +148,12 @@ export default function PostingsTable({
     )
   }
 
-  // ── Mobile card layout (<md) ────────────────────────────────────────────────
+  // ── Empty state ─────────────────────────────────────────────────────────────
   if (!isLoading && data.length === 0) {
     return (
       <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center">
-        <p className="text-gray-500">No postings match — clear filters</p>
+        <p className="font-medium text-gray-800">No jobs match these filters</p>
+        <p className="mt-1 text-sm text-gray-500">Try removing a filter or searching for something broader.</p>
         {onClearFilters && (
           <button
             type="button"
@@ -165,8 +169,8 @@ export default function PostingsTable({
 
   return (
     <>
-      {/* Mobile cards */}
-      <div className="md:hidden space-y-3">
+      {/* Cards: always on phones, at every width in card view */}
+      <div className={`${view === 'cards' ? '' : 'md:hidden'} space-y-3`}>
         {isLoading
           ? Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
           : data.map((posting) => (
@@ -176,6 +180,7 @@ export default function PostingsTable({
       </div>
 
       {/* Desktop table */}
+      {view === 'table' && (
       <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200 bg-white">
         <table className="w-full text-sm" role="table" aria-label="Co-op postings">
           <thead className="bg-gray-50 border-b border-gray-200">
@@ -270,6 +275,7 @@ export default function PostingsTable({
           </tbody>
         </table>
       </div>
+      )}
     </>
   )
 }

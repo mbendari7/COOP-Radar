@@ -5,6 +5,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { aiHeaders } from './aiKey'
 import { API_BASE, apiFetch, toApiError } from './client'
+import type { CategoryKey, WorkMode } from './postings'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -23,8 +24,27 @@ export interface MatchResultOut {
   province: string
   term: string
   deadline: string
-  score: number        // 0–100
+  score: number        // 0-100
   reason: string
+  work_mode: string
+  /** The posting's skills that the resume shows, and the ones it doesn't */
+  matched_skills: string[]
+  missing_skills: string[]
+}
+
+/** What the student is looking for; matching only considers jobs that fit. */
+export interface JobPreferences {
+  categories: CategoryKey[]
+  keywords: string
+  province: string
+  city: string
+  work_modes: WorkMode[]
+  /** entry: students + entry-level · students: co-op/intern only · all */
+  level: 'entry' | 'students' | 'all'
+}
+
+export const DEFAULT_PREFERENCES: JobPreferences = {
+  categories: [], keywords: '', province: '', city: '', work_modes: [], level: 'entry',
 }
 
 export interface UploadResponse {
@@ -35,6 +55,7 @@ export interface UploadResponse {
 export interface MatchesResponse {
   items: MatchResultOut[]
   resume: ResumeOut | null
+  preferences?: JobPreferences | null
 }
 
 export interface DemandSkill {
@@ -66,9 +87,10 @@ export type AskMode = 'question' | 'tailor' | 'cover_letter'
 
 const fetchMatches = () => apiFetch<MatchesResponse>('/api/resume/matches')
 
-function uploadResumeFile(file: File): Promise<UploadResponse> {
+function uploadResumeFile({ file, preferences }: { file: File; preferences?: JobPreferences }): Promise<UploadResponse> {
   const form = new FormData()
   form.append('file', file)
+  if (preferences) form.append('preferences', JSON.stringify(preferences))
   return apiFetch<UploadResponse>('/api/resume', { method: 'POST', body: form, headers: aiHeaders() })
 }
 
@@ -95,6 +117,20 @@ export function useUploadResume() {
       void queryClient.invalidateQueries({ queryKey: ['matches'] })
       void queryClient.invalidateQueries({ queryKey: ['insights'] })
     },
+  })
+}
+
+/** Save what the student is looking for and re-match the stored resume (free). */
+export function useUpdatePreferences() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (preferences: JobPreferences) =>
+      apiFetch<UploadResponse>('/api/resume/preferences', {
+        method: 'PUT',
+        headers: aiHeaders(),
+        json: preferences,
+      }),
+    onSuccess: () => void queryClient.invalidateQueries({ queryKey: ['matches'] }),
   })
 }
 

@@ -47,7 +47,7 @@ export default function ClaimAccountForm({ onDone }: { onDone?: () => void }) {
         disabled={claim.isPending}
         className="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
       >
-        {claim.isPending ? 'Saving…' : 'Keep my account'}
+        {claim.isPending ? 'Saving...' : 'Keep my account'}
       </button>
       {claim.isError && (
         <p role="alert" className="text-sm text-red-600 sm:basis-full">

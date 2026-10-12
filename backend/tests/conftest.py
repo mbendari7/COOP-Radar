@@ -30,7 +30,7 @@ import app.models  # noqa: E402,F401 — registers every table on Base.metadata
 from app.config import get_settings  # noqa: E402
 from app.db import Base, get_db  # noqa: E402
 from app.main import create_app  # noqa: E402
-from app.redis import get_redis  # noqa: E402
+from app.store import get_store  # noqa: E402
 
 get_settings.cache_clear()
 
@@ -73,7 +73,7 @@ async def db_session(db_engine: AsyncEngine) -> AsyncGenerator[AsyncSession, Non
 
 
 class MockRedis:
-    """In-memory Redis stand-in — covers every command the app uses."""
+    """In-memory stand-in for the session store (app/store.py) — every command the app uses."""
 
     def __init__(self) -> None:
         self._store: dict[str, dict[str, str]] = {}
@@ -110,13 +110,21 @@ def mock_redis() -> MockRedis:
 
 
 @pytest.fixture(autouse=True)
+def fresh_category_counts() -> None:
+    """Each test seeds its own postings, so don't reuse job type counts between tests."""
+    from app.services.postings import clear_category_counts_cache
+
+    clear_category_counts_cache()
+
+
+@pytest.fixture(autouse=True)
 def fake_queue(monkeypatch: pytest.MonkeyPatch) -> MagicMock:
     """
-    Replace the RQ queue so no test needs a real Redis. Tests can assert on
-    `fake_queue.enqueue` to check which jobs were queued.
+    Stop background jobs from really starting. Tests can assert on
+    `fake_queue.enqueue` to check which jobs were started (see app/jobs.py).
     """
     queue = MagicMock()
-    monkeypatch.setattr("app.worker.create_queue", lambda conn=None: queue)
+    monkeypatch.setattr("app.jobs.enqueue", queue.enqueue)
     return queue
 
 
@@ -134,12 +142,12 @@ async def client(
     async def override_get_db() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
 
-    async def override_get_redis() -> AsyncGenerator[MockRedis, None]:
+    async def override_get_store() -> AsyncGenerator[MockRedis, None]:
         yield mock_redis
 
     app.dependency_overrides[get_db] = override_get_db
-    app.dependency_overrides[get_redis] = override_get_redis
-    app.state.redis = mock_redis
+    app.dependency_overrides[get_store] = override_get_store
+    app.state.store = mock_redis
 
     async with AsyncClient(
         transport=ASGITransport(app=app),

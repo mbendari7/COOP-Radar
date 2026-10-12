@@ -59,13 +59,13 @@ function renderTable(props: Partial<React.ComponentProps<typeof PostingsTable>> 
 describe('PostingsTable', () => {
   it('shows empty state when data is empty', () => {
     renderTable({ data: [] })
-    expect(screen.getByText(/No postings match/i)).toBeInTheDocument()
+    expect(screen.getByText(/No jobs match/i)).toBeInTheDocument()
   })
 
   it('shows error state and retry button on error', () => {
     const onRetry = vi.fn()
     renderTable({ isError: true, onRetry })
-    expect(screen.getByText(/Something went wrong/i)).toBeInTheDocument()
+    expect(screen.getByText(/didn't load/i)).toBeInTheDocument()
 
     fireEvent.click(screen.getByRole('button', { name: /try again/i }))
     expect(onRetry).toHaveBeenCalledOnce()

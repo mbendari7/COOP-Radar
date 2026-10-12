@@ -10,7 +10,7 @@ to explain it in a pitch or an interview.
 
 ## 1. The one-paragraph version
 
-CoopRadar is a website for co-op students. A background worker **imports real jobs** from Canadian employers' own
+CoopRadar is a website for co-op students. A background job **imports real jobs** from Canadian employers' own
 career pages (the public Greenhouse, Lever, and Ashby job-board APIs) into a **PostgreSQL** database. A student
 **drops in their resume**, with no sign-up needed. In SQL, the app finds which in-demand skills the resume shows and
 which it's missing, and ranks the open jobs that fit a *student* best. With the student's **own AI key** (Claude,
@@ -23,12 +23,13 @@ also search every job and track applications on a board.
 
 ```
  Student's browser ──▶  one website (FastAPI serves the React app + the /api)
-                              │            │                 │
-                         PostgreSQL      Redis          the student's AI
-                     (jobs, users,   (sessions, rate   (Claude / ChatGPT / Gemini,
-                      resumes, search) limits, job queue)  their own key, per request)
+                              │                              │
+                         PostgreSQL                     the student's AI
+                  (jobs, users, resumes,           (Claude / ChatGPT / Gemini,
+                   sessions, search)                their own key, per request)
                               ▲
-                         worker ── every 6 h ──▶ employers' public career-board APIs
+              background jobs ── every 6 h ──▶ employers' public career-board APIs
+              (inside the same server)
 ```
 
 | Part | What it does | Where |
@@ -36,11 +37,11 @@ also search every job and track applications on a board.
 | **Website** (frontend) | Pages: Jobs, My resume, Tracker, AI key. React + TypeScript. | `frontend/src/` |
 | **API** (backend) | Checks who you are, runs the logic, talks to the database. FastAPI (Python). | `backend/app/` |
 | **Database** | Stores everything **and** does the searching (full-text, skill overlap, optional vectors). | `backend/app/models/`, migrations in `backend/alembic/versions/` |
-| **Redis** | Fast memory for login sessions, rate limits, and the background job queue. | `backend/app/redis.py` |
-| **Worker** | Imports jobs from career boards every 6 hours (and creates search vectors if enabled). | `backend/app/worker.py`, `backend/app/ingest/` |
+| **Session store** | Remembers who's logged in, plus rate-limit counters. A small Postgres table by default; Redis if `REDIS_URL` is set. | `backend/app/store.py` |
+| **Background jobs** | Import jobs from career boards every 6 hours (and create search vectors if enabled), inside the web server. | `backend/app/jobs.py`, `backend/app/ingest/` |
 
-In production all of this is **one container** (`Dockerfile`) plus a database and Redis, which Render creates from
-`render.yaml` with one click.
+All of this is **one server process plus one database**. On your computer, `python start.py` sets up and runs it
+(it even runs the database for you). Online, Render creates both from `render.yaml` with one click.
 
 ### Inside the backend: four layers (same for every feature)
 | Layer | Folder | Job | Example |
@@ -56,7 +57,7 @@ In production all of this is **one container** (`Dockerfile`) plus a database an
 
 ### 3.1 Jobs arrive (the importer)
 `backend/app/ingest/` · sources listed in `backend/seed/job_boards.py`
-1. On start-up and every 6 hours, the worker queues one import per employer (`worker.py`).
+1. On start-up and every 6 hours, the scheduler runs one import per employer, one after another (`jobs.py`).
 2. The **adapter** for that employer's job board (`boards.py`: Greenhouse, Lever, or Ashby) downloads the
    company's public job list as JSON. These APIs exist so companies can show their jobs on other sites. No keys,
    no scraping, and every job links back to the employer.
@@ -126,7 +127,7 @@ If the reply is garbage, it falls back to the free ranking.
   `google-genai`) and maps their errors to clear messages. The key is never stored, logged, or echoed.
 
 ### 3.9 Accounts, keeping a temporary account, and the tracker
-- Passwords are hashed with **argon2id**. Sessions are random tokens in Redis (7-day rolling expiry), sent as
+- Passwords are hashed with **argon2id**. Sessions are random tokens in the session store (7-day rolling expiry), sent as
   **HTTP-only cookies**.
 - **Keep my account** → `POST /api/me/claim` adds an email and password to a temporary account and clears
   `is_demo`. Everything stays.
@@ -171,14 +172,15 @@ If the reply is garbage, it falls back to the free ranking.
 > your resume and write a tailoring plan and cover letter opener for any job. No sign-up needed."
 
 ### 30-second version (to an engineer or employer)
-> "It's a full-stack app: React and TypeScript on FastAPI with PostgreSQL. A worker imports real jobs from
+> "It's a full-stack app: React and TypeScript on FastAPI with PostgreSQL. A background scheduler imports real jobs from
 > employers' public Greenhouse, Lever, and Ashby APIs every six hours, with location parsing and de-duplication. Resume
 > matching runs in SQL first. Skill coverage plus a student-fit adjustment ranks jobs for free. Then an optional
 > bring-your-own-key layer uses Claude, ChatGPT, or Gemini for reviews, re-ranking, and streamed tailoring. One
-> container on Render, 264 tests, CI with a production smoke test."
+> command to run it (`python start.py`, no Docker), one click to host it on Render, 273 tests, CI that starts
+> the real site and smoke-tests it."
 
 ### 2-minute walkthrough (follow the data)
-1. **Data in**: the worker pulls about 800 Canadian jobs from 27 employers' public job-board APIs, filters to
+1. **Data in**: a background job pulls about 800 Canadian jobs from 27 employers' public job-board APIs, filters to
    Canada, parses locations, de-duplicates, and tags skills.
 2. **Resume in**: drop a file and you get a temporary account. Text is extracted, and only the text is stored.
 3. **Free intelligence**: SQL finds skills found and missing (`unnest` and `GROUP BY` over all open jobs) and ranks
@@ -187,7 +189,7 @@ If the reply is garbage, it falls back to the free ranking.
    replies are validated, results are cached, and answers stream.
 5. **Product details**: no sign-up, keep the account later, a tracker board, mobile-friendly, keys never leave the
    browser except per request.
-6. **Quality**: 264 tests, strict typing, CI that boots the real production image.
+6. **Quality**: 273 tests, strict typing, CI that starts the real site the way the host does.
 
 ### Likely questions
 | Question | Answer |
@@ -199,7 +201,7 @@ If the reply is garbage, it falls back to the free ranking.
 | *Why bring-your-own-key?* | Hosting stays free, users control their own spend, and they pick the provider they trust. The key stays in their browser. |
 | *How does "no sign-up" work securely?* | A temporary account with a random password nobody knows and a normal HTTP-only session, rate-limited per network and deleted after 7 days unless claimed with an email and password. |
 | *What breaks if a job board changes?* | Only that source. The run is logged, it auto-pauses after 3 failures, and the other 26 keep working. Adapters are tested against recorded responses. |
-| *How would it scale?* | Search is indexed SQL (p95 about 55 ms on 10,000 postings in CI). The AI cost sits with users. The importer is a queue, so more workers can be added. |
+| *How would it scale?* | Search is indexed SQL (p95 about 55 ms on 10,000 postings in CI). The AI cost sits with users. Imports run as bounded background jobs; under heavy load they can move to a separate worker, and sessions can move to Redis by setting `REDIS_URL`. |
 | *What's next?* | More employers and schools' public feeds, email alerts for new matches, a tool-using assistant exposed over MCP, and per-school location presets. |
 
 ---
@@ -219,4 +221,4 @@ If the reply is garbage, it falls back to the free ranking.
 | Home page hero | `frontend/src/components/WelcomeHero.tsx` |
 | AI providers and key handling | `backend/app/ai.py`, `frontend/src/api/aiKey.ts`, `pages/AiKeyPage.tsx` |
 | A database table | `backend/app/models/` + a migration (the `/db-migration` skill) |
-| Hosting | `Dockerfile`, `render.yaml`, `docker-compose.prod.yml`, `docs/DEPLOY.md` |
+| Running and hosting | `start.py`, `render.yaml`, `docs/DEPLOY.md` |

@@ -18,10 +18,10 @@ Pick the one that fits you:
 | You are… | Do this |
 |---|---|
 | **A student** someone shared a link with | Just open the link. Skip to [section 2](#2-use-it-in-3-steps). |
-| **The person sharing it** (you want your own copy online) | [Put it online in about 10 minutes](#put-your-own-copy-online-no-docker-no-coding) (free, no Docker, no coding) |
-| **A developer** who wants it on your own computer | [Run it on your computer](#run-it-on-your-computer) |
+| **The person sharing it** (you want your own copy online) | [Put it online in about 10 minutes](#put-your-own-copy-online-no-coding) (free, no coding) |
+| **Anyone** who wants it on their own computer | [Run it on your computer](#run-it-on-your-computer) (one command) |
 
-### Put your own copy online (no Docker, no coding)
+### Put your own copy online (no coding)
 
 This uses **Render**, a hosting site with a free plan. Render builds everything on its own servers. You only click
 buttons in your browser.
@@ -29,7 +29,7 @@ buttons in your browser.
 1. Make a free account at **https://render.com** by choosing **Sign up with GitHub**.
 2. Go to the project's GitHub page and click the purple **Deploy to Render** button near the top of the README.
    (Or, in Render: **New → Blueprint**, then pick the `COOP-Radar` repository.)
-3. Render lists what it will create: the website, a database, and a small cache. Click **Apply** (or
+3. Render lists what it will create: the website and a database. Click **Apply** (or
    **Deploy Blueprint**).
 4. It asks for `ANTHROPIC_API_KEY` and `OPENAI_API_KEY`. **Leave both blank.** Visitors use their own free AI key.
 5. Wait about 5–10 minutes for the first build. When it says **Live**, open the link at the top of the page. It looks
@@ -39,6 +39,12 @@ buttons in your browser.
 
 That link is your website. Share it with anyone.
 
+**Want a Vercel address instead (`your-site.vercel.app`)?** Do the Render steps first (Render runs the part with
+the database). Then sign in at **https://vercel.com** with GitHub, click **Add New, Project**, pick `COOP-Radar`
+and click **Deploy**. Vercel shows the pages and quietly passes every `/api` request on to your Render site. If
+your Render address isn't `https://coopradar.onrender.com`, change that address in `vercel.json` first. Details in
+`docs/DEPLOY.md`.
+
 > **About the free plan:** the site falls asleep after about 15 minutes with no visitors. The next visitor waits
 > about a minute while it wakes up. Render's free database is also time-limited (about 30 days at the time of
 > writing). Before an important demo or pitch, open the site yourself a minute early. For an always-on site,
@@ -47,61 +53,66 @@ That link is your website. Share it with anyone.
 
 ### Run it on your computer
 
-You need **[Docker Desktop](https://www.docker.com/products/docker-desktop/)** installed and running.
-Then, in a terminal:
+You need two free programs (both have normal installers):
+- **[Python](https://www.python.org/downloads/)** 3.12 or newer. On Windows, tick **Add python.exe to PATH**.
+- **[Node.js](https://nodejs.org)** (the **LTS** version).
+
+Then open a terminal (on Windows: **PowerShell**) and run:
 
 ```bash
 git clone https://github.com/mbendari7/COOP-Radar.git
 cd COOP-Radar
-cp .env.example .env                                  # then open .env and set POSTGRES_PASSWORD to anything
-docker compose -f docker-compose.prod.yml up --build
+python start.py
 ```
 
-Open **http://localhost:8080**. The first start takes a few minutes. To stop it, press `Ctrl + C`.
+(No `git`? On the GitHub page click **Code → Download ZIP**, unzip it, open a terminal in that folder, and run
+`python start.py`.)
+
+The first time takes a few minutes. It installs everything, builds the website, and creates a private database in
+a `.coopradar` folder in your home folder. Then your browser opens **http://localhost:8000** by itself. Real jobs
+appear on the **Jobs** page a minute or two later. After that, `python start.py` starts in a few seconds.
+
+To stop it, press `Ctrl + C` in the terminal. To start over with empty data, delete the `.coopradar` folder in your
+home folder.
 
 ---
 
 ## 2. Use it in 3 steps
 
-### Step 1: Upload your resume
-Click **My resume** (or **Analyze my resume** on the home page). Drag your resume onto the box, or click it to
-choose a file (PDF or Word, up to 5 MB).
+### Step 1: Say what you're looking for
+Click **Match my resume**. Pick the job types you want (Software & web, Data & AI, Design & UX, Business & finance
+and more; each shows how many jobs are open), add a job title or keywords if you like ("data analyst"), choose a
+province, work mode (on-site, hybrid, remote) and level (*Students & entry-level*, *Co-op & intern only*, or
+*All levels*). Leave anything empty to see everything. Remote jobs are always included.
+
+### Step 2: Upload your resume
+Drag your resume onto the box, or click it to choose a file (PDF or Word, up to 5 MB).
 
 You don't need an account. The site makes you a **private temporary account** that's kept for 7 days. To keep it
 for good, click **Keep my account** in the yellow bar and add an email and password. Everything stays.
 
-### Step 2: Read what your resume says
-Right away, for free:
-- **Skills employers can see**: skills found on your resume that real postings ask for.
-- **In demand, but not on your resume**: the skills open jobs ask for most, with how many jobs want each.
+### Step 3: See the jobs your resume fits
+**Jobs that fit your resume** lists your 20 best matches within your choices, best first, each with a score out of
+100, the job's skills that are **on your resume**, and the ones **worth adding, if you have them**. Change your
+choices in step 1 and click **Update my matches** any time; it's free and takes a second.
 
-For the full picture, click **Get my AI review**. You'll need an AI key first ([how to get one free](#3-get-a-free-ai-key-optional)).
-The review gives you:
-- 💪 **What you're good at**, with evidence from your resume
-- 🛠️ **What to fix**, like weak bullet points or missing numbers
-- 🎯 **How to tailor it** for co-op applications
-- 🔎 **Roles to search for**. Click one to search the jobs list.
-- 🏷️ **Keywords to add**, but only ones that are true for you
+For each job:
+- **View job and apply** opens the posting; apply on the company's own site. CoopRadar never applies for you.
+- **Save to tracker** keeps it in your tracker.
+- With an AI key: **Tailor my resume for this job**, **Write a cover letter opener**, or **Ask a question**
+  ("Do I have the skills for this?"). Answers quote your resume or the posting.
 
-### Step 3: Apply to the right jobs
-Under **Jobs to apply for** you get your 20 best matches, each with a score out of 100 and a reason like
-*"You have Python, SQL; it also asks for Go."* For each job:
-- **✏️ Tailor my resume**: what to lead with, three bullet rewrites, keywords from the posting, and gaps to address
-- **✉️ Cover letter opener**: a first paragraph written from your real experience
-- **Ask a question**: for example "Do I have the skills for this?" Answers quote your resume or the posting.
-
-Click the job title, then **Apply on the company's site**. CoopRadar never applies for you. It sends you to the
-employer.
+The **Resume feedback** tab shows, for free, the skills employers can see on your resume and the in-demand skills
+it's missing. With an AI key, **Review my resume** adds what you're good at, what to fix, how to tailor it, roles to
+search for, and keywords to add (only ones that are true for you).
 
 ### Also handy
-- **Jobs**: search everything. Filter by city (remote jobs always show up too), term, work mode, or skills.
-  Tick **Co-op & intern roles only** to hide full-time senior roles. **Live** means the job came straight from the
-  employer's careers page.
-- **Tracker**: bookmark jobs, then move each one through *Applying → Applied → Interview → Offer*. You can add
-  notes and dates, and you can export to a spreadsheet.
-- **Try the demo**: opens a pre-filled sample account so you can see everything before uploading your own resume.
-
----
+- **Jobs**: search and filter everything. The sidebar has job type, experience level, province and city, work
+  mode, date posted, term and length, company, and skills. Sort by newest, deadline, company or title, and switch
+  between cards and a table.
+- **Tracker**: bookmark jobs, then move each one through *Applying, Applied, Interview, Offer*. You can add notes
+  and dates, and export to a spreadsheet.
+- **Try it with a sample resume**: opens a pre-filled sample account so you can see everything first.
 
 ## 3. Get a free AI key (optional)
 

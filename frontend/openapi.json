@@ -243,12 +243,59 @@
             "contentMediaType": "application/octet-stream",
             "title": "File",
             "type": "string"
+          },
+          "preferences": {
+            "anyOf": [
+              {
+                "maxLength": 2000,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preferences"
           }
         },
         "required": [
           "file"
         ],
         "title": "Body_upload_resume_endpoint_api_resume_post",
+        "type": "object"
+      },
+      "CategoryCount": {
+        "description": "A job type for the filter list, with how many open postings it has.",
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "key": {
+            "enum": [
+              "software",
+              "data",
+              "design",
+              "product",
+              "hardware",
+              "it_security",
+              "business",
+              "sales_marketing",
+              "customer"
+            ],
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "count"
+        ],
+        "title": "CategoryCount",
         "type": "object"
       },
       "ChangePasswordIn": {
@@ -370,12 +417,33 @@
       "FilterMeta": {
         "description": "Distinct values available for each filter dropdown.\nPopulated from the postings table so the frontend never shows a city\nthat has zero postings.",
         "properties": {
+          "categories": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/CategoryCount"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
           "cities": {
             "items": {
               "type": "string"
             },
             "title": "Cities",
             "type": "array"
+          },
+          "companies": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Companies",
+            "type": "array"
+          },
+          "open_jobs": {
+            "default": 0,
+            "title": "Open Jobs",
+            "type": "integer"
           },
           "provinces": {
             "items": {
@@ -596,6 +664,70 @@
         "title": "IngestSourceOut",
         "type": "object"
       },
+      "JobPreferences": {
+        "description": "What the student is looking for, set before or after uploading. Matching only considers\nopen postings that fit these; keywords (e.g. \"data analyst\") rank fitting postings higher.",
+        "properties": {
+          "categories": {
+            "default": [],
+            "items": {
+              "enum": [
+                "software",
+                "data",
+                "design",
+                "product",
+                "hardware",
+                "it_security",
+                "business",
+                "sales_marketing",
+                "customer"
+              ],
+              "type": "string"
+            },
+            "maxItems": 9,
+            "title": "Categories",
+            "type": "array"
+          },
+          "city": {
+            "default": "",
+            "maxLength": 100,
+            "title": "City",
+            "type": "string"
+          },
+          "keywords": {
+            "default": "",
+            "maxLength": 100,
+            "title": "Keywords",
+            "type": "string"
+          },
+          "level": {
+            "default": "entry",
+            "enum": [
+              "entry",
+              "students",
+              "all"
+            ],
+            "title": "Level",
+            "type": "string"
+          },
+          "province": {
+            "default": "",
+            "maxLength": 2,
+            "title": "Province",
+            "type": "string"
+          },
+          "work_modes": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/WorkMode"
+            },
+            "maxItems": 3,
+            "title": "Work Modes",
+            "type": "array"
+          }
+        },
+        "title": "JobPreferences",
+        "type": "object"
+      },
       "LoginIn": {
         "description": "Login payload — password has no min length here (wrong pw → 401, not 422).",
         "properties": {
@@ -727,6 +859,22 @@
             "title": "Deadline",
             "type": "string"
           },
+          "matched_skills": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Matched Skills",
+            "type": "array"
+          },
+          "missing_skills": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Skills",
+            "type": "array"
+          },
           "posting_id": {
             "format": "uuid",
             "title": "Posting Id",
@@ -750,6 +898,11 @@
           },
           "title": {
             "title": "Title",
+            "type": "string"
+          },
+          "work_mode": {
+            "default": "",
+            "title": "Work Mode",
             "type": "string"
           }
         },
@@ -775,6 +928,16 @@
             },
             "title": "Items",
             "type": "array"
+          },
+          "preferences": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobPreferences"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "resume": {
             "anyOf": [
@@ -2256,7 +2419,7 @@
     },
     "/api/health": {
       "get": {
-        "description": "Liveness probe used by Docker/CI — no DB or Redis calls.",
+        "description": "Liveness probe used by the host and CI — no database calls.",
         "operationId": "health_api_health_get",
         "responses": {
           "200": {
@@ -2616,6 +2779,71 @@
                 }
               ],
               "title": "Skills"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "software",
+                      "data",
+                      "design",
+                      "product",
+                      "hardware",
+                      "it_security",
+                      "business",
+                      "sales_marketing",
+                      "customer"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "company",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company"
+            }
+          },
+          {
+            "in": "query",
+            "name": "posted_within",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Posted Within"
             }
           },
           {
@@ -3103,7 +3331,7 @@
         ]
       },
       "post": {
-        "description": "Upload a resume (PDF/DOCX, ≤5 MB), extract text, run match pipeline,\nstore results, and return ranked matches. With the visitor's AI key (X-AI-* headers) the\nAI ranks and explains matches; without any key, matches are ranked by skill overlap for\nfree. Only the site owner's fallback key counts toward the daily AI limit.",
+        "description": "Upload a resume (PDF/DOCX, ≤5 MB), extract text, run match pipeline,\nstore results, and return ranked matches. With the visitor's AI key (X-AI-* headers) the\nAI ranks and explains matches; without any key, matches are ranked by skill overlap for\nfree. Only the site owner's fallback key counts toward the daily AI limit.\n`preferences` (optional) is a JobPreferences JSON object: what the student is looking for.",
         "operationId": "upload_resume_endpoint_api_resume_post",
         "parameters": [
           {
@@ -3516,6 +3744,114 @@
           }
         },
         "summary": "Ask About Posting",
+        "tags": [
+          "resume"
+        ]
+      }
+    },
+    "/api/resume/preferences": {
+      "put": {
+        "description": "Save what the student is looking for (job types, location, work mode, level, keywords)\nand re-match the stored resume against it. Uses the visitor's own AI key if they set one;\notherwise the free ranking, so changing filters never spends the site owner's AI quota.",
+        "operationId": "update_preferences_endpoint_api_resume_preferences_put",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "x-ai-provider",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Ai-Provider"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-ai-key",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Ai-Key"
+            }
+          },
+          {
+            "in": "header",
+            "name": "x-ai-model",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "X-Ai-Model"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/JobPreferences"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UploadResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Update Preferences Endpoint",
         "tags": [
           "resume"
         ]

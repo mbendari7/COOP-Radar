@@ -44,7 +44,7 @@ function CopyButton({ text }: { text: string }) {
       }}
       className="text-xs text-gray-500 hover:text-gray-800"
     >
-      {copied ? 'Copied ✓' : 'Copy'}
+      {copied ? 'Copied' : 'Copy'}
     </button>
   )
 }
@@ -127,10 +127,10 @@ export default function ConversationPanel({ postingId, postingTitle, company }: 
     <div>
       <div className="flex flex-wrap gap-2">
         <button type="button" disabled={loading} onClick={() => void run('tailor', '')} className={actionClass}>
-          ✏️ Tailor my resume
+          Tailor my resume for this job
         </button>
         <button type="button" disabled={loading} onClick={() => void run('cover_letter', '')} className={actionClass}>
-          ✉️ Cover letter opener
+          Write a cover letter opener
         </button>
         <button
           type="button"
@@ -161,7 +161,7 @@ export default function ConversationPanel({ postingId, postingTitle, company }: 
                   ) : (
                     <div className="text-gray-700">
                       <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs text-gray-500">{msg.streaming ? 'Writing…' : 'Assistant'}</span>
+                        <span className="text-xs text-gray-500">{msg.streaming ? 'Writing...' : 'Assistant'}</span>
                         {!msg.streaming && msg.text && <CopyButton text={msg.text} />}
                       </div>
                       <RichText text={msg.text} />
@@ -202,7 +202,7 @@ export default function ConversationPanel({ postingId, postingTitle, company }: 
               disabled={!input.trim() || loading}
               className="shrink-0 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-brand-500"
             >
-              {loading ? '…' : 'Send'}
+              {loading ? '...' : 'Send'}
             </button>
           </div>
           <p className="text-xs text-gray-500">

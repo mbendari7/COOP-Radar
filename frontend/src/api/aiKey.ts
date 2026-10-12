@@ -139,7 +139,7 @@ export const PROVIDER_GUIDES: ProviderGuide[] = [
       'Click "Get API key", then "Create API key".',
       'Copy the key (it starts with "AIza") and paste it below.',
     ],
-    cost: 'Has a free tier with usage limits — the easiest way to start. On the free tier Google may use your inputs to improve its products.',
+    cost: 'Has a free tier with usage limits, so it is the easiest way to start. On the free tier Google may use your inputs to improve its products.',
   },
   {
     id: 'openai',
@@ -149,7 +149,7 @@ export const PROVIDER_GUIDES: ProviderGuide[] = [
     consoleUrl: 'https://platform.openai.com/api-keys',
     steps: [
       'Sign in at platform.openai.com (this is separate from a ChatGPT Plus subscription).',
-      'Add credit under Settings → Billing — the API is pay-as-you-go.',
+      'Add credit under Settings, then Billing. The API is pay-as-you-go.',
       'Go to API keys → "Create new secret key", copy it, and paste it below.',
     ],
     cost: 'Pay per use from prepaid credit. A resume match plus a few questions usually costs cents.',
@@ -162,7 +162,7 @@ export const PROVIDER_GUIDES: ProviderGuide[] = [
     consoleUrl: 'https://console.anthropic.com/settings/keys',
     steps: [
       'Sign in at console.anthropic.com (separate from a Claude.ai subscription).',
-      'Add credit under Settings → Billing — the API is pay-as-you-go.',
+      'Add credit under Settings, then Billing. The API is pay-as-you-go.',
       'Go to API keys → "Create Key", copy it, and paste it below.',
     ],
     cost: 'Pay per use from prepaid credit. A resume match plus a few questions usually costs cents.',

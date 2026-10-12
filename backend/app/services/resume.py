@@ -2,7 +2,9 @@
 Resume upload, text extraction, match pipeline, and delete logic.
 
 Match pipeline (two stages):
-  1. Shortlist ~40 open postings. Default: by the share of each posting's skills found in the
+  0. Only open postings that fit the student's preferences (job type, location, work mode,
+     level) are considered; preference keywords ("data analyst") rank fitting postings higher.
+  1. Shortlist ~40 of them. Default: by the share of each posting's skills found in the
      resume (pure SQL, no AI key needed). If the site owner set OPENAI_API_KEY, by embedding
      similarity instead.
   2. The visitor's own AI (Claude, ChatGPT, or Gemini — see app/ai.py) scores the shortlist
@@ -17,7 +19,7 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import ARRAY, Text, case, delete, func, literal, select, text
+from sqlalchemy import ARRAY, Text, case, delete, func, literal, or_, select, text
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -27,10 +29,17 @@ from app.config import get_settings
 from app.ingest.skill_match import mentions
 from app.llm import parse_json
 from app.models.match_result import MatchResult
-from app.models.posting import Posting
+from app.models.posting import Posting, WorkMode
 from app.models.posting_embedding import PostingEmbedding
 from app.models.resume import Resume
-from app.schemas.resume import MatchesResponse, MatchResultOut, ResumeOut, UploadResponse
+from app.schemas.resume import (
+    JobPreferences,
+    MatchesResponse,
+    MatchResultOut,
+    ResumeOut,
+    UploadResponse,
+)
+from app.services.categories import any_category
 from app.services.postings import SENIOR_TITLE_PATTERN, STUDENT_TITLE_PATTERN
 
 logger = logging.getLogger(__name__)
@@ -104,14 +113,42 @@ _OPEN = (Posting.closed_at.is_(None), Posting.deadline >= func.current_date())
 
 
 
-def _student_fit(similarity: Any) -> Any:
+def _student_fit(similarity: Any, prefs: JobPreferences | None = None) -> Any:
     """
     Adjust a 0-1 relevance for a student: senior titles count half, co-op / intern /
-    new-grad titles get a +25 boost. Capped at 1.
+    new-grad titles get a +25 boost, and postings matching the preference keywords +30.
+    Capped at 1.
     """
     seniority = case((Posting.title.op("~*")(SENIOR_TITLE_PATTERN), 0.5), else_=1.0)
     student = case((Posting.title.op("~*")(STUDENT_TITLE_PATTERN), 0.25), else_=0.0)
-    return func.least(similarity * seniority + student, 1.0)
+    adjusted = similarity * seniority + student
+    if prefs is not None and prefs.keywords.strip():
+        # websearch_to_tsquery takes the keywords as a bound parameter, never as SQL
+        query = func.websearch_to_tsquery("english", prefs.keywords.strip())
+        adjusted = adjusted + case((Posting.search_vector.op("@@")(query), 0.3), else_=0.0)
+    return func.least(adjusted, 1.0)
+
+
+def preference_filters(prefs: JobPreferences | None) -> list[Any]:
+    """SQL conditions for the postings a student wants to see (none = everything open)."""
+    if prefs is None:
+        return []
+    remote = Posting.work_mode == WorkMode.remote
+    clauses: list[Any] = []
+    if prefs.categories:
+        clauses.append(any_category(prefs.categories))
+    # Remote jobs can be done from anywhere, so they always count as "in" a location
+    if prefs.province:
+        clauses.append(or_(Posting.province.ilike(prefs.province), remote))
+    if prefs.city:
+        clauses.append(or_(Posting.city.ilike(prefs.city), remote))
+    if prefs.work_modes:
+        clauses.append(Posting.work_mode.in_(prefs.work_modes))
+    if prefs.level == "students":
+        clauses.append(Posting.title.op("~*")(STUDENT_TITLE_PATTERN))
+    elif prefs.level == "entry":
+        clauses.append(Posting.title.op("!~*")(SENIOR_TITLE_PATTERN))
+    return clauses
 
 
 def skills_in_text(skills: list[str], text_value: str) -> list[str]:
@@ -120,7 +157,9 @@ def skills_in_text(skills: list[str], text_value: str) -> list[str]:
     return [skill for skill in skills if mentions(skill, text_value, lowered)]
 
 
-async def _candidates_by_skills(db: AsyncSession, resume_text: str) -> list[Any]:
+async def _candidates_by_skills(
+    db: AsyncSession, resume_text: str, prefs: JobPreferences | None = None
+) -> list[Any]:
     """
     Shortlist without any AI or embeddings: rank open postings by the share of their
     required skills that appear in the resume (postings listing fewer than 3 skills can't
@@ -141,20 +180,23 @@ async def _candidates_by_skills(db: AsyncSession, resume_text: str) -> list[Any]
         .scalar_subquery()
     )
     coverage = overlap / func.greatest(func.cardinality(Posting.skills), _MIN_SKILLS)
-    similarity = _student_fit(coverage).label("similarity")
+    similarity = _student_fit(coverage, prefs).label("similarity")
     stmt = (
         select(
             Posting.id, Posting.title, Posting.company, Posting.city, Posting.province,
-            Posting.term, Posting.deadline, Posting.description, Posting.skills, similarity,
+            Posting.term, Posting.deadline, Posting.description, Posting.skills,
+            Posting.work_mode, similarity,
         )
-        .where(*_OPEN)
+        .where(*_OPEN, *preference_filters(prefs))
         .order_by(similarity.desc(), Posting.deadline, Posting.id)
         .limit(_CANDIDATES)
     )
     return list((await db.execute(stmt)).mappings().all())
 
 
-async def _candidates_by_embedding(db: AsyncSession, resume_text: str) -> list[Any] | None:
+async def _candidates_by_embedding(
+    db: AsyncSession, resume_text: str, prefs: JobPreferences | None = None
+) -> list[Any] | None:
     """
     Shortlist by meaning (pgvector). Only used when the site owner set OPENAI_API_KEY, which
     also powers smart search; returns None when unavailable so the skill shortlist is used.
@@ -173,21 +215,23 @@ async def _candidates_by_embedding(db: AsyncSession, resume_text: str) -> list[A
         select(
             Posting.id, Posting.title, Posting.company, Posting.city, Posting.province,
             Posting.term, Posting.deadline, Posting.description, Posting.skills,
-            _student_fit(1 - distance).label("similarity"),
+            Posting.work_mode, _student_fit(1 - distance, prefs).label("similarity"),
         )
         .join(PostingEmbedding, PostingEmbedding.posting_id == Posting.id)
-        .where(*_OPEN)
-        .order_by(_student_fit(1 - distance).desc())
+        .where(*_OPEN, *preference_filters(prefs))
+        .order_by(_student_fit(1 - distance, prefs).desc())
         .limit(_CANDIDATES)
     )
     rows = list((await db.execute(stmt)).mappings().all())
     return rows or None
 
 
-async def find_candidates(db: AsyncSession, resume_text: str) -> list[Any]:
-    """Stage 1: the ~40 most promising open postings for this resume."""
-    return await _candidates_by_embedding(db, resume_text) or await _candidates_by_skills(
-        db, resume_text
+async def find_candidates(
+    db: AsyncSession, resume_text: str, prefs: JobPreferences | None = None
+) -> list[Any]:
+    """Stage 1: the ~40 most promising open postings for this resume and preferences."""
+    return await _candidates_by_embedding(db, resume_text, prefs) or await _candidates_by_skills(
+        db, resume_text, prefs
     )
 
 
@@ -251,14 +295,21 @@ def _shortlist_rankings(
     ]
 
 
+def _work_mode_text(value: Any) -> str:
+    return str(value.value if isinstance(value, WorkMode) else value or "")
+
+
 async def embed_and_rank(
-    db: AsyncSession, extracted_text: str, creds: AICredentials | None
+    db: AsyncSession,
+    extracted_text: str,
+    creds: AICredentials | None,
+    prefs: JobPreferences | None = None,
 ) -> list[MatchResultOut]:
     """
     Run both stages and return up to 20 results, best first. Without AI credentials the
     free skill-overlap ranking is used (stage 1 only).
     """
-    rows = await find_candidates(db, extracted_text)
+    rows = await find_candidates(db, extracted_text, prefs)
     if not rows:
         return []
 
@@ -283,6 +334,8 @@ async def embed_and_rank(
         except (TypeError, ValueError):
             score = 0
         reason = str(item.get("reason") or "").strip() or "Matched on resume content."
+        posting_skills = list(row.get("skills") or [])
+        have = skills_in_text(posting_skills, extracted_text)
         results.append(
             MatchResultOut(
                 posting_id=UUID(pid),
@@ -294,6 +347,9 @@ async def embed_and_rank(
                 deadline=str(row["deadline"]) if row["deadline"] else "",
                 score=max(0, min(100, score)),
                 reason=reason[:500],
+                work_mode=_work_mode_text(row.get("work_mode")),
+                matched_skills=have,
+                missing_skills=[s for s in posting_skills if s not in have],
             )
         )
 
@@ -312,6 +368,7 @@ async def upload_resume(
     filename: str,
     file_bytes: bytes,
     creds: AICredentials | None,
+    prefs: JobPreferences | None = None,
 ) -> UploadResponse:
     """
     Validate, extract text, run match pipeline, and store results.
@@ -353,6 +410,11 @@ async def upload_resume(
             },
         )
 
+    # A new version of the resume keeps the preferences set for the old one
+    if prefs is None:
+        previous = await get_resume(db, user_id)
+        prefs = stored_preferences(previous) if previous else None
+
     # Delete existing resume (cascades to match_results)
     await db.execute(delete(Resume).where(Resume.user_id == user_id))
 
@@ -362,21 +424,36 @@ async def upload_resume(
         filename=filename,
         file_size=len(file_bytes),
         extracted_text=extracted,
+        preferences=prefs.model_dump(mode="json") if prefs else None,
     )
     db.add(resume)
     await db.flush()  # populate resume.id before FK use
 
-    matches = await embed_and_rank(db, extracted, creds)
+    matches = await embed_and_rank(db, extracted, creds, prefs)
     await _store_matches(db, resume, matches)
     return UploadResponse(resume=ResumeOut.model_validate(resume), matches=matches)
 
 
-async def rematch_resume(db: AsyncSession, resume: Resume, creds: AICredentials) -> UploadResponse:
-    """Re-run matching on the stored resume text (e.g. with AI after adding a key)."""
-    matches = await embed_and_rank(db, resume.extracted_text, creds)
+def stored_preferences(resume: Resume) -> JobPreferences | None:
+    return JobPreferences.model_validate(resume.preferences) if resume.preferences else None
+
+
+async def rematch_resume(
+    db: AsyncSession, resume: Resume, creds: AICredentials | None
+) -> UploadResponse:
+    """Re-run matching on the stored resume (with AI after adding a key, or new preferences)."""
+    matches = await embed_and_rank(db, resume.extracted_text, creds, stored_preferences(resume))
     await db.execute(delete(MatchResult).where(MatchResult.resume_id == resume.id))
     await _store_matches(db, resume, matches)
     return UploadResponse(resume=ResumeOut.model_validate(resume), matches=matches)
+
+
+async def update_preferences(
+    db: AsyncSession, resume: Resume, prefs: JobPreferences, creds: AICredentials | None
+) -> UploadResponse:
+    """Save what the student is looking for and re-match the stored resume against it."""
+    resume.preferences = prefs.model_dump(mode="json")
+    return await rematch_resume(db, resume, creds)
 
 
 async def _store_matches(db: AsyncSession, resume: Resume, matches: list[MatchResultOut]) -> None:
@@ -425,13 +502,14 @@ async def get_matches(db: AsyncSession, user_id: UUID) -> MatchesResponse:
     """
     resume = await get_resume(db, user_id)
     if resume is None:
-        return MatchesResponse(items=[], resume=None)
+        return MatchesResponse(items=[], resume=None, preferences=None)
 
     # Fetch match_results joined with postings for display fields
     sql = text(
         """
         SELECT mr.posting_id, mr.score, mr.reason,
-               p.title, p.company, p.city, p.province, p.term, p.deadline::text
+               p.title, p.company, p.city, p.province, p.term, p.deadline::text,
+               p.work_mode::text AS work_mode, p.skills
         FROM match_results mr
         JOIN postings p ON p.id = mr.posting_id
         WHERE mr.resume_id = :resume_id
@@ -441,22 +519,29 @@ async def get_matches(db: AsyncSession, user_id: UUID) -> MatchesResponse:
     )
     rows = (await db.execute(sql, {"resume_id": str(resume.id)})).mappings().all()
 
-    items = [
-        MatchResultOut(
-            posting_id=row["posting_id"],
-            title=row["title"],
-            company=row["company"],
-            city=row["city"],
-            province=row["province"],
-            term=row["term"],
-            deadline=str(row["deadline"]) if row["deadline"] else "",
-            score=int(row["score"]),
-            reason=row["reason"],
+    items = []
+    for row in rows:
+        posting_skills = list(row["skills"] or [])
+        have = skills_in_text(posting_skills, resume.extracted_text)
+        items.append(
+            MatchResultOut(
+                posting_id=row["posting_id"],
+                title=row["title"],
+                company=row["company"],
+                city=row["city"],
+                province=row["province"],
+                term=row["term"],
+                deadline=str(row["deadline"]) if row["deadline"] else "",
+                score=int(row["score"]),
+                reason=row["reason"],
+                work_mode=row["work_mode"] or "",
+                matched_skills=have,
+                missing_skills=[s for s in posting_skills if s not in have],
+            )
         )
-        for row in rows
-    ]
 
     return MatchesResponse(
         items=items,
         resume=ResumeOut.model_validate(resume),
+        preferences=stored_preferences(resume),
     )

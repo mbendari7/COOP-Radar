@@ -9,9 +9,9 @@ Create a migration for: $ARGUMENTS
 
 1. Update the SQLAlchemy models first. Declare every index in the model's `__table_args__` (including DESC,
    GIN, and HNSW indexes) — anything that exists only in a migration will be dropped by the next autogenerate.
-2. Generate: `docker compose exec api alembic revision --autogenerate -m "$ARGUMENTS"`.
-   Name the file with the next number after the newest in `backend/alembic/versions/` (e.g. `0008_<slug>.py`,
-   `revision = "0008"`, `down_revision = "0007"`) to match the existing style.
+2. Generate (in `backend/`, venv active): `alembic revision --autogenerate -m "$ARGUMENTS"`.
+   Name the file with the next number after the newest in `backend/alembic/versions/` (e.g. `0010_<slug>.py`,
+   `revision = "0010"`, `down_revision = "0009"`) to match the existing style.
 3. Review the generated file by hand:
    - indexes present; nothing dropped by accident; enums created with `checkfirst=True`
    - pgvector columns are `vector(1536)` with an HNSW `vector_cosine_ops` index

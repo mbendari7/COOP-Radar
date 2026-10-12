@@ -20,7 +20,6 @@ import secrets
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
-import redis.asyncio as aioredis
 from fastapi import HTTPException, status
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,6 +31,7 @@ from app.models.resume import Resume
 from app.models.saved_posting import ApplicationStatus, SavedPosting
 from app.models.user import User
 from app.services.auth import _create_session, _ph
+from app.store import Store
 
 DEMO_EMAIL_DOMAIN = "demo.coopradar"
 DEMO_TTL = timedelta(days=7)  # temporary accounts are deleted after this
@@ -69,11 +69,11 @@ def _client_ip(forwarded_for: str | None, peer: str | None) -> str:
     return peer or "unknown"
 
 
-async def _check_rate_limit(redis: aioredis.Redis, ip: str) -> None:
+async def _check_rate_limit(store: Store, ip: str) -> None:
     key = f"demo_create:{ip}"
-    count = await redis.incr(key)
+    count = await store.incr(key)
     if count == 1:
-        await redis.expire(key, _RATE_WINDOW)
+        await store.expire(key, _RATE_WINDOW)
     if count > _RATE_LIMIT:
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -153,13 +153,13 @@ async def _fill_demo_data(db: AsyncSession, user_id: UUID) -> None:
 
 async def create_demo_user(
     db: AsyncSession,
-    redis: aioredis.Redis,
+    store: Store,
     forwarded_for: str | None,
     peer: str | None,
     prefill: bool = True,
 ) -> tuple[User, str]:
     """Create a fresh temporary account (pre-filled demo, or an empty guest) and log into it."""
-    await _check_rate_limit(redis, _client_ip(forwarded_for, peer))
+    await _check_rate_limit(store, _client_ip(forwarded_for, peer))
     await cleanup_expired_demo_users(db)
 
     user = User(
@@ -175,7 +175,7 @@ async def create_demo_user(
     await db.commit()
     await db.refresh(user)
 
-    token = await _create_session(redis, user.id)
+    token = await _create_session(store, user.id)
     return user, token
 
 

@@ -54,6 +54,38 @@ describe('ResumePage', () => {
     expect(calls.indexOf('POST /api/auth/guest')).toBeLessThan(calls.indexOf('POST /api/resume'))
   })
 
+  it('sends the job preferences picked in step 1 with the resume', async () => {
+    localStorage.clear()
+    let sent: FormData | undefined
+    const meta = {
+      cities: [], provinces: ['ON'], terms: [], skills: [], companies: [], open_jobs: 3,
+      categories: [{ key: 'data', label: 'Data & AI', count: 3 }],
+    }
+    vi.stubGlobal('fetch', vi.fn((url: string, init?: RequestInit) => {
+      if (url === '/api/config') return Promise.resolve(json(CONFIG))
+      if (url === '/api/me') return Promise.resolve(json({ detail: 'Not signed in', code: 'UNAUTHENTICATED' }, 401))
+      if (url === '/api/postings/meta/filters') return Promise.resolve(json(meta))
+      if (url === '/api/auth/guest') return Promise.resolve(json(GUEST, 201))
+      if (url === '/api/resume' && init?.method === 'POST') {
+        sent = init.body as FormData
+        return Promise.resolve(json({ resume: { id: 'r1', filename: 'cv.pdf', file_size: 10, uploaded_at: '2026-10-11T00:00:00Z' }, matches: [] }))
+      }
+      return Promise.resolve(json({ items: [], resume: null }))
+    }))
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: /Data & AI/ }))
+    fireEvent.change(screen.getByLabelText('Where'), { target: { value: 'ON' } })
+    fireEvent.click(screen.getByLabelText('Co-op & intern only'))
+    fireEvent.change(screen.getByLabelText(/drop your resume here/i), {
+      target: { files: [new File(['%PDF-1.4'], 'cv.pdf', { type: 'application/pdf' })] },
+    })
+
+    await waitFor(() => expect(sent).toBeDefined())
+    const prefs = JSON.parse(String(sent?.get('preferences')))
+    expect(prefs).toMatchObject({ categories: ['data'], province: 'ON', level: 'students' })
+  })
+
   it('rejects files that are not PDF or DOCX before uploading', async () => {
     const fetchMock = vi.fn((url: string) =>
       Promise.resolve(url === '/api/config' ? json(CONFIG) : json({ detail: 'x', code: 'UNAUTHENTICATED' }, 401)),

@@ -4,6 +4,9 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
+from app.models.posting import WorkMode
+from app.services.categories import CategoryKey
+
 
 class ResumeOut(BaseModel):
     id: UUID
@@ -12,6 +15,21 @@ class ResumeOut(BaseModel):
     uploaded_at: datetime
 
     model_config = {"from_attributes": True}
+
+
+class JobPreferences(BaseModel):
+    """
+    What the student is looking for, set before or after uploading. Matching only considers
+    open postings that fit these; keywords (e.g. "data analyst") rank fitting postings higher.
+    """
+
+    categories: list[CategoryKey] = Field(default=[], max_length=9)
+    keywords: str = Field(default="", max_length=100)
+    province: str = Field(default="", max_length=2)
+    city: str = Field(default="", max_length=100)
+    work_modes: list[WorkMode] = Field(default=[], max_length=3)
+    # entry: students + entry-level (no senior titles) · students: co-op/intern only · all
+    level: Literal["entry", "students", "all"] = "entry"
 
 
 class MatchResultOut(BaseModel):
@@ -24,6 +42,10 @@ class MatchResultOut(BaseModel):
     deadline: str
     score: int
     reason: str
+    work_mode: str = ""
+    # The posting's listed skills, split into ones the resume shows and ones it doesn't
+    matched_skills: list[str] = []
+    missing_skills: list[str] = []
 
     @field_validator("score")
     @classmethod
@@ -48,6 +70,7 @@ class UploadResponse(BaseModel):
 class MatchesResponse(BaseModel):
     items: list[MatchResultOut]
     resume: ResumeOut | None
+    preferences: JobPreferences | None = None
 
 
 class AskRequest(BaseModel):

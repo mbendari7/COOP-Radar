@@ -1,10 +1,11 @@
 /**
- * SearchBox — debounced keyword search input.
+ * SearchBox: debounced keyword search input.
  * Waits 300ms after the user stops typing before calling onSearch,
  * so we don't fire an API request on every keystroke.
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { SearchIcon } from './Icons'
 
 interface Props {
   value: string
@@ -12,7 +13,7 @@ interface Props {
   placeholder?: string
 }
 
-export default function SearchBox({ value, onSearch, placeholder = 'Search postings…' }: Props) {
+export default function SearchBox({ value, onSearch, placeholder = 'Search job title, company or skill' }: Props) {
   const [local, setLocal] = useState(value)
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -35,11 +36,8 @@ export default function SearchBox({ value, onSearch, placeholder = 'Search posti
   return (
     <div className="relative">
       {/* Search icon */}
-      <span className="absolute inset-y-0 left-3 flex items-center text-gray-500 pointer-events-none" aria-hidden="true">
-        <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-            d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-        </svg>
+      <span className="absolute inset-y-0 left-3.5 flex items-center text-gray-500 pointer-events-none" aria-hidden="true">
+        <SearchIcon className="h-5 w-5" />
       </span>
       <input
         type="search"
@@ -49,9 +47,9 @@ export default function SearchBox({ value, onSearch, placeholder = 'Search posti
         onChange={handleChange}
         placeholder={placeholder}
         className="
-          w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg bg-white
-          placeholder-gray-400 text-gray-900
-          focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-transparent
+          w-full pl-11 pr-4 py-2.5 text-base border border-gray-300 rounded-lg bg-white
+          placeholder-gray-500 text-gray-900
+          focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
         "
       />
     </div>

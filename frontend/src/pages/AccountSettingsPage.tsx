@@ -30,7 +30,7 @@ export default function AccountSettingsPage() {
   const [deleteLoading, setDeleteLoading] = useState(false)
 
   if (isLoading) {
-    return <div className="flex justify-center items-center h-64 text-gray-500">Loading…</div>
+    return <div className="flex justify-center items-center h-64 text-gray-500">Loading...</div>
   }
 
   if (!me) {
@@ -88,11 +88,11 @@ export default function AccountSettingsPage() {
         <h1 className="text-2xl font-semibold text-gray-900">Temporary account</h1>
         <p className="text-sm text-gray-600">
           This account is private to you and is deleted automatically 7 days after it was created.
-          Add an email and password to keep it — your resume, matches, and tracker all stay.
+          Add an email and password to keep it. Your resume, matches and tracker all stay.
         </p>
         <ClaimAccountForm />
         <p className="text-sm text-gray-500">
-          Not keeping it? Just sign out — everything is removed when it expires.
+          Not keeping it? Just sign out. Everything is removed when it expires.
         </p>
       </div>
     )
@@ -143,7 +143,7 @@ export default function AccountSettingsPage() {
             disabled={pwLoading}
             className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            {pwLoading ? 'Updating…' : 'Update password'}
+            {pwLoading ? 'Updating...' : 'Update password'}
           </button>
         </form>
       </section>
@@ -195,7 +195,7 @@ export default function AccountSettingsPage() {
                 disabled={deleteLoading}
                 className="px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-lg hover:bg-red-700 disabled:opacity-50"
               >
-                {deleteLoading ? 'Deleting…' : 'Permanently delete account'}
+                {deleteLoading ? 'Deleting...' : 'Permanently delete account'}
               </button>
               <button
                 type="button"

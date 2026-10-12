@@ -41,8 +41,11 @@ description: CoopRadar backend conventions for FastAPI routers, Pydantic schemas
 - AI failures must degrade, not 500: fall back (cosine ranking, keyword search) or return 503 `AI_UNAVAILABLE`.
 
 ## Background work
-- Slow work (embeddings, ingestion) goes on the RQ queue via `app.worker.create_queue()`; enqueue *after* commit,
-  and treat enqueue failures as non-fatal unless the request is meaningless without the job (then 503).
+- Slow work (embeddings, ingestion) runs as an in-process background job: register an async function in
+  `app/jobs.py` `JOBS` and call `jobs.enqueue("name", *str_args)`. Enqueue *after* commit (the job opens its own
+  session), and treat failures as non-fatal unless the request is meaningless without the job (then 503).
+- Sessions and counters go through the `Store` dependency (`app/store.py`, `Depends(get_store)`): Postgres
+  `kv_store` by default, Redis when `REDIS_URL` is set. Only use `hget/hset/incr/expire/delete`.
 
 ## Tests (`backend/tests/`)
 - Every endpoint: one happy-path + one validation/error test. Bug fixes get a regression test named after the bug.
@@ -50,8 +53,8 @@ description: CoopRadar backend conventions for FastAPI routers, Pydantic schemas
   - `client` — httpx client on the real app, sharing the test's DB session; it keeps cookies, so
     `await client.post("/api/auth/register", ...)` logs you in.
   - `db_session` — runs inside a rolled-back transaction; service `commit()`s become savepoints, so tests never leak.
-  - `fake_queue` (autouse) — assert on `fake_queue.enqueue`.
+  - `fake_queue` (autouse) — stops background jobs; assert on `fake_queue.enqueue("run_source", ...)`.
   - `mock_claude_create(text)`, `mock_claude_stream(text, stop_reason=...)`, `mock_embedding` — no live AI calls ever.
 - Assert errors as `res.json()["code"] == "SOME_CODE"`.
-- Run: `docker compose exec api pytest -q` (or locally with `DATABASE_URL` pointing at a throwaway Postgres+pgvector DB).
+- Run: `pytest -q` in `backend/` with the venv active and `DATABASE_URL` pointing at a throwaway Postgres+pgvector DB.
 - Before finishing: `ruff check .`, `mypy app` (strict), `pytest -q -m "not perf"`, `alembic check`.

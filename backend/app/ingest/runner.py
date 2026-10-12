@@ -1,5 +1,5 @@
 """
-run_source — main ingest job function enqueued by the RQ worker.
+run_source — imports one source. Started in the background by app/jobs.py.
 
 Each call:
   1. Opens a DB session and loads the IngestSource
@@ -14,7 +14,6 @@ Each call:
   7. Commits the run, then queues embedding jobs for new postings
 """
 
-import asyncio
 from datetime import UTC, date, datetime, timedelta
 from uuid import UUID
 
@@ -38,15 +37,8 @@ _ESTIMATED_DEADLINE = timedelta(days=45)
 _VALID_DURATIONS = {4, 8, 12, 16}
 
 
-def run_source(source_id: str, run_id: str | None = None) -> None:
-    """
-    RQ job entry point (synchronous wrapper around the async implementation).
-    RQ workers are sync by default; we create a new event loop per job.
-    """
-    asyncio.run(_run_source_async(UUID(source_id), UUID(run_id) if run_id else None))
-
-
-async def _run_source_async(source_id: UUID, run_id: UUID | None) -> None:
+async def run_source(source_id: UUID, run_id: UUID | None = None) -> None:
+    """Background job entry point: run one import, then queue embeddings for new postings."""
     from app.ingest.embed import enqueue_embed_job
 
     async with AsyncSessionLocal() as db:

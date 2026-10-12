@@ -22,7 +22,11 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     database_url: str
-    redis_url: str = "redis://localhost:6379/0"
+    # Optional. Empty = sessions and counters live in Postgres (app/store.py), so the site
+    # needs nothing but a database. Set it (redis://...) to use Redis for them instead.
+    redis_url: str = ""
+    # Run career-board imports in the background inside the web server (app/jobs.py).
+    background_jobs: bool = True
 
     # Comma-separated list of allowed CORS origins.
     # Example: "http://localhost:5173,https://coopradar.example.com"
@@ -53,7 +57,7 @@ class Settings(BaseSettings):
     # AI actions (resume uploads + Q&A questions) per user per UTC day; 0 = unlimited.
     ai_daily_limit: int = 20
     # Folder with the built React app (index.html + assets/). When it exists, the API also
-    # serves the website, so one container = the whole site. Set by the production Dockerfile.
+    # serves the website, so one process = the whole site. start.py sets it to frontend/dist.
     static_dir: str = ""
     # Postgres cancels any single statement that runs longer than this (milliseconds).
     db_statement_timeout_ms: int = 10_000

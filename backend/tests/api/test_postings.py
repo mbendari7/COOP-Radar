@@ -329,3 +329,73 @@ async def test_similar_postings_returns_nearest(client: AsyncClient, db_session:
 async def test_error_responses_have_flat_shape(client: AsyncClient) -> None:
     body = (await client.get(f"/api/postings/{uuid4()}")).json()
     assert body == {"detail": "Posting not found", "code": "POSTING_NOT_FOUND"}
+
+
+# --- Job types, employers, recency --------------------------------------------
+
+async def test_category_filter_matches_job_type_from_title(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await add(
+        db_session,
+        make_posting(title="Software Developer Co-op"),
+        make_posting(title="Data Analyst Intern"),
+        make_posting(title="UX Designer Co-op"),
+    )
+
+    one = (await client.get("/api/postings?category=design")).json()
+    two = (await client.get("/api/postings?category=software&category=data")).json()
+
+    assert [p["title"] for p in one["items"]] == ["UX Designer Co-op"]
+    assert {p["title"] for p in two["items"]} == {"Software Developer Co-op", "Data Analyst Intern"}
+    assert (await client.get("/api/postings?category=astronaut")).status_code == 422
+
+
+async def test_company_filter(client: AsyncClient, db_session: AsyncSession) -> None:
+    await add(
+        db_session,
+        make_posting(title="A", company="Shopify"),
+        make_posting(title="B", company="Wealthsimple"),
+        make_posting(title="C", company="Lyft"),
+    )
+
+    body = (await client.get("/api/postings?company=Shopify&company=Lyft&sort=title&order=asc")).json()
+
+    assert [p["title"] for p in body["items"]] == ["A", "C"]
+
+
+async def test_posted_within_filter(client: AsyncClient, db_session: AsyncSession) -> None:
+    now = datetime.now(tz=UTC)
+    await add(
+        db_session,
+        make_posting(title="Today", posted_at=now),
+        make_posting(title="Last week", posted_at=now - timedelta(days=5)),
+        make_posting(title="Last month", posted_at=now - timedelta(days=20)),
+    )
+
+    day = (await client.get("/api/postings?posted_within=1")).json()
+    week = (await client.get("/api/postings?posted_within=7")).json()
+
+    assert [p["title"] for p in day["items"]] == ["Today"]
+    assert {p["title"] for p in week["items"]} == {"Today", "Last week"}
+    assert (await client.get("/api/postings?posted_within=2")).status_code == 422
+
+
+async def test_filter_meta_lists_job_types_and_employers(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await add(
+        db_session,
+        make_posting(title="Software Developer Co-op", company="Shopify"),
+        make_posting(title="Backend Intern", company="Lyft"),
+        make_posting(title="Closed role", company="Gone Inc", deadline=date.today() - timedelta(days=1)),
+    )
+
+    body = (await client.get("/api/postings/meta/filters")).json()
+
+    assert body["companies"] == ["Lyft", "Shopify"]  # open postings only
+    assert body["open_jobs"] == 2
+    counts = {c["key"]: c["count"] for c in body["categories"]}
+    assert counts["software"] == 2
+    assert counts["design"] == 0
+    assert body["categories"][0]["label"] == "Software & web"

@@ -138,37 +138,37 @@ async def trigger_run(db: AsyncSession, source_id: UUID) -> TriggerRunOut:
         )
 
     # Create the run record now so the admin UI shows "running" immediately;
-    # the worker picks up this same run via run_id and fills in the results.
+    # the background job picks up this same run via run_id and fills in the results.
     run = IngestRun(
         source_id=source_id,
         started_at=datetime.now(UTC),
         status="running",
     )
     db.add(run)
-    await db.flush()
+    # Commit before starting the job: it loads this run in its own session
+    await db.commit()
 
     try:
-        from app.worker import create_queue
+        from app import jobs
 
-        create_queue().enqueue("app.ingest.runner.run_source", str(source_id), str(run.id))
+        jobs.enqueue("run_source", str(source_id), str(run.id))
     except Exception as exc:  # noqa: BLE001
-        # Without a queue the run could never finish — record it as failed instead
+        # If the job can't start, the run could never finish — record it as failed instead
         # of leaving a "running" row that would block every future trigger.
         run.status = "failed"
         run.finished_at = datetime.now(UTC)
         run.errors = 1
-        run.error_log = [f"Could not enqueue run: {exc}"]
+        run.error_log = [f"Could not start run: {exc}"]
         await db.commit()
         raise HTTPException(
             status_code=503,
             detail={
-                "detail": "Job queue unavailable. Try again shortly.",
+                "detail": "Could not start the import. Try again shortly.",
                 "code": "QUEUE_UNAVAILABLE",
             },
         ) from exc
 
-    await db.commit()
-    return TriggerRunOut(run_id=run.id, message="Run queued.")
+    return TriggerRunOut(run_id=run.id, message="Run started.")
 
 
 async def patch_source(
