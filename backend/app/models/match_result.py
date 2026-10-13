@@ -24,8 +24,8 @@ if TYPE_CHECKING:
 
 class MatchResult(Base):
     """
-    One scored match between a resume and a posting, produced by the match pipeline.
-    All rows for a given resume are replaced when a new upload triggers re-ranking.
+    One scored match between a resume and a job.
+    Every row for a resume gets replaced when a new upload ranks things again.
     """
 
     __tablename__ = "match_results"

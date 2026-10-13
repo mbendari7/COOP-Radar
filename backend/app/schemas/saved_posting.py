@@ -1,9 +1,9 @@
 """
-Pydantic schemas for saved postings endpoints.
+Shapes for the saved jobs endpoints.
 
-Shapes match the API contracts in specs/002-accounts-tracker/contracts/api.md.
-SavedPostingOut embeds the PostingListItem so the frontend gets all posting
-fields in a single response without a second request.
+They match the contracts in specs/002-accounts-tracker/contracts/api.md.
+SavedPostingOut carries the whole PostingListItem so the site gets every
+job field in one response without asking twice.
 """
 
 from datetime import date, datetime
@@ -16,7 +16,7 @@ from app.schemas.posting import PostingListItem
 
 
 class ApplicationEventOut(BaseModel):
-    """A single entry in a saved posting's status-change history."""
+    """One entry in a saved job's status history."""
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -27,29 +27,29 @@ class ApplicationEventOut(BaseModel):
 
 
 class EventCreateIn(BaseModel):
-    """Body for POST /api/saved/{id}/events — record a status change with optional note."""
+    """Body for POST /api/saved/{id}/events. Logs a status change with an optional note."""
     status: ApplicationStatus
     notes: str | None = None
     event_date: date | None = None
 
 
 class SaveIn(BaseModel):
-    """Body for POST /api/saved — just the posting ID to bookmark."""
+    """Body for POST /api/saved. Just the id of the job to save."""
     posting_id: UUID
 
 
 class StatusUpdateIn(BaseModel):
-    """Body for PATCH /api/saved/{id}/status — pass null to clear the status."""
+    """Body for PATCH /api/saved/{id}/status. Send null to clear the status."""
     status: ApplicationStatus | None
-    # Optional note recorded alongside the status change
+    # An optional note saved with the status change
     notes: str | None = None
     event_date: date | None = None
 
 
 class SavedPostingOut(BaseModel):
     """
-    A saved posting record with the full posting embedded.
-    Returned by GET /api/saved items and POST/PATCH operations.
+    A saved job with the whole posting inside it.
+    GET /api/saved items and the POST and PATCH calls send this back.
     """
     model_config = ConfigDict(from_attributes=True)
 
@@ -62,16 +62,16 @@ class SavedPostingOut(BaseModel):
 
 
 class SavedPostingsPage(BaseModel):
-    """Paginated list of saved postings with per-status counts."""
+    """A page of saved jobs with a count for each status."""
     items: list[SavedPostingOut]
     total: int
     page: int
     page_size: int
-    # Count of saved postings per status + "none" for unset
+    # How many saved jobs are in each status plus "none" for no status
     status_counts: dict[str, int]
-    # Stats for the stats panel
+    # Numbers for the stats panel
     total_applied: int
     total_interview: int
     total_offer: int
-    # Deadlines within the next 7 days (posting ids + deadlines)
+    # Deadlines in the next 7 days with job ids
     deadlines_this_week: list[dict[str, str]]

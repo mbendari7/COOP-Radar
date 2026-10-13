@@ -1,4 +1,4 @@
-"""Base adapter ABC and RawPosting dataclass for ingest sources."""
+"""The base adapter and the RawPosting shape every import source fills in."""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -10,12 +10,12 @@ if TYPE_CHECKING:
 
 
 class AdapterError(Exception):
-    """Raised when an adapter cannot fetch postings (e.g. non-200 HTTP response)."""
+    """Raised when an adapter cannot get jobs, like when the server does not answer 200."""
 
 
 @dataclass
 class RawPosting:
-    """Normalised posting data as returned by any adapter before DB insertion."""
+    """A job as any adapter hands it over, cleaned up but not saved yet."""
 
     title: str
     company: str
@@ -27,17 +27,17 @@ class RawPosting:
     skills: list[str] = field(default_factory=list)
     source_ref: str | None = None
     source_url: str | None = None
-    # Optional extras some sources provide (career-board APIs do; feeds often don't)
+    # Extras some sources give us. Career board APIs do and feeds often do not
     province: str | None = None
     posted_at: datetime | None = None
     country: str = "CA"  # "CA" or "US"
 
 
 class BaseAdapter(ABC):
-    """Abstract base class for all ingestion source adapters."""
+    """The base class every import source adapter builds on."""
 
     user_agent: str = "CoopRadar-Ingest/1.0 (+https://github.com/mbendari7/COOP-Radar)"
 
     @abstractmethod
     async def fetch(self, source: "IngestSource") -> list[RawPosting]:
-        """Fetch raw postings from the source. Must not make live network calls in tests."""
+        """Get raw jobs from the source. Tests should never hit the real network."""

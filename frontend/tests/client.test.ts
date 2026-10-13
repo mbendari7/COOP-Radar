@@ -1,5 +1,5 @@
 /**
- * apiFetch / toApiError tests — every API hook relies on these to surface backend errors.
+ * Tests for apiFetch and toApiError. Every API hook leans on these to show backend errors.
  */
 
 import { afterEach, describe, expect, it, vi } from 'vitest'

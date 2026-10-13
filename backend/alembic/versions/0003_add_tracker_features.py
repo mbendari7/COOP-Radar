@@ -16,9 +16,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # ── last_status_at column on saved_postings ──────────────────────────────
-    # Populated whenever the application status changes; used for sorting by
-    # "last updated" on the tracker table view.
+    # last_status_at column on saved_postings
+    # Filled in whenever the application status changes and used to sort
+    # by last updated on the tracker table
     op.add_column(
         "saved_postings",
         sa.Column(
@@ -28,9 +28,9 @@ def upgrade() -> None:
         ),
     )
 
-    # ── application_events table ─────────────────────────────────────────────
-    # One row per status change, storing the new status, an optional note, and
-    # an optional user-supplied date (e.g. the date of an interview).
+    # application_events table
+    # One row per status change with the new status, an optional note and
+    # an optional date the student picks, like the interview day
     op.create_table(
         "application_events",
         sa.Column(
@@ -51,7 +51,7 @@ def upgrade() -> None:
                 "saved", "applying", "applied", "interview",
                 "offer", "rejected", "withdrawn",
                 name="application_status_enum",
-                create_type=False,  # enum already created in 0002
+                create_type=False,  # the enum was made in 0002
             ),
             nullable=False,
         ),
@@ -65,13 +65,13 @@ def upgrade() -> None:
         ),
     )
 
-    # Index for fetching all events for a saved posting (most common read path)
+    # Index for getting all events for a saved job, the most common read
     op.create_index(
         "idx_application_events_saved_posting_id",
         "application_events",
         ["saved_posting_id"],
     )
-    # Descending index to efficiently fetch the most recent events first
+    # Newest first index to get recent events quickly
     op.create_index(
         "idx_application_events_created_at",
         "application_events",

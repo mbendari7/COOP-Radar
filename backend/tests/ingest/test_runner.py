@@ -1,4 +1,4 @@
-"""Tests for run_source runner using a fixture-backed adapter mock."""
+"""Tests for the run_source runner with a fake adapter reading test files."""
 
 import json
 from datetime import UTC, datetime
@@ -51,7 +51,7 @@ async def _create_source(db: AsyncSession) -> IngestSource:
 
 @pytest.mark.asyncio
 async def test_first_run_adds_postings(db_session: AsyncSession):
-    """First run with 5 fixture postings should add 5 new rows."""
+    """The first run with 5 test jobs should add 5 new rows."""
     source = await _create_source(db_session)
     raw = _make_raw_postings()
 
@@ -72,7 +72,7 @@ async def test_first_run_adds_postings(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_second_run_adds_zero(db_session: AsyncSession):
-    """Running the same fixture data twice should add 0 on the second run."""
+    """Running the same data twice should add nothing the second time."""
     source = await _create_source(db_session)
     raw = _make_raw_postings()
 
@@ -97,7 +97,7 @@ async def test_second_run_adds_zero(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_removed_posting_gets_closed_at(db_session: AsyncSession):
-    """A posting absent from the second run has closed_at set."""
+    """A job missing from the second run gets closed_at set."""
     source = await _create_source(db_session)
     raw = _make_raw_postings()
 
@@ -107,7 +107,7 @@ async def test_removed_posting_gets_closed_at(db_session: AsyncSession):
         mock_af.return_value = mock_a
         await _execute_run(db_session, source.id)
 
-    # Remove first posting from batch
+    # Take the first job out of the batch
     raw_minus_one = raw[1:]
     with patch("app.ingest.runner.adapter_for") as mock_af2:
         mock_a2 = AsyncMock()
@@ -115,7 +115,7 @@ async def test_removed_posting_gets_closed_at(db_session: AsyncSession):
         mock_af2.return_value = mock_a2
         await _execute_run(db_session, source.id)
 
-    # The first posting (acme-001) should now have closed_at set
+    # The first job (acme-001) should now have closed_at set
     stmt = select(Posting).where(Posting.source_ref == "acme-001")
     posting = (await db_session.execute(stmt)).scalar_one_or_none()
     assert posting is not None
@@ -124,7 +124,7 @@ async def test_removed_posting_gets_closed_at(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_adapter_error_sets_failed_status(db_session: AsyncSession):
-    """AdapterError from the adapter sets IngestRun status='failed' and increments failures."""
+    """An AdapterError marks the IngestRun as failed and counts one more failure."""
     source = await _create_source(db_session)
 
     with patch("app.ingest.runner.adapter_for") as mock_af:
@@ -144,7 +144,7 @@ async def test_adapter_error_sets_failed_status(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_three_consecutive_failures_auto_pause(db_session: AsyncSession):
-    """After 3 consecutive failures, source.auto_paused becomes True."""
+    """After 3 failures in a row source.auto_paused turns True."""
     source = await _create_source(db_session)
 
     for _ in range(3):
@@ -161,7 +161,7 @@ async def test_three_consecutive_failures_auto_pause(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_rerun_updates_and_never_closes_unchanged_postings(db_session: AsyncSession):
-    """Re-running an unchanged feed used to skip every row as a duplicate, then close them all."""
+    """Rerunning a feed that did not change used to skip every row as a duplicate and then close them all."""
     source = await _create_source(db_session)
     raw = _make_raw_postings()
 
@@ -188,7 +188,7 @@ async def test_rerun_updates_and_never_closes_unchanged_postings(db_session: Asy
 
 @pytest.mark.asyncio
 async def test_run_reuses_triggered_run_record(db_session: AsyncSession):
-    """Run now creates the run row; the worker must finish that row, not create a second one."""
+    """Run now makes the run row and the worker has to finish that row and not make a second one."""
     source = await _create_source(db_session)
     run = IngestRun(source_id=source.id, started_at=datetime.now(UTC), status="running")
     db_session.add(run)
@@ -232,7 +232,7 @@ async def test_run_stores_country_and_what_the_posting_asks_for(db_session: Asyn
 
 @pytest.mark.asyncio
 async def test_rerun_refreshes_the_location(db_session: AsyncSession):
-    """A location fixed on the board (or parsed better) replaces the old one on the next run."""
+    """A location fixed on the board, or read better by us, replaces the old one on the next run."""
     source = await _create_source(db_session)
 
     def raw(city: str, province: str) -> RawPosting:
@@ -250,3 +250,25 @@ async def test_rerun_refreshes_the_location(db_session: AsyncSession):
         await db_session.execute(select(Posting).where(Posting.source_ref == "loc-1"))
     ).scalar_one()
     assert (posting.city, posting.province) == ("New York", "NY")
+
+
+@pytest.mark.asyncio
+async def test_rerun_refreshes_the_employer_name(db_session: AsyncSession):
+    """Jobs first saved under a board label get the clean employer name on the next run."""
+    source = await _create_source(db_session)
+
+    def raw(company: str) -> RawPosting:
+        return RawPosting(
+            title="Analog Intern", company=company, city="Toronto", province="ON", country="CA",
+            term="Summer 2027", description="d", source_ref="co-1",
+        )
+
+    for company in ("Astera Labs Early Career - North America 2027", "Astera Labs"):
+        with patch("app.ingest.runner.adapter_for") as mock_af:
+            mock_af.return_value.fetch = AsyncMock(return_value=[raw(company)])
+            await _execute_run(db_session, source.id)
+
+    posting = (
+        await db_session.execute(select(Posting).where(Posting.source_ref == "co-1"))
+    ).scalar_one()
+    assert posting.company == "Astera Labs"

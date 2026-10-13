@@ -1,5 +1,5 @@
 /**
- * DemoButton tests — hidden when demo accounts are off; one click creates a demo session.
+ * Tests for the demo button. Hidden when demo accounts are off and one click starts a demo.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'

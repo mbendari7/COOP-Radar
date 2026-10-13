@@ -1,6 +1,6 @@
 """
-Tests for running without Redis or a separate worker: the Postgres-backed session store
-(app/store.py) and the in-process background jobs (app/jobs.py).
+Tests for running with no Redis and no separate worker. The Postgres session store
+(app/store.py) and the background jobs inside the app (app/jobs.py).
 """
 
 import asyncio
@@ -11,13 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app import jobs
 from app.config import get_settings
-from app.jobs import enqueue as real_enqueue  # conftest patches app.jobs.enqueue per test
+from app.jobs import enqueue as real_enqueue  # conftest patches app.jobs.enqueue in each test
 from app.store import PostgresStore, create_store
 
 
 @pytest.fixture
 async def store(db_session: AsyncSession) -> PostgresStore:
-    """A PostgresStore whose writes stay inside the test's rolled-back transaction."""
+    """A PostgresStore whose writes stay inside the test's transaction, which rolls back."""
     conn = await db_session.connection()
     factory = async_sessionmaker(
         bind=conn, join_transaction_mode="create_savepoint", expire_on_commit=False
@@ -25,12 +25,12 @@ async def store(db_session: AsyncSession) -> PostgresStore:
     return PostgresStore(factory)
 
 
-# ── Session store ─────────────────────────────────────────────────────────────
+# Session store
 
 
 async def test_hset_hget_round_trip(store: PostgresStore) -> None:
     await store.hset("session:abc", "user_id", "42")
-    await store.hset("session:abc", "other", "x")  # merges, doesn't overwrite
+    await store.hset("session:abc", "other", "x")  # adds to it and does not overwrite
 
     assert await store.hget("session:abc", "user_id") == "42"
     assert await store.hget("session:abc", "other") == "x"
@@ -52,7 +52,7 @@ async def test_expired_keys_behave_as_missing(store: PostgresStore) -> None:
     await store.expire("rate:old", -3600)
 
     assert await store.hget("session:old", "user_id") is None
-    assert await store.incr("rate:old") == 1  # counter starts over, like Redis
+    assert await store.incr("rate:old") == 1  # the counter starts over like Redis
 
     await store.hset("session:gone", "user_id", "8")
     await store.expire("session:gone", -3600)
@@ -71,7 +71,7 @@ def test_create_store_uses_postgres_without_redis_url(monkeypatch: pytest.Monkey
     assert isinstance(create_store(), PostgresStore)
 
 
-# ── Background jobs ───────────────────────────────────────────────────────────
+# Background jobs
 
 
 async def test_enqueue_runs_job_in_background(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -88,7 +88,7 @@ async def test_failed_job_is_logged_not_raised(monkeypatch: pytest.MonkeyPatch) 
     monkeypatch.setitem(jobs.JOBS, "boom", AsyncMock(side_effect=RuntimeError("feed down")))
 
     real_enqueue("boom")
-    await asyncio.gather(*jobs._tasks)  # would raise if the error escaped
+    await asyncio.gather(*jobs._tasks)  # this would raise if the error got out
 
 
 def test_enqueue_unknown_job_raises() -> None:

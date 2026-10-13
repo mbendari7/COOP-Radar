@@ -5,7 +5,7 @@ import type { CategoryKey, CountryCode, ProgramKey, WorkMode } from '../api/post
 export const WORK_MODES: WorkMode[] = ['onsite', 'hybrid', 'remote']
 export const DURATIONS = [4, 8, 12, 16]
 
-/** '' = co-op & internships (the default: what most students here want) */
+/** Empty means co-op and internships, the default since that is what most students here want */
 export type Level = '' | 'entry' | 'all'
 
 export const LEVELS: { value: Level; label: string; short: string }[] = [
@@ -14,7 +14,7 @@ export const LEVELS: { value: Level; label: string; short: string }[] = [
   { value: 'all', label: 'All levels', short: 'All levels' },
 ]
 
-/** '' = Canada (the default), 'US', or 'all' for both */
+/** Empty means Canada, the default. US for the US or all for both */
 export type CountryChoice = '' | 'US' | 'all'
 
 export const COUNTRY_CHOICES: { value: CountryChoice; label: string }[] = [
@@ -28,7 +28,7 @@ export function countriesFor(choice: CountryChoice): CountryCode[] | undefined {
   return choice === 'US' ? ['US'] : ['CA']
 }
 
-/** This year and the next six, for "Graduating in" selects. */
+/** This year and the next six for the Graduating in menus. */
 export function gradYears(now: Date = new Date()): number[] {
   return Array.from({ length: 7 }, (_, i) => now.getFullYear() + i)
 }
@@ -65,7 +65,7 @@ export const EMPTY_FILTERS: Filters = {
   show_expired: false,
 }
 
-/** How many filters differ from the defaults (shown on the phone "Filters" button). */
+/** How many filters are changed from the defaults. Shown on the All filters button. */
 export function countActive(f: Filters): number {
   return (
     f.category.length + f.duration.length + f.company.length + f.skills.length +

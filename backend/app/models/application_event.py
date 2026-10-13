@@ -1,9 +1,8 @@
 """
-ApplicationEvent ORM model.
+One row for every status change on a saved job.
 
-Each status change on a SavedPosting creates one row here, capturing the
-new status, an optional free-text note, and an optional user-supplied date
-(e.g. an interview date).  Cascades on DELETE from saved_postings.
+It keeps the new status, an optional note and an optional date the student
+picks, like an interview date. Rows go away when the saved job is deleted.
 """
 
 from datetime import date, datetime
@@ -33,9 +32,9 @@ class ApplicationEvent(Base):
     status: Mapped[ApplicationStatus] = mapped_column(
         Enum(ApplicationStatus, name="application_status_enum"), nullable=False
     )
-    # Optional note the student records for this status change
+    # A note the student can add for this change
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
-    # Optional date the student associates with this event (e.g. interview date)
+    # A date the student can tie to this event, like the interview day
     event_date: Mapped[date | None] = mapped_column(DATE, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False

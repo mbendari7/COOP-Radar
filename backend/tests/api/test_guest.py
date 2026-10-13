@@ -1,6 +1,6 @@
 """
-Tests for guest accounts (POST /api/auth/guest), keeping them (POST /api/me/claim),
-and the students-only postings filter.
+Tests for guest accounts (POST /api/auth/guest), keeping them (POST /api/me/claim)
+and the students only job filter.
 """
 
 from datetime import date, timedelta
@@ -20,7 +20,7 @@ async def test_guest_gets_an_empty_temporary_account(client: AsyncClient) -> Non
 
     me = await client.get("/api/me")
     assert me.status_code == 200
-    # Unlike the demo, a guest starts with nothing saved and no resume
+    # Unlike the demo a guest starts with nothing saved and no resume
     assert (await client.get("/api/saved")).json()["total"] == 0
     assert (await client.get("/api/resume")).status_code == 404
 
@@ -43,7 +43,7 @@ async def test_claim_turns_guest_into_normal_account(client: AsyncClient) -> Non
     assert res.json()["email"] == "kept@test.com"
     assert res.json()["is_demo"] is False
 
-    # The new credentials work
+    # The new email and password work
     await client.post("/api/auth/logout")
     login = await client.post(
         "/api/auth/login", json={"email": "kept@test.com", "password": "Password1!"}
@@ -82,7 +82,7 @@ async def test_claim_requires_login(client: AsyncClient) -> None:
     assert res.status_code == 401
 
 
-# ── Students-only filter ──────────────────────────────────────────────────────
+# Students only filter
 
 def _posting(title: str) -> Posting:
     return Posting(

@@ -1,4 +1,4 @@
-"""Tests for CSV upload and manual posting entry endpoints."""
+"""Tests for CSV upload and adding a job by hand."""
 
 import io
 from pathlib import Path
@@ -11,7 +11,7 @@ FIXTURE_DIR = Path(__file__).parent.parent / "fixtures" / "ingest"
 
 
 async def _login(client: AsyncClient, db: AsyncSession) -> str:
-    """Register and login a user; return session cookie value."""
+    """Sign up and sign in a user and give back the session cookie."""
     await client.post(
         "/api/auth/register",
         json={"email": "csv_user@example.com", "password": "TestPass123!"},
@@ -26,7 +26,7 @@ async def _login(client: AsyncClient, db: AsyncSession) -> str:
 
 @pytest.mark.asyncio
 async def test_valid_csv_adds_five_postings(client: AsyncClient, db_session: AsyncSession):
-    """Uploading valid 5-row CSV adds 5 postings."""
+    """Uploading a good 5 row CSV adds 5 jobs."""
     session_token = await _login(client, db_session)
     csv_content = (FIXTURE_DIR / "sample_postings.csv").read_bytes()
 
@@ -44,7 +44,7 @@ async def test_valid_csv_adds_five_postings(client: AsyncClient, db_session: Asy
 
 @pytest.mark.asyncio
 async def test_csv_with_error_row(client: AsyncClient, db_session: AsyncSession):
-    """CSV with one invalid deadline: 4 added, 1 error on line 4 (3rd data row; header is line 1)."""
+    """A CSV with one bad deadline adds 4 and reports 1 error on line 4, the 3rd data row after the header."""
     session_token = await _login(client, db_session)
     csv_content = (FIXTURE_DIR / "sample_postings_with_error.csv").read_bytes()
 
@@ -63,7 +63,7 @@ async def test_csv_with_error_row(client: AsyncClient, db_session: AsyncSession)
 
 @pytest.mark.asyncio
 async def test_duplicate_csv_skips_all(client: AsyncClient, db_session: AsyncSession):
-    """Uploading the same CSV twice: second upload skips all 5 as duplicates."""
+    """Uploading the same CSV twice skips all 5 as duplicates the second time."""
     session_token = await _login(client, db_session)
     csv_content = (FIXTURE_DIR / "sample_postings.csv").read_bytes()
 
@@ -85,7 +85,7 @@ async def test_duplicate_csv_skips_all(client: AsyncClient, db_session: AsyncSes
 
 @pytest.mark.asyncio
 async def test_oversized_csv_returns_413(client: AsyncClient, db_session: AsyncSession):
-    """CSV with more than 1,000 rows returns 413 FILE_TOO_LARGE."""
+    """A CSV with more than 1,000 rows answers 413 FILE_TOO_LARGE."""
     session_token = await _login(client, db_session)
 
     # Build a CSV with 1001 data rows
@@ -105,7 +105,7 @@ async def test_oversized_csv_returns_413(client: AsyncClient, db_session: AsyncS
 
 @pytest.mark.asyncio
 async def test_rate_limit_on_fourth_upload(client: AsyncClient, db_session: AsyncSession):
-    """4th CSV upload within the rate window returns 429 RATE_LIMITED."""
+    """A 4th CSV upload in the limit window answers 429 RATE_LIMITED."""
     session_token = await _login(client, db_session)
     csv_content = (FIXTURE_DIR / "sample_postings.csv").read_bytes()
 
@@ -127,7 +127,7 @@ async def test_rate_limit_on_fourth_upload(client: AsyncClient, db_session: Asyn
 
 @pytest.mark.asyncio
 async def test_manual_entry_returns_201(client: AsyncClient, db_session: AsyncSession):
-    """Manual posting entry returns 201 with the new posting."""
+    """Adding a job by hand answers 201 with the new job."""
     session_token = await _login(client, db_session)
 
     resp = await client.post(
@@ -148,7 +148,7 @@ async def test_manual_entry_returns_201(client: AsyncClient, db_session: AsyncSe
 
 @pytest.mark.asyncio
 async def test_manual_duplicate_returns_409(client: AsyncClient, db_session: AsyncSession):
-    """Submitting the same manual posting twice returns 409 DUPLICATE."""
+    """Adding the same job by hand twice answers 409 DUPLICATE."""
     session_token = await _login(client, db_session)
     payload = {
         "title": "Duplicate Job Co-op",
@@ -170,7 +170,7 @@ async def test_manual_duplicate_returns_409(client: AsyncClient, db_session: Asy
 async def test_manual_entry_is_committed_and_queued_for_embedding(
     client: AsyncClient, db_session: AsyncSession, fake_queue, monkeypatch
 ):
-    """create_manual used to flush without committing, so postings vanished."""
+    """create_manual used to flush without committing so jobs disappeared."""
     from app.config import get_settings
 
     monkeypatch.setattr(get_settings(), "openai_api_key", "sk-owner")  # smart search on
@@ -193,7 +193,7 @@ async def test_manual_entry_is_committed_and_queued_for_embedding(
 async def test_no_embedding_jobs_without_openai_key(
     client: AsyncClient, db_session: AsyncSession, fake_queue, monkeypatch
 ):
-    """With smart search off, no embedding job is started (it could only fail)."""
+    """With smart search off no embedding job starts, since it could only fail."""
     from app.config import get_settings
 
     monkeypatch.setattr(get_settings(), "openai_api_key", "")

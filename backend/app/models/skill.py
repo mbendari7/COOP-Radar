@@ -1,4 +1,4 @@
-"""Skill taxonomy ORM model — the fixed ~150-skill list used for extraction."""
+"""The fixed list of about 150 skills we look for in jobs and resumes."""
 
 from datetime import datetime
 from uuid import UUID

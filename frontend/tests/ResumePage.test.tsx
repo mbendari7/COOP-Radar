@@ -1,6 +1,6 @@
 /**
- * ResumePage tests — a signed-out visitor can upload straight away: a guest account is
- * created first, then the resume is uploaded.
+ * Tests for the resume page. Someone who is not signed in can upload right away. A guest
+ * account gets made first and then the resume goes up.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'

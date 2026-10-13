@@ -1,7 +1,16 @@
-/** Format an ISO date or datetime string to a short human-readable date. */
+/**
+ * Turn a date or datetime string into a Date. A plain date like 2026-10-14 is read as that
+ * day on this computer. new Date() would read it as midnight UTC, which shows the day
+ * before for anyone in Canada.
+ */
+export function parseDay(value: string): Date {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(value)
+  return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])) : new Date(value)
+}
+
+/** A date or datetime as a short readable date like Oct 14, 2026. */
 export function formatDate(value: string): string {
-  const d = new Date(value)
-  return d.toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })
+  return parseDay(value).toLocaleDateString('en-CA', { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
 export function workModeLabel(mode: string): string {
@@ -13,7 +22,7 @@ export function workModeLabel(mode: string): string {
   }
 }
 
-/** "Toronto, ON", "Austin, TX, US", "Remote" or "Canada", never a dangling comma. */
+/** Toronto, ON or Austin, TX, US or Remote or Canada, and never a comma hanging off the end. */
 export function formatLocation(city: string, province: string, country = 'CA'): string {
   const parts = [city, province].filter(Boolean)
   if (country === 'US' && city !== 'United States') parts.push('US')
@@ -40,13 +49,13 @@ const STATES: Record<string, string> = {
   WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
 }
 
-/** "ON" -> "Ontario", "TX" -> "Texas"; unknown codes are shown as they are. */
+/** ON gives Ontario and TX gives Texas. Codes we do not know show as they are. */
 export function provinceName(code: string): string {
   const c = code.toUpperCase()
   return PROVINCES[c] ?? STATES[c] ?? code
 }
 
-/** Canadian province codes vs US state codes (the two sets don't overlap). */
+/** Canadian province codes or US state codes. The two lists never overlap. */
 export function isProvince(code: string): boolean {
   return code.toUpperCase() in PROVINCES
 }
@@ -55,7 +64,7 @@ export function countryName(code: string): string {
   return code === 'US' ? 'United States' : 'Canada'
 }
 
-/** "today", "yesterday", "3 days ago", "2 weeks ago", else a date. */
+/** today, yesterday, 3 days ago, 2 weeks ago, or else a date. */
 export function timeAgo(value: string, now: Date = new Date()): string {
   const days = Math.floor((now.getTime() - new Date(value).getTime()) / 86_400_000)
   if (days <= 0) return 'today'

@@ -1,13 +1,12 @@
 """
-SavedPosting ORM model and ApplicationStatus enum.
+Saved jobs and the application status list.
 
-One row per (user, posting) bookmark.  The UNIQUE constraint on
-(user_id, posting_id) enforces "one save per pair" at the database level,
-making the save operation safely idempotent via ON CONFLICT DO NOTHING.
+One row for each person and job they saved. The database only allows one row
+per pair, so saving twice is safe and does nothing the second time.
 
-Both FKs use ON DELETE CASCADE so:
-- Deleting a user removes all their saved postings (FR-013)
-- Deleting a posting removes it from all saved lists
+Both links cascade on delete, so
+deleting a person removes everything they saved
+deleting a job removes it from every saved list
 """
 
 import enum
@@ -29,9 +28,9 @@ from app.db import Base
 
 class ApplicationStatus(enum.StrEnum):
     """
-    Seven stages of a co-op application lifecycle.
-    str mixin lets FastAPI serialise these as plain strings automatically.
-    NULL in the database means "no status set" — distinct from any value here.
+    The stages a co-op application goes through.
+    The str mixin lets FastAPI send these as plain strings.
+    NULL in the database means no status yet, which is not the same as any value here.
     """
     saved      = "saved"
     applying   = "applying"
@@ -54,14 +53,14 @@ class SavedPosting(Base):
     posting_id: Mapped[UUID] = mapped_column(
         ForeignKey("postings.id", ondelete="CASCADE"), nullable=False
     )
-    # NULL = no status set; not the same as any of the four enum values
+    # NULL means no status yet and is not the same as any status value
     status: Mapped[ApplicationStatus | None] = mapped_column(
         Enum(ApplicationStatus, name="application_status_enum"), nullable=True
     )
     saved_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False
     )
-    # Updated whenever status changes — used for "last updated" sort on tracker table
+    # Changes whenever the status does. The tracker sorts by it for last updated
     last_status_at: Mapped[datetime | None] = mapped_column(
         TIMESTAMP(timezone=True), nullable=True
     )
@@ -81,7 +80,7 @@ class SavedPosting(Base):
         Index("idx_saved_postings_posting_id", "posting_id"),
         Index("idx_saved_postings_status", "status"),
         Index("idx_saved_postings_saved_at", text("saved_at DESC")),
-        # Redundant with the unique constraint above, but migration 0002 created it;
-        # declaring it keeps autogenerate from proposing to drop it.
+        # Doubles up on the unique constraint above but migration 0002 made it
+        # and listing it here stops autogenerate from trying to drop it
         Index("ux_saved_postings_user_posting_idx", "user_id", "posting_id", unique=True),
     )

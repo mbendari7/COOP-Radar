@@ -15,9 +15,9 @@ if TYPE_CHECKING:
 
 class Resume(Base):
     """
-    Stores resume metadata and extracted text for one user.
-    Only one resume per user is kept at a time (UNIQUE on user_id).
-    The raw file is never persisted; only extracted_text is stored.
+    The resume details and its text for one person.
+    Each person keeps one resume at a time.
+    We never keep the file itself, only the text we pulled out.
     """
 
     __tablename__ = "resumes"
@@ -40,9 +40,9 @@ class Resume(Base):
     filename: Mapped[str] = mapped_column(Text, nullable=False)
     file_size: Mapped[int] = mapped_column(Integer, nullable=False)
     extracted_text: Mapped[str] = mapped_column(Text, nullable=False)
-    # Cached AI resume review (strengths, tailoring tips, roles to search); None until requested
+    # The saved AI resume review. None until someone asks for it
     insights: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
-    # What the student is looking for (JobPreferences); None = no preference, match everything
+    # What the student is looking for. None means no preference so everything can match
     preferences: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
     uploaded_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), nullable=False, server_default=func.now()

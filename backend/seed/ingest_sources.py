@@ -1,4 +1,4 @@
-"""Seed fixture-backed dev/test ingest sources."""
+"""Add the dev and test import sources that read from local files."""
 
 import asyncio
 import json
@@ -8,7 +8,7 @@ from sqlalchemy import text
 
 from app.db import AsyncSessionLocal
 
-# Fixture files live in backend/tests/fixtures/ingest (works in Docker and locally)
+# The test files live in backend/tests/fixtures/ingest
 _FIXTURE_DIR = Path(__file__).resolve().parents[1] / "tests" / "fixtures" / "ingest"
 
 
@@ -32,7 +32,7 @@ SOURCES = [
 
 
 async def seed_sources() -> None:
-    """Insert the dev sources, skipping any whose name already exists (idempotent)."""
+    """Add the dev sources and skip any whose name is already there, so it is safe to rerun."""
     async with AsyncSessionLocal() as db:
         for source in SOURCES:
             await db.execute(

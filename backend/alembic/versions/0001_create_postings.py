@@ -15,8 +15,8 @@ branch_labels = None
 depends_on = None
 
 
-# Generated columns may only call IMMUTABLE functions; array_to_string() is STABLE,
-# so wrap it. Must match SKILLS_TO_TEXT_DDL in app/models/posting.py.
+# Generated columns can only call IMMUTABLE functions and array_to_string() is STABLE,
+# so we wrap it. Has to match SKILLS_TO_TEXT_DDL in app/models/posting.py
 SKILLS_TO_TEXT_DDL = (
     "CREATE OR REPLACE FUNCTION coopradar_skills_text(text[]) RETURNS text "
     "LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT array_to_string($1, ' ') $$"
@@ -26,8 +26,8 @@ SKILLS_TO_TEXT_DDL = (
 def upgrade() -> None:
     op.execute(SKILLS_TO_TEXT_DDL)
 
-    # Create the work_mode enum type first — the table references it below.
-    # checkfirst=True prevents errors if this migration is re-run accidentally.
+    # Make the work_mode enum first since the table below uses it.
+    # checkfirst=True means no error if this migration runs twice by accident
     work_mode_enum = postgresql.ENUM(
         "onsite", "hybrid", "remote",
         name="work_mode_enum",
@@ -52,7 +52,7 @@ def upgrade() -> None:
             postgresql.ENUM(
                 "onsite", "hybrid", "remote",
                 name="work_mode_enum",
-                create_type=False,  # already created above
+                create_type=False,  # already made above
             ),
             nullable=False,
         ),
@@ -73,9 +73,9 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("'{}'::text[]"),
         ),
-        # GENERATED ALWAYS AS STORED keeps the search_vector in sync automatically.
-        # We use weights: A=title, B=company+skills, C=description so title
-        # matches rank higher — satisfying FR-003.
+        # A stored generated column keeps search_vector up to date on its own.
+        # The weights are A for title, B for company and skills and C for description
+        # so title matches rank higher
         sa.Column(
             "search_vector",
             postgresql.TSVECTOR,
@@ -86,24 +86,24 @@ def upgrade() -> None:
                 setweight(to_tsvector('english', coalesce(coopradar_skills_text(skills), '')), 'B') ||
                 setweight(to_tsvector('english', coalesce(description, '')), 'C')
                 """,
-                persisted=True,  # STORED — computed once on write, not on every read
+                persisted=True,  # STORED means it is worked out once on write and not on every read
             ),
             nullable=True,
         ),
         sa.CheckConstraint("duration_months IN (4, 8, 12, 16)", name="ck_duration_months"),
     )
 
-    # GIN index for full-text search (@@) — very fast for tsvector queries
+    # GIN index for full text search, very fast for tsvector queries
     op.create_index(
         "idx_postings_search_vector", "postings", ["search_vector"],
         postgresql_using="gin",
     )
-    # GIN index for skills array contains-all (@>) queries
+    # GIN index for has all these skills queries
     op.create_index(
         "idx_postings_skills", "postings", ["skills"],
         postgresql_using="gin",
     )
-    # B-tree indexes for sort columns and equality filters
+    # Normal indexes for sort columns and exact filters
     op.create_index("idx_postings_posted_at", "postings", ["posted_at"])
     op.create_index("idx_postings_deadline", "postings", ["deadline"])
     op.create_index("idx_postings_company", "postings", ["company"])
@@ -116,8 +116,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Drop indexes first, then table, then the custom type.
-    # Order matters — the type can't be dropped while the table still references it.
+    # Drop the indexes first, then the table, then the custom type.
+    # Order matters because the type cannot go while the table still uses it
     for idx in [
         "idx_postings_duration", "idx_postings_work_mode", "idx_postings_term",
         "idx_postings_province", "idx_postings_city", "idx_postings_title",

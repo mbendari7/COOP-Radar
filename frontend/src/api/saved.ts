@@ -1,12 +1,12 @@
 /**
- * TanStack Query hooks for saved postings, events, and CSV export.
+ * TanStack Query hooks for saved jobs, their history and the CSV download.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { API_BASE, ApiError, apiFetch } from './client'
 import type { PostingListItem } from './postings'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// Types
 
 export type ApplicationStatus =
   | 'saved'
@@ -74,7 +74,7 @@ export interface SavedListParams {
   page_size?: number
 }
 
-// ── Fetchers ──────────────────────────────────────────────────────────────────
+// Calls to the server
 
 function fetchSaved(params: SavedListParams): Promise<SavedPostingsPage> {
   const sp = new URLSearchParams()
@@ -92,7 +92,7 @@ async function deleteSave(savedId: string): Promise<void> {
   try {
     await apiFetch<void>(`/api/saved/${savedId}`, { method: 'DELETE' })
   } catch (err) {
-    // Already gone counts as success (e.g. unsaved in another tab)
+    // Already gone counts as done, like when it was unsaved in another tab
     if (!(err instanceof ApiError && err.status === 404)) throw err
   }
 }
@@ -119,7 +119,7 @@ const postEvent = (
     json: { status, notes, event_date: eventDate },
   })
 
-// ── Hooks ─────────────────────────────────────────────────────────────────────
+// Hooks
 
 export function useSavedPostings(params: SavedListParams = {}) {
   return useQuery({
@@ -189,7 +189,7 @@ export function useAddEvent() {
   })
 }
 
-/** Trigger a CSV download — the browser sends the session cookie with the navigation. */
+/** Start a CSV download. The browser sends the session cookie along with it. */
 export function downloadCsv(): void {
   window.open(`${API_BASE}/api/saved/export/csv`, '_blank')
 }

@@ -1,0 +1,42 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1440px;height:900px;overflow:hidden;font-family:Archivo,sans-serif;color:#141414;background:#fff}
+.bar{background:#141414;color:#fff;height:64px;display:flex;align-items:center;padding:0 40px;gap:40px}
+.logo{font-weight:800;font-size:22px}
+.nav{display:flex;gap:28px;font-size:15px;font-weight:600}
+.nav .on{border-bottom:4px solid #F2B705;padding-bottom:18px;margin-bottom:-22px}
+.right{margin-left:auto;display:flex;gap:12px}.btn{background:#F2B705;color:#141414;padding:8px 16px;font-weight:700;font-size:14px;border-radius:20px}
+.filters{padding:18px 40px;display:flex;gap:12px;border-bottom:1px solid #DDD}
+.search{flex:1;max-width:520px;border:2px solid #141414;border-radius:24px;padding:10px 16px;color:#666}
+.chip{border:2px solid #CCC;border-radius:20px;padding:8px 14px;font-size:14px;font-weight:600}
+.wrap{display:grid;grid-template-columns:600px 1fr;height:760px}
+.list{border-right:1px solid #DDD}
+.row{display:grid;grid-template-columns:28px 1fr;gap:16px;padding:18px 40px;border-bottom:1px solid #EEE}
+.line{position:relative}.line:before{content:"";position:absolute;left:11px;top:-18px;bottom:-18px;width:6px;background:var(--c)}
+.line i{position:absolute;left:4px;top:4px;width:20px;height:20px;border-radius:50%;background:#fff;border:5px solid var(--c)}
+.t{font-size:18px;font-weight:700}.c{font-size:15px;margin-top:4px}.m{font-size:13px;color:#666;margin-top:6px}
+.det{padding:36px 56px}
+h1{font-size:38px;font-weight:800;margin-top:8px}
+.k{font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:#00843D}
+.stops{display:flex;align-items:center;margin-top:40px;position:relative;width:640px}
+.stops:before{content:"";position:absolute;left:10px;right:10px;top:10px;height:6px;background:#F2B705}
+.s{flex:1;position:relative;font-size:13px;font-weight:600}
+.s i{display:block;width:26px;height:26px;border-radius:50%;background:#fff;border:6px solid #F2B705;margin-bottom:10px}
+.s.on i{background:#141414;border-color:#141414}
+.apply{display:inline-block;margin-top:40px;background:#141414;color:#fff;padding:14px 26px;font-weight:700;border-radius:26px}
+</style></head><body>
+<div class="bar"><div class="logo">CoopRadar</div><div class="nav"><a class="on">Find jobs</a><a>Match my resume</a><a>Tracker</a><a>AI key</a></div><div class="right"><span class="btn">Sign in</span></div></div>
+<div class="filters"><div class="search">Search titles, companies, skills</div><span class="chip">Winter 2027</span><span class="chip">Ontario</span><span class="chip">Remote ok</span></div>
+<div class="wrap"><div class="list">
+<div class="row"><div class="line" style="--c:#00843D"><i></i></div><div><div class="t">Data Intern, Product Analytics</div><div class="c">1Password</div><div class="m">Remote · Winter 2027</div></div></div>
+<div class="row"><div class="line" style="--c:#F2B705"><i></i></div><div><div class="t">Analog Mixed Signal Engineer Intern</div><div class="c">Astera Labs</div><div class="m">Toronto ON · Summer 2027</div></div></div>
+<div class="row"><div class="line" style="--c:#D7282F"><i></i></div><div><div class="t">AI Software Engineer</div><div class="c">Snowflake</div><div class="m">Toronto ON</div></div></div>
+<div class="row"><div class="line" style="--c:#00843D"><i></i></div><div><div class="t">DashMart Team Member</div><div class="c">DoorDash Canada</div><div class="m">Montréal QC</div></div></div>
+</div>
+<div class="det"><div class="k">Winter line</div><h1>Data Intern, Product Analytics</h1><p style="margin-top:8px;font-size:18px">1Password · Remote in Canada</p>
+<div class="stops"><div class="s on"><i></i>Saved</div><div class="s"><i></i>Applied</div><div class="s"><i></i>Interview</div><div class="s"><i></i>Offer</div></div>
+<span class="apply">Apply on 1Password</span></div></div>
+</body></html>

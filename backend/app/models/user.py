@@ -1,9 +1,9 @@
 """
-User ORM model.
+One row for every student account.
 
-One row per registered student.  Email is stored lowercase (normalised
-at the service layer before every write and lookup).  hashed_password
-is an argon2id hash — the plaintext is never stored or logged.
+Emails are saved in lowercase, and the service lowercases them before every
+write and lookup. hashed_password is an argon2id hash and the real password
+is never saved or logged.
 """
 
 from datetime import datetime
@@ -26,17 +26,17 @@ class User(Base):
     id: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True), primary_key=True, default=uuid4
     )
-    # Unique constraint enforced in DB via idx_users_email unique index
+    # The database keeps emails unique with the idx_users_email index
     email: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     hashed_password: Mapped[str] = mapped_column(Text, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False
     )
     is_admin: Mapped[bool] = mapped_column(BOOLEAN, nullable=False, server_default=text("FALSE"))
-    # Throwaway "Try the demo" account — deleted 24 h after created_at (services/demo.py)
+    # A throwaway demo account that gets deleted 24 hours after it was made (services/demo.py)
     is_demo: Mapped[bool] = mapped_column(BOOLEAN, nullable=False, server_default=text("FALSE"))
 
-    # Back-reference so we can access user.saved_postings if needed
+    # Link back so user.saved_postings works when we need it
     saved_postings: Mapped[list["SavedPosting"]] = relationship(
         back_populates="user", cascade="all, delete-orphan"
     )

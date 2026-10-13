@@ -1,4 +1,4 @@
-# CoopRadar — The Project Guide
+# CoopRadar: The Project Guide
 
 This is the deep technical reference: how every part works, so you can debug and extend it.
 Start with the shorter guides if you haven't: **[Using CoopRadar](../guides/using-coopradar/README.md)** (use it,
@@ -69,8 +69,8 @@ Then walk through the app and check that each piece works. This doubles as your 
    embeddings exist (empty otherwise).
 4. Toggle **smart search** and try `low-level firmware`. Results come back ranked by meaning.
 5. **Register** (password ≥ 10 chars). Bookmark a posting, then open **Saved**: change status, add a note with a date,
-   switch to **Board** and drag a card, and **↓ CSV** to export.
-6. **My resume**: drop a PDF/DOCX resume (signed out is fine: a temporary account is created). With no AI key you
+   switch to **Board** and drag a job, and **Download CSV** to export.
+6. **Match my resume**: drop a PDF/DOCX resume (signed out is fine: a temporary account is created). With no AI key you
    immediately get skills found, in-demand skills missing, and 20 skill-ranked matches. Add a key on **AI key**, then
    try **Get my AI review**, **Re-rank with my AI**, and a match's **Tailor my resume**. Answers stream in.
 7. Make yourself admin (see the README), refresh, and open **Admin**. Click **Run now** on "Acme Jobs (Dev Fixture)".
@@ -146,7 +146,7 @@ erDiagram
 | `skills` | name (unique), aliases `text[]`, category | The taxonomy used by extraction (`seed/skills.py`). |
 | `posting_embeddings` | posting_id (PK), embedding `vector(1536)`, model | HNSW index with `vector_cosine_ops` for fast `<=>` queries. |
 | `resumes` | user_id (unique: one per user), filename, file_size, extracted_text, insights `jsonb`, preferences `jsonb` | The file itself is never stored. `preferences` (job types, keywords, location, work modes, level, program, degree, graduation year, term, countries) limits and weights matching. |
-| `match_results` | resume_id, posting_id (unique together), score 0–100, reason | Replaced on every upload. |
+| `match_results` | resume_id, posting_id (unique together), score 0 to 100, reason | Replaced on every upload. |
 | `kv_store` | key (PK), fields `jsonb`, counter, expires_at | Login sessions and rate-limit counters when Redis isn't configured (`app/store.py`). Expired rows are ignored and purged by the scheduler. |
 
 **Migrations** (`backend/alembic/versions/`) build this schema step by step: 0001 postings, 0002 auth and saved
@@ -269,7 +269,7 @@ a `field_map`, or write an adapter (see recipes). Always check the site's terms 
    `OPENAI_API_KEY`, pgvector cosine similarity (with the same student fit) is used instead. Without AI the top 20
    are stored with a skill reason ("You have Python, SQL; it also asks for Go.").
 4. **Stage 2, precision (`rank_with_ai`)**: one call through `ai.complete()` to the visitor's provider/model scores
-   every candidate 0–100 with a reason as a JSON array. The code drops invented IDs and duplicates, clamps scores,
+   every candidate 0 to 100 with a reason as a JSON array. The code drops invented IDs and duplicates, clamps scores,
    and keeps the top 20.
 5. **Fallback**: unusable output → the stage-1 relevance becomes the score. A rejected key, unknown model, or
    exhausted credit is **raised** (400/429 with a clear code) rather than hidden, and the old resume is kept
@@ -311,15 +311,17 @@ the visitor per posting. SQL narrows thousands of postings to 40, then one LLM c
 | Piece | Where | Notes |
 |---|---|---|
 | Providers | `src/main.tsx` | `BrowserRouter` plus `QueryClientProvider` (30 s staleTime, 1 retry). |
-| Routes | `src/App.tsx` | `/` jobs · `/postings/:id` detail · `/resume` My resume (upload, insights, matches, assistant) · `/saved` tracker · `/ai-key` bring-your-own-key · `/account` · `/add` CSV + manual entry · `/admin/sources` · `/matches` → `/resume`. Signed-out visitors see `WelcomeHero` ("Analyze my resume"). Heavy pages are lazy-loaded. |
-| Resume page | `pages/ResumePage.tsx` | `ResumeDropzone` (guest login if signed out, then upload), `InsightsSection`, `MatchesSection` + `MatchCard`. |
+| Routes | `src/App.tsx` | `/` jobs · `/postings/:id` detail · `/resume` Match my resume (upload, insights, matches, assistant) · `/saved` tracker · `/ai-key` bring-your-own-key · `/account` · `/add` CSV + manual entry · `/admin/sources` · `/matches` → `/resume`. Heavy pages are lazy-loaded. |
+| Look | `tailwind.config.ts`, `src/index.css`, `components/Postmark.tsx`, `components/postal.ts` | The postal design system: `post` (red) and `air` (blue) palettes, ink greys, square corners, Archivo with condensed widths, shared classes (`btn-primary`, `btn-secondary`, `field`, `chip`, `label-form`, `display`), and the postmark stamp on every job. Written up in `DESIGN.md`. |
+| Resume page | `pages/ResumePage.tsx` | A three part form (`StepCard`), `ResumeDropzone` (guest login if signed out, then upload), `MatchesTab` with `MatchCard` and its score stamp, `FeedbackTab`. |
 | Per-job assistant | `components/ConversationPanel.tsx`, `RichText.tsx` | Tailor / cover letter / ask buttons, streamed replies rendered from a safe Markdown subset (never HTML), copy button. |
 | Temporary accounts | `components/DemoBanner.tsx`, `ClaimAccountForm.tsx` | Banner with **Keep my account** → `POST /api/me/claim`. |
 | HTTP | `src/api/client.ts` | `apiFetch` (relative `/api` URLs, cookies, JSON, throws `ApiError {status, code}`) and `toApiError`. |
 | AI key | `src/api/aiKey.ts`, `pages/AiKeyPage.tsx` | Key kept in session/localStorage only; `aiHeaders()` attaches it to AI requests; provider how-to steps in `PROVIDER_GUIDES`. |
 | Hooks | `src/api/{postings,auth,saved,resume,ingest,meta,aiKey}.ts` | One TanStack Query hook per endpoint. Mutations invalidate affected keys (e.g. saving invalidates `['saved']` and `['postings']` so `is_saved` refreshes). |
 | URL state | `pages/PostingsListPage.tsx` | Reads every filter from `useSearchParams` and writes with `replace: true`, so links are shareable and Back works. |
-| Table | `components/PostingsTable.tsx` | TanStack Table in manual mode (it only *displays*; sort changes are sent back to the URL). Becomes `PostingCard`s below `md`. |
+| Table | `components/PostingsTable.tsx` | TanStack Table in manual mode. It only shows things and sends sort changes back to the URL. Becomes the `PostingCard` list below `md`. |
+| Job row and details | `components/PostingCard.tsx`, `PostingDetailView.tsx` | Rows split by rules with a postmark (city and posted day). Details have a ruled facts row and a days left bar drawn to scale. |
 | Tracker board | `components/TrackerBoard.tsx` | dnd-kit; dropping on a column calls the status mutation. |
 | SSE reader | `api/resume.ts → askAboutPosting` | Reads `res.body` with a stream reader, splits on lines, and parses `data:` events. |
 
@@ -348,10 +350,10 @@ same origin (see `docs/DEPLOY.md`).
   matcher · `perf/` the 10k-row latency budget (`-m perf`). `api/test_store_and_jobs.py` covers the Postgres
   session store (expiry, counters) and the background jobs.
 
-**Frontend** (`frontend/tests/`, 42 tests): FilterBar (incl. country, program, graduation year), PostingsTable and
-PostingCard (role badge, US location, selected job), DemoButton, ResumePage (guest-then-upload flow with studies and
-preferences, file validation), RichText, the AI key store + page, and the API client, using Vitest + Testing
-Library in jsdom.
+**Frontend** (`frontend/tests/`, 45 tests): FilterBar (incl. country, program, graduation year), PostingsTable and
+PostingCard (role badge, US location, selected job), DemoButton, ResumePage (guest then upload flow with studies and
+preferences, file validation), RichText, the AI key store and page, the API client, and date handling (a plain
+date like 2026-10-14 never shows a day early), using Vitest and Testing Library in jsdom.
 
 **End-to-end** (`frontend/e2e/`, Playwright, 7 tests): against the running site, in a real browser: search with no
 results, quick filters and the All filters panel, the details panel beside the list, uploading a generated PDF
@@ -394,7 +396,7 @@ The project was built **spec-first** with [Spec Kit](https://github.com/github/s
   whenever a convention changes, because they're how future sessions learn your rules.
 - **`CLAUDE.md`** is loaded into every Claude Code session: stack, layout, commands, rules.
 - **`.claude/settings.json`** turns off AI attribution in commits and PRs for everyone working in this repo.
-- The original prompts for features 001–004 are in `docs/speckit-prompts.md`. Copy their shape for Feature 005.
+- The original prompts for features 001 to 004 are in `docs/speckit-prompts.md`. Copy their shape for Feature 005.
 
 ---
 
@@ -469,13 +471,14 @@ is a classic bug class:
 
 | Symptom | Fix |
 |---|---|
-| My resume shows no matches | No open postings yet. On a fresh site the scheduler imports the career boards within a few minutes (watch the `start.py` terminal), or click **Run now** on the Admin page. |
+| Match my resume shows no matches | No open postings yet. On a fresh site the scheduler imports the career boards within a few minutes (watch the `start.py` terminal), or click **Run now** on the Admin page. |
 | No jobs at all after deploy | Check `BACKGROUND_JOBS` isn't `false` and outbound internet is allowed; check `ingest_runs.error_log` on the Admin page. |
 | A resume shows "We couldn't spot any listed skills" | The PDF is an image, or it has no skills the postings mention. Try a text-based PDF with a Skills line. |
 | AI buttons say "Add your own AI key…" | Expected without a key: add one on **AI key** (or set the owner's `ANTHROPIC_API_KEY`). |
 | Logged in but still treated as logged out | You're calling the API on another origin. Use the app at `localhost:8000` (or `:5173` with `--dev`), or set `VITE_API_URL` **and** `CORS_ORIGINS`. |
 | "Run now" returns 503 `QUEUE_UNAVAILABLE` | The background job couldn't start; check the server log for the error. |
-| A source shows "Auto-paused" | 3 consecutive failures. Fix the URL/config, then click **Re-enable**. |
+| A source shows "Paused itself" | 3 failures in a row. Fix the URL or config, then click **Turn back on**. |
+| The Vercel site says the jobs didn't load | The `/api` rewrite in `vercel.json` must end with `/api/:path*`. Check `https://<project>.vercel.app/api/postings?page_size=10` returns JSON. |
 | `alembic check` fails after editing a model | Generate a migration (`/db-migration`). |
 | Tests fail with `extension "vector" is not available` | Point `DATABASE_URL` at a Postgres with pgvector installed (e.g. one started with `pgserver`), not plain Postgres. |
 | `start.py` says the database wasn't shut down cleanly | Normal after a crash or a closed window: Postgres repairs itself in under a minute and `start.py` waits for it. |

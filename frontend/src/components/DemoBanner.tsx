@@ -1,6 +1,6 @@
 /**
- * DemoBanner — shown while using a temporary account (the demo, or "upload without an
- * account"). Explains it's deleted after 7 days and offers to keep it with an email + password.
+ * Shows while someone is on a temporary account, from the demo or from uploading without an
+ * account. Says it gets deleted after 7 days and offers to keep it with an email and password.
  */
 
 import { useState } from 'react'
@@ -13,17 +13,13 @@ export default function DemoBanner() {
   if (!me?.is_demo) return null
 
   return (
-    <div role="status" className="bg-amber-50 border-b border-amber-200 text-amber-900 text-sm">
-      <div className="max-w-6xl mx-auto px-4 py-2 space-y-2">
+    <div role="status" className="border-b-[1.5px] border-gray-900 bg-air-50 text-sm text-gray-900">
+      <div className="mx-auto max-w-7xl space-y-2 px-4 py-2">
         <p>
-          <strong className="font-semibold">You're using a temporary account.</strong>{' '}
+          <strong className="font-bold">You're using a temporary account.</strong>{' '}
           Everything here is private to you and deleted after 7 days.{' '}
           {!open && (
-            <button
-              type="button"
-              onClick={() => setOpen(true)}
-              className="font-semibold underline hover:text-amber-700"
-            >
+            <button type="button" onClick={() => setOpen(true)} className="link underline">
               Keep my account
             </button>
           )}

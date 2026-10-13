@@ -1,5 +1,5 @@
 /**
- * PostingsTable tests — renders rows, sort header clicks update URL params.
+ * Tests for the job list and table. Rows show up and clicking a header changes the sort.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
@@ -9,7 +9,7 @@ import { describe, it, expect, vi } from 'vitest'
 import PostingsTable from '../src/components/PostingsTable'
 import type { PostingListItem } from '../src/api/postings'
 
-// --- Helpers -----------------------------------------------------------------
+// Helpers
 
 function makePosting(overrides: Partial<PostingListItem> = {}): PostingListItem {
   return {
@@ -58,7 +58,7 @@ function renderTable(props: Partial<React.ComponentProps<typeof PostingsTable>> 
   )
 }
 
-// --- Tests -------------------------------------------------------------------
+// Tests
 
 describe('PostingCard', () => {
   it('shows the kind of role, the term and a US location', () => {
@@ -100,7 +100,7 @@ describe('PostingsTable', () => {
     ]
     renderTable({ data })
 
-    // Both titles visible in the table (hidden on mobile in the DOM but in the table)
+    // Both titles show in the table. They are hidden on phones but still in the table
     expect(screen.getAllByText('Backend Dev').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Frontend Dev').length).toBeGreaterThan(0)
   })
@@ -129,24 +129,24 @@ describe('PostingsTable', () => {
     const data = [makePosting()]
     renderTable({ data, sort: 'posted_at', order: 'desc', onSortChange })
 
-    // Click the "Deadline" column header
+    // Click the Deadline column header
     const deadlineHeader = screen.getByRole('columnheader', { name: /deadline/i })
     fireEvent.click(deadlineHeader)
 
-    // First click on a new column sorts ascending (soonest deadline first)
+    // The first click on a new column sorts up, soonest deadline first
     expect(onSortChange).toHaveBeenCalledWith('deadline', 'asc')
   })
 
   it('toggles sort order on second click of the same column', () => {
     const onSortChange = vi.fn()
     const data = [makePosting()]
-    // Already sorted by deadline asc
+    // Already sorted by deadline going up
     renderTable({ data, sort: 'deadline', order: 'asc', onSortChange })
 
     const deadlineHeader = screen.getByRole('columnheader', { name: /deadline/i })
     fireEvent.click(deadlineHeader)
 
-    // Second click should toggle to desc
+    // The second click should flip it to going down
     expect(onSortChange).toHaveBeenCalledWith('deadline', 'desc')
   })
 })

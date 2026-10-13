@@ -1,4 +1,4 @@
-"""Admin-only routes for ingest source management."""
+"""Admin only routes for managing where jobs get imported from."""
 
 from uuid import UUID
 
@@ -19,7 +19,7 @@ async def get_sources(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(get_admin_user),
 ) -> list[IngestSourceOut]:
-    """List all ingest sources with their latest run stats."""
+    """List every source with how its last run went."""
     return await list_sources(db)
 
 
@@ -31,7 +31,7 @@ async def get_source_runs(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(get_admin_user),
 ) -> RunsPage:
-    """Paginated run history for a source."""
+    """Run history for one source, a page at a time."""
     return await list_runs(db, source_id, page, page_size)
 
 
@@ -41,7 +41,7 @@ async def trigger_source_run(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(get_admin_user),
 ) -> TriggerRunOut:
-    """Trigger an immediate run for a source (409 if one is already running)."""
+    """Run a source right now. Answers 409 if it is already running."""
     return await trigger_run(db, source_id)
 
 
@@ -52,5 +52,5 @@ async def patch_source_endpoint(
     db: AsyncSession = Depends(get_db),
     _admin: User = Depends(get_admin_user),
 ) -> IngestSourceOut:
-    """Enable, disable, or un-pause a source."""
+    """Turn a source on or off, or unpause it."""
     return await patch_source(db, source_id, data)

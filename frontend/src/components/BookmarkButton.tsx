@@ -1,9 +1,9 @@
 /**
- * BookmarkButton — save / unsave a posting.
+ * Save or unsave a job.
  *
- * Shows a filled bookmark icon when the posting is saved, outline when not.
- * If the user isn't authenticated, clicking opens the AuthModal.
- * Uses optimistic updates for instant feedback.
+ * A filled bookmark means it is saved and an outline means it is not.
+ * If nobody is signed in, clicking opens the sign in box.
+ * It flips right away and then lets the server confirm.
  */
 
 import { useState } from 'react'
@@ -13,7 +13,7 @@ import AuthModal from './AuthModal'
 
 interface Props {
   postingId: string
-  savedId?: string       // set when the posting is already saved
+  savedId?: string       // there when the job is already saved
   isSaved: boolean
   onSaved?: (savedId: string) => void
   onUnsaved?: () => void
@@ -31,7 +31,7 @@ export default function BookmarkButton({ postingId, savedId, isSaved, onSaved, o
   const isPending = savePosting.isPending || unsavePosting.isPending
 
   const handleClick = async (e: React.MouseEvent) => {
-    e.stopPropagation()  // don't navigate to detail page when clicking bookmark
+    e.stopPropagation()  // do not open the job when clicking the bookmark
 
     if (!me) {
       setAuthOpen(true)
@@ -44,7 +44,7 @@ export default function BookmarkButton({ postingId, savedId, isSaved, onSaved, o
         await unsavePosting.mutateAsync(savedId)
         onUnsaved?.()
       } catch {
-        setOptimistic(true)  // revert on error
+        setOptimistic(true)  // put it back if it failed
       }
     } else {
       setOptimistic(true)
@@ -52,10 +52,10 @@ export default function BookmarkButton({ postingId, savedId, isSaved, onSaved, o
         const result = await savePosting.mutateAsync(postingId)
         onSaved?.(result.id)
       } catch {
-        setOptimistic(false)  // revert on error
+        setOptimistic(false)  // put it back if it failed
       }
     }
-    setOptimistic(null)  // let server state take over after mutation
+    setOptimistic(null)  // now the server's answer takes over
   }
 
   return (
@@ -65,8 +65,8 @@ export default function BookmarkButton({ postingId, savedId, isSaved, onSaved, o
         disabled={isPending}
         aria-label={effectivelySaved ? 'Remove from saved postings' : 'Save posting'}
         className={`
-          p-1.5 rounded transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1
-          ${effectivelySaved ? 'text-blue-600 hover:text-blue-800' : 'text-gray-500 hover:text-blue-600'}
+          rounded-sm p-1.5 transition-colors
+          ${effectivelySaved ? 'text-post-600 hover:text-post-800' : 'text-gray-600 hover:text-post-600'}
           ${isPending ? 'opacity-50 cursor-wait' : ''}
         `}
       >

@@ -1,10 +1,10 @@
 /**
- * ConversationPanel — the AI assistant for one matched job.
+ * The AI helper for one matched job.
  *
- * - One-click actions: "Tailor my resume" and "Cover letter opener"
- * - "Ask a question" opens a free-text Q&A (answers cite the resume / posting)
- * - Replies stream in word by word; each can be copied
- * - Without an AI key it points the visitor to the AI key page instead
+ *   one click to tailor the resume or write a cover letter opener
+ *   Ask a question opens a free text box and answers point back to the resume or the job
+ *   replies stream in word by word and each one can be copied
+ *   with no AI key it points people to the AI key page instead
  */
 
 import { useRef, useState } from 'react'
@@ -42,7 +42,7 @@ function CopyButton({ text }: { text: string }) {
           setTimeout(() => setCopied(false), 1500)
         })
       }}
-      className="text-xs text-gray-500 hover:text-gray-800"
+      className="text-xs font-semibold text-gray-700 hover:text-gray-900 hover:underline"
     >
       {copied ? 'Copied' : 'Copy'}
     </button>
@@ -111,13 +111,12 @@ export default function ConversationPanel({ postingId, postingTitle, company }: 
     void run('question', q)
   }
 
-  const actionClass =
-    'text-sm px-3 py-1.5 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50'
+  const actionClass = 'btn-secondary px-3 py-1.5 font-semibold'
 
   if (!canUseAi) {
     return (
-      <p className="text-sm text-gray-500">
-        <Link to="/ai-key" className="text-blue-700 font-medium hover:underline">Add a free AI key</Link>{' '}
+      <p className="text-sm text-gray-700">
+        <Link to="/ai-key" className="link">Add a free AI key</Link>{' '}
         to tailor your resume, draft a cover letter opener, or ask questions about this job.
       </p>
     )
@@ -135,7 +134,7 @@ export default function ConversationPanel({ postingId, postingTitle, company }: 
         <button
           type="button"
           onClick={() => (open ? handleClose() : setOpen(true))}
-          className="text-sm px-3 py-1.5 text-blue-700 hover:underline"
+          className="btn-quiet px-3 py-1.5"
           aria-expanded={open}
           aria-controls={`conversation-${postingId}`}
         >
@@ -146,27 +145,27 @@ export default function ConversationPanel({ postingId, postingTitle, company }: 
       {open && (
         <div
           id={`conversation-${postingId}`}
-          className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3"
+          className="mt-3 space-y-3 border-[1.5px] border-gray-900 bg-gray-50 p-4"
           aria-label={`AI assistant for ${postingTitle} at ${company}`}
         >
           {messages.length > 0 && (
-            <div className="space-y-4 max-h-[28rem] overflow-y-auto" role="log" aria-live="polite">
+            <div className="max-h-[28rem] space-y-4 overflow-y-auto" role="log" aria-live="polite">
               {messages.map((msg, i) => (
                 <div key={i} className="text-sm">
                   {msg.role === 'user' ? (
-                    <p className="font-medium text-gray-800">
-                      <span className="block text-xs text-gray-500 mb-0.5">You</span>
+                    <p className="font-semibold text-gray-900">
+                      <span className="label-form mb-0.5 block">You</span>
                       {msg.text}
                     </p>
                   ) : (
-                    <div className="text-gray-700">
-                      <div className="flex items-center justify-between mb-0.5">
-                        <span className="text-xs text-gray-500">{msg.streaming ? 'Writing...' : 'Assistant'}</span>
+                    <div className="text-gray-800">
+                      <div className="mb-0.5 flex items-center justify-between">
+                        <span className="label-form !text-air-700">{msg.streaming ? 'Writing...' : 'Assistant'}</span>
                         {!msg.streaming && msg.text && <CopyButton text={msg.text} />}
                       </div>
                       <RichText text={msg.text} />
                       {msg.streaming && msg.text === '' && (
-                        <span className="inline-block w-2 h-4 bg-gray-400 animate-pulse" aria-hidden="true" />
+                        <span className="inline-block h-4 w-2 animate-pulse bg-gray-400" aria-hidden="true" />
                       )}
                     </div>
                   )}
@@ -175,9 +174,9 @@ export default function ConversationPanel({ postingId, postingTitle, company }: 
             </div>
           )}
 
-          {error && <p role="alert" className="text-sm text-red-600">{error}</p>}
+          {error && <p role="alert" className="text-sm font-semibold text-post-700">{error}</p>}
 
-          <div className="flex gap-2 items-end">
+          <div className="flex items-end gap-2">
             <label htmlFor={`qa-input-${postingId}`} className="sr-only">
               Ask a question about this role
             </label>
@@ -193,19 +192,19 @@ export default function ConversationPanel({ postingId, postingTitle, company }: 
                   handleSend()
                 }
               }}
-              placeholder="e.g. Do I have the skills for this role?"
+              placeholder="For example, do I have the skills for this role?"
               disabled={loading}
-              className="flex-1 rounded-lg border border-gray-300 px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-brand-500 disabled:opacity-50"
+              className="field flex-1 resize-none"
             />
             <button
               onClick={handleSend}
               disabled={!input.trim() || loading}
-              className="shrink-0 px-4 py-2 rounded-lg bg-brand-600 text-white text-sm font-medium hover:bg-brand-700 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-brand-500"
+              className="btn-primary shrink-0"
             >
               {loading ? '...' : 'Send'}
             </button>
           </div>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-gray-600">
             Answers use only your resume and this posting. Always check before you send anything.
           </p>
         </div>

@@ -1,11 +1,11 @@
 """
-Find taxonomy skills in free text (job descriptions and resumes).
+Find skills from our list in free text like job descriptions and resumes.
 
-Plain whole-word matching works for most skills, but a few skill names are also ordinary
-words and need context:
-  - "C" / "R":  must be a capital letter on its own ("C++", "C-suite", "R&D" don't count)
-  - "Go":       capitalised and not used as a verb ("Go to market", start of a sentence)
-  - "Spring":   the Java framework, not the season ("Spring 2027", "spring term")
+Plain whole word matching works for most skills, but a few skill names are also everyday
+words and need a closer look
+  C and R  must be a capital letter on its own, so "C++" or "C-suite" or "R&D" do not count
+  Go       has to be capitalised and not used as a verb, like "Go to market" or starting a sentence
+  Spring   means the Java framework and not the season, so not "Spring 2027" or "spring term"
 """
 
 import re
@@ -26,7 +26,7 @@ _SPRING_SEASON = re.compile(
 def _go_mentioned(text: str) -> bool:
     for m in _GO.finditer(text):
         before = text[: m.start()].rstrip(" \t")
-        # "Go" opening a sentence or a line is almost always the verb
+        # "Go" at the start of a sentence or line is nearly always the verb
         if before and before[-1] not in ".!?:\n•-*":
             return True
     return False
@@ -41,7 +41,7 @@ def _spring_mentioned(text: str, lowered: str) -> bool:
 
 
 def mentions(skill: str, text: str, lowered: str | None = None) -> bool:
-    """True if `skill` (a name or alias) is mentioned in `text` as a whole word."""
+    """True if `skill`, a name or alias, shows up in `text` as a whole word."""
     lowered = lowered if lowered is not None else text.lower()
     if skill in ("C", "R"):
         return any(m.group(1) == skill for m in _SINGLE_LETTER.finditer(text))
@@ -54,7 +54,7 @@ def mentions(skill: str, text: str, lowered: str | None = None) -> bool:
 
 
 def match_skills(taxonomy: list[tuple[str, list[str]]], text: str) -> list[str]:
-    """Names of the taxonomy skills mentioned in `text` (by name or any alias)."""
+    """Names of the skills from our list that show up in `text` by name or any alias."""
     lowered = text.lower()
     return [
         name

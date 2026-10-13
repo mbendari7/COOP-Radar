@@ -1,5 +1,5 @@
 /**
- * RichText tests — the AI's headings, bullets, and bold text render as plain elements.
+ * Tests for RichText. The AI's headings, bullets and bold words show up as plain elements.
  */
 
 import { render, screen } from '@testing-library/react'

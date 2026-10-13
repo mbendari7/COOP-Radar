@@ -1,4 +1,4 @@
-"""RssAdapter — fetches postings from an RSS/Atom feed using feedparser."""
+"""Gets jobs from an RSS or Atom feed with feedparser."""
 
 import asyncio
 from datetime import date
@@ -11,17 +11,17 @@ from app.ingest.base import AdapterError, BaseAdapter, RawPosting
 
 class RssAdapter(BaseAdapter):
     """
-    Fetches postings from an RSS or Atom feed.
+    Gets jobs from an RSS or Atom feed.
 
-    source.config must contain:
-      - url: str  — the feed URL
+    source.config needs
+      url  the feed address
     """
 
     async def fetch(self, source: Any) -> list[RawPosting]:
         config = source.config
         url = config.get("url", "")
 
-        # feedparser is synchronous — run it in a thread pool to avoid blocking
+        # feedparser is not async so run it in a thread to keep things moving
         feed = await asyncio.to_thread(feedparser.parse, url)
 
         if feed.bozo and not feed.entries:
@@ -35,7 +35,7 @@ class RssAdapter(BaseAdapter):
         link = getattr(entry, "link", None)
         summary = getattr(entry, "summary", None)
 
-        # Try to parse deadline from published date
+        # Try to read a deadline from the published date
         deadline: date | None = None
         published_parsed = getattr(entry, "published_parsed", None)
         if published_parsed:
@@ -45,14 +45,14 @@ class RssAdapter(BaseAdapter):
             except (ValueError, OverflowError):
                 deadline = None
 
-        # Source ref is the entry id or link
+        # The source ref is the entry id or link
         source_ref = getattr(entry, "id", None) or link or title
 
         return RawPosting(
             title=title,
             company=company,
-            city="",  # RSS feeds typically don't provide city; extract_fields will fill
-            term="",  # Same — will be extracted
+            city="",  # feeds rarely give a city so extract_fields fills it in
+            term="",  # same here, it gets pulled out later
             work_mode=None,
             deadline=deadline,
             description=summary,

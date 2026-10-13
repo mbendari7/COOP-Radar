@@ -1,19 +1,18 @@
 /**
- * ResumePage: /resume, the heart of CoopRadar.
+ * The resume page at /resume, the heart of CoopRadar. It reads like a form in three parts.
  *
- *   1. About you and what you're looking for: program, degree, graduation year, co-op or
- *      new grad, term, countries, then job types, keywords, location and work mode.
- *      Program, degree and graduation year are read from the resume when left blank.
- *   2. Your resume (no account needed: a private temporary account is created)
- *   3. Results, in two tabs:
- *      - Matching jobs: ranked for this resume within the preferences, each with why it fits
- *        (role, the program and graduation year the posting names, term, skills), the skills
- *        it wants that the resume shows or lacks, plus tailor / cover letter tools
- *      - Resume feedback: skills found, in-demand skills missing (free) and an AI review
- *        (visitor's own key)
+ *   1. About you. Program, degree, grad year, co-op or new grad, term and countries.
+ *      Program, degree and grad year get read from the resume when left blank
+ *   2. What kind of job. Job types, keywords, place and work mode
+ *   3. Your resume. No account needed since a private temporary account gets made
+ *   Then the results in two tabs
+ *      Matching jobs are ranked for this resume within the preferences, each with why it fits,
+ *      the skills it wants that the resume shows or lacks, and the tailor and cover letter tools
+ *      Resume feedback has the skills found and popular skills missing for free, plus an AI
+ *      review on the visitor's own key
  *
- * Before the first upload, preferences are kept in this browser and sent with the file.
- * Afterwards they're saved on the resume, and changing them re-matches for free.
+ * Before the first upload the preferences stay in this browser and go up with the file.
+ * After that they are saved on the resume and changing them matches again for free.
  */
 
 import { useEffect, useRef, useState } from 'react'
@@ -47,7 +46,6 @@ import {
   ArrowRightIcon, CheckIcon, ExternalIcon, FileIcon, PinIcon, TrendIcon, UploadIcon,
 } from '../components/Icons'
 import { gradYears } from '../components/filters'
-import { CompanyInitial } from '../components/PostingCard'
 import { formatDate, formatLocation, isProvince, provinceName, workModeLabel } from '../utils/format'
 
 const MAX_SIZE_BYTES = 5 * 1024 * 1024
@@ -69,7 +67,7 @@ const COUNTRIES: { value: CountryCode; label: string }[] = [
   { value: 'US', label: 'United States' },
 ]
 
-/** The next six co-op terms (Winter = Jan, Summer = May, Fall = Sep). */
+/** The next six co-op terms. Winter starts in January, Summer in May and Fall in September. */
 function upcomingTerms(now: Date = new Date()): string[] {
   const seasons = [['Winter', 0], ['Summer', 4], ['Fall', 8]] as const
   const terms: string[] = []
@@ -87,13 +85,13 @@ function useCanUseAi(): boolean {
   return Boolean(aiKey) || Boolean(config?.server_ai_enabled)
 }
 
-/** Preferences picked before uploading live in this browser (storage can be unavailable). */
+/** Preferences picked before uploading live in this browser. Storage might not be there. */
 function loadLocalPrefs(): JobPreferences {
   try {
     const raw = localStorage.getItem(PREFS_KEY)
     if (raw) return { ...DEFAULT_PREFERENCES, ...(JSON.parse(raw) as Partial<JobPreferences>) }
   } catch {
-    // private mode or blocked storage: start fresh
+    // private mode or blocked storage, so just start fresh
   }
   return DEFAULT_PREFERENCES
 }
@@ -102,7 +100,7 @@ function saveLocalPrefs(prefs: JobPreferences) {
   try {
     localStorage.setItem(PREFS_KEY, JSON.stringify(prefs))
   } catch {
-    // not critical
+    // not a big deal if this fails
   }
 }
 
@@ -112,27 +110,24 @@ function StepCard({
   step, title, subtitle, done = false, children,
 }: { step: number; title: string; subtitle?: string; done?: boolean; children: React.ReactNode }) {
   return (
-    <section aria-labelledby={`step-${step}`} className="rounded-xl border border-gray-200 bg-white">
-      <div className="flex items-start gap-3 border-b border-gray-100 px-5 py-4 sm:px-6">
-        <span
-          className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-sm font-semibold ${
-            done ? 'bg-blue-700 text-white' : 'bg-gray-100 text-gray-700'
-          }`}
-          aria-hidden="true"
-        >
-          {done ? <CheckIcon className="h-4 w-4" /> : step}
-        </span>
+    <section aria-labelledby={`step-${step}`} className="border-t-[1.5px] border-gray-900">
+      <div className="flex items-start justify-between gap-4 pb-4 pt-4">
         <div>
-          <h2 id={`step-${step}`} className="text-lg font-semibold text-gray-900">{title}</h2>
-          {subtitle && <p className="text-sm text-gray-600">{subtitle}</p>}
+          <h2 id={`step-${step}`} className="display text-2xl leading-tight text-gray-900">{title}</h2>
+          {subtitle && <p className="mt-0.5 text-sm text-gray-700">{subtitle}</p>}
         </div>
+        {done && (
+          <span className="label-form mt-1.5 inline-flex shrink-0 items-center gap-1 !text-air-700">
+            <CheckIcon className="h-4 w-4" /> Done
+          </span>
+        )}
       </div>
-      <div className="px-5 py-5 sm:px-6">{children}</div>
+      <div className="pb-8">{children}</div>
     </section>
   )
 }
 
-// ── Step 1: what you're looking for ───────────────────────────────────────────
+// Part 1 and 2. What you are looking for
 
 function Toggle({
   on, onClick, children, count,
@@ -142,23 +137,19 @@ function Toggle({
       type="button"
       aria-pressed={on}
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-sm transition-colors ${
-        on
-          ? 'border-blue-700 bg-blue-700 text-white'
-          : 'border-gray-300 bg-white text-gray-800 hover:border-gray-500'
-      }`}
+      className={`chip py-1.5 ${on ? 'chip-on' : ''}`}
     >
       {on && <CheckIcon className="h-3.5 w-3.5" />}
       {children}
       {count !== undefined && (
-        <span className={`text-xs tabular-nums ${on ? 'text-blue-100' : 'text-gray-500'}`}>{count}</span>
+        <span className={`text-xs tabular-nums ${on ? 'text-air-100' : 'text-gray-600'}`}>{count}</span>
       )}
     </button>
   )
 }
 
-const fieldClass =
-  'mt-1.5 w-full rounded-md border border-gray-400 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600'
+const fieldClass = 'field mt-1.5'
+const labelClass = 'label-form !text-gray-900'
 
 function AboutYou({
   prefs, onChange, education,
@@ -176,7 +167,7 @@ function AboutYou({
   return (
     <div className="space-y-5">
       {found && (
-        <p className="rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-900">
+        <p className="border-[1.5px] border-air-700 bg-air-50 px-3 py-2 text-sm text-air-900">
           We read your resume:{' '}
           {[found.program_label, degreeLabel, found.grad_year ? `graduating ${found.grad_year}` : '']
             .filter(Boolean).join(', ')}.
@@ -186,7 +177,7 @@ function AboutYou({
 
       <div className="grid gap-4 sm:grid-cols-3">
         <div className="sm:col-span-3 md:col-span-1">
-          <label htmlFor="pref-program" className="text-sm font-semibold text-gray-900">Program or major</label>
+          <label htmlFor="pref-program" className={labelClass}>Program or major</label>
           <select
             id="pref-program"
             value={prefs.program}
@@ -198,7 +189,7 @@ function AboutYou({
           </select>
         </div>
         <div>
-          <label htmlFor="pref-degree" className="text-sm font-semibold text-gray-900">Degree</label>
+          <label htmlFor="pref-degree" className={labelClass}>Degree</label>
           <select
             id="pref-degree"
             value={prefs.degree}
@@ -210,7 +201,7 @@ function AboutYou({
           </select>
         </div>
         <div>
-          <label htmlFor="pref-grad" className="text-sm font-semibold text-gray-900">Graduating in</label>
+          <label htmlFor="pref-grad" className={labelClass}>Graduating in</label>
           <select
             id="pref-grad"
             value={prefs.grad_year ?? ''}
@@ -224,13 +215,13 @@ function AboutYou({
       </div>
 
       <fieldset>
-        <legend className="text-sm font-semibold text-gray-900">Looking for</legend>
-        <div className="mt-1.5 inline-flex flex-wrap rounded-md border border-gray-400 bg-gray-50 p-1">
+        <legend className={labelClass}>Looking for</legend>
+        <div className="mt-1.5 inline-flex flex-wrap border-[1.5px] border-gray-900 bg-white">
           {LEVELS.map((l) => (
             <label
               key={l.value}
-              className={`cursor-pointer rounded px-3 py-1.5 text-sm ${
-                prefs.level === l.value ? 'bg-white font-semibold text-gray-900 shadow-sm ring-1 ring-gray-300' : 'text-gray-700 hover:text-gray-900'
+              className={`cursor-pointer px-3 py-1.5 text-sm font-semibold transition-colors ${
+                prefs.level === l.value ? 'bg-gray-900 text-white' : 'text-gray-800 hover:bg-gray-100'
               }`}
             >
               <input
@@ -248,8 +239,8 @@ function AboutYou({
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
-          <label htmlFor="pref-term" className="text-sm font-semibold text-gray-900">
-            Co-op term <span className="font-normal text-gray-500">(optional)</span>
+          <label htmlFor="pref-term" className={labelClass}>
+            Co-op term <span className="font-normal normal-case tracking-normal text-gray-600">optional</span>
           </label>
           <select
             id="pref-term"
@@ -260,16 +251,16 @@ function AboutYou({
             <option value="">Any term</option>
             {upcomingTerms().map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
-          <p className="mt-1 text-xs text-gray-500">Jobs for this term are ranked higher.</p>
+          <p className="mt-1 text-xs text-gray-600">Jobs for this term are ranked higher.</p>
         </div>
         <fieldset>
-          <legend className="text-sm font-semibold text-gray-900">Countries</legend>
+          <legend className={labelClass}>Countries</legend>
           <div className="mt-2.5 flex flex-wrap gap-4">
             {COUNTRIES.map((c) => (
               <label key={c.value} className="flex cursor-pointer items-center gap-2 text-sm text-gray-800">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-gray-400 text-blue-600 focus:ring-blue-600"
+                  className="h-4 w-4"
                   checked={prefs.countries.includes(c.value)}
                   onChange={(e) => {
                     const next = e.target.checked
@@ -282,7 +273,7 @@ function AboutYou({
               </label>
             ))}
           </div>
-          <p className="mt-1.5 text-xs text-gray-500">US jobs here are internships and new grad roles.</p>
+          <p className="mt-1.5 text-xs text-gray-600">US jobs here are internships and new grad roles.</p>
         </fieldset>
       </div>
     </div>
@@ -295,7 +286,7 @@ function PreferencesForm({
   prefs: JobPreferences
   onChange: (p: JobPreferences) => void
   hasResume: boolean
-  /** What's saved on the server (null before the first upload) */
+  /** What is saved on the server. null before the first upload */
   saved: JobPreferences | null
 }) {
   const { data: meta } = useFilterMeta()
@@ -312,8 +303,8 @@ function PreferencesForm({
   return (
     <div className="space-y-6">
       <fieldset>
-        <legend className="text-sm font-semibold text-gray-900">Job type</legend>
-        <p className="mb-2.5 text-sm text-gray-500">
+        <legend className={labelClass}>Job type</legend>
+        <p className="mb-2.5 mt-1 text-sm text-gray-700">
           Pick any that interest you. Leave empty and we'll use the usual job types for your program.
         </p>
         <div className="flex flex-wrap gap-2">
@@ -327,13 +318,13 @@ function PreferencesForm({
               {c.label}
             </Toggle>
           ))}
-          {categories.length === 0 && <p className="text-sm text-gray-500">Loading job types...</p>}
+          {categories.length === 0 && <p className="text-sm text-gray-600">Loading job types...</p>}
         </div>
       </fieldset>
 
       <div>
-        <label htmlFor="pref-keywords" className="text-sm font-semibold text-gray-900">
-          Job title or keywords <span className="font-normal text-gray-500">(optional)</span>
+        <label htmlFor="pref-keywords" className={labelClass}>
+          Job title or keywords <span className="font-normal normal-case tracking-normal text-gray-600">optional</span>
         </label>
         <input
           id="pref-keywords"
@@ -342,14 +333,14 @@ function PreferencesForm({
           value={prefs.keywords}
           onChange={(e) => onChange({ ...prefs, keywords: e.target.value })}
           placeholder="For example: data analyst, frontend, marketing"
-          className={`${fieldClass} placeholder-gray-500`}
+          className={fieldClass}
         />
-        <p className="mt-1 text-xs text-gray-500">Jobs that mention these are ranked higher.</p>
+        <p className="mt-1 text-xs text-gray-600">Jobs that mention these are ranked higher.</p>
       </div>
 
       <div className="grid gap-6 sm:grid-cols-2">
         <div>
-          <label htmlFor="pref-province" className="text-sm font-semibold text-gray-900">Where</label>
+          <label htmlFor="pref-province" className={labelClass}>Where</label>
           <select
             id="pref-province"
             value={prefs.province}
@@ -359,11 +350,11 @@ function PreferencesForm({
             <option value="">Anywhere</option>
             {regions.map((p) => <option key={p} value={p}>{provinceName(p)}</option>)}
           </select>
-          <p className="mt-1 text-xs text-gray-500">Remote jobs are always included.</p>
+          <p className="mt-1 text-xs text-gray-600">Remote jobs are always included.</p>
         </div>
 
         <fieldset>
-          <legend className="text-sm font-semibold text-gray-900">Work mode</legend>
+          <legend className={labelClass}>Work mode</legend>
           <div className="mt-1.5 flex flex-wrap gap-2">
             {WORK_MODES.map((m) => (
               <Toggle
@@ -379,25 +370,25 @@ function PreferencesForm({
       </div>
 
       {hasResume && (
-        <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 pt-5">
+        <div className="flex flex-wrap items-center gap-3 border-t border-gray-200 pt-5">
           <button
             type="button"
             disabled={!dirty || update.isPending}
             onClick={() => update.mutate(prefs)}
-            className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-50"
+            className="btn-primary"
           >
             {update.isPending ? 'Updating matches...' : 'Update my matches'}
           </button>
-          {dirty && !update.isPending && <span className="text-sm text-gray-600">You changed your preferences.</span>}
-          {update.isSuccess && !dirty && <span className="text-sm text-blue-800">Matches updated.</span>}
-          {update.isError && <span role="alert" className="text-sm text-red-600">{update.error.message}</span>}
+          {dirty && !update.isPending && <span className="text-sm text-gray-700">You changed your preferences.</span>}
+          {update.isSuccess && !dirty && <span className="text-sm font-semibold text-air-700">Matches updated.</span>}
+          {update.isError && <span role="alert" className="text-sm text-post-700">{update.error.message}</span>}
         </div>
       )}
     </div>
   )
 }
 
-// ── Step 2: upload ────────────────────────────────────────────────────────────
+// Part 3. Uploading
 
 function ResumeDropzone({ compact, prefs }: { compact: boolean; prefs: JobPreferences }) {
   const { data: me } = useMe()
@@ -434,7 +425,7 @@ function ResumeDropzone({ compact, prefs }: { compact: boolean; prefs: JobPrefer
       } catch (err) {
         setStarting(false)
         if (err instanceof ApiError && err.code === 'DEMO_DISABLED') {
-          setAuthOpen(true)  // this site requires an account
+          setAuthOpen(true)  // this site needs an account
         } else {
           setError(err instanceof Error ? err.message : 'Could not start. Please try again.')
         }
@@ -463,28 +454,32 @@ function ResumeDropzone({ compact, prefs }: { compact: boolean; prefs: JobPrefer
           setDragging(false)
           void handleFile(e.dataTransfer.files?.[0])
         }}
-        className={`flex cursor-pointer flex-col items-center rounded-lg border-2 border-dashed text-center transition-colors ${
-          compact ? 'px-4 py-4' : 'px-6 py-10'
-        } ${dragging ? 'border-blue-600 bg-blue-50' : 'border-gray-300 bg-gray-50 hover:border-blue-500 hover:bg-blue-50/50'}`}
+        className={`relative flex cursor-pointer border-[1.5px] transition-colors ${
+          compact ? 'flex-col items-center px-4 py-4 text-center' : 'items-start justify-between gap-6 px-6 py-7 text-left sm:px-8'
+        } ${dragging ? 'border-air-700 bg-air-50' : 'border-gray-900 bg-white hover:border-air-700 hover:bg-air-50'}`}
       >
         {busy ? (
-          <span className="font-medium text-blue-800 animate-pulse">
+          <span className="animate-pulse font-semibold text-air-800">
             Reading your resume and finding matching jobs...
           </span>
         ) : compact ? (
-          <span className="flex items-center gap-2 text-sm text-gray-700">
-            <UploadIcon className="h-4 w-4 text-blue-700" />
-            <span><span className="font-semibold text-blue-800">Drop your resume here</span> to replace it, or browse</span>
+          <span className="flex items-center gap-2 text-sm text-gray-800">
+            <UploadIcon className="h-4 w-4 text-air-700" />
+            <span><span className="font-bold text-air-800">Drop your resume here</span> to replace it, or browse</span>
           </span>
         ) : (
           <>
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white text-blue-700 ring-1 ring-gray-200">
-              <UploadIcon className="h-6 w-6" />
+            {/* Laid out like the front of an envelope. The words go where the address would and the file goes in the stamp corner */}
+            <span className="min-w-0 pt-2">
+              <span className="display block text-2xl text-gray-900 sm:text-[28px]">
+                Drop your resume here, or <span className="text-air-700 underline underline-offset-4">browse</span>
+              </span>
+              <span className="mt-2 block border-t border-gray-300 pt-2 text-sm text-gray-700">PDF or Word (.docx), up to 5 MB. No sign up needed.</span>
             </span>
-            <span className="mt-3 block text-base font-semibold text-gray-900">
-              Drop your resume here, or <span className="text-blue-700 underline underline-offset-2">browse</span>
+            <span className="flex h-24 w-20 shrink-0 rotate-3 flex-col items-center justify-center gap-1.5 border-2 border-dashed border-post-600 text-post-600" aria-hidden="true">
+              <UploadIcon className="h-7 w-7" />
+              <span className="stretch-condensed text-[10px] font-bold uppercase tracking-wider">PDF DOCX</span>
             </span>
-            <span className="mt-1 block text-sm text-gray-500">PDF or Word (.docx), up to 5 MB. No sign-up needed.</span>
           </>
         )}
         <input
@@ -497,9 +492,9 @@ function ResumeDropzone({ compact, prefs }: { compact: boolean; prefs: JobPrefer
           onChange={(e) => void handleFile(e.target.files?.[0])}
         />
       </label>
-      {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
+      {error && <p role="alert" className="mt-2 text-sm font-semibold text-post-700">{error}</p>}
       {!compact && (
-        <p className="mt-3 text-xs text-gray-500">
+        <p className="mt-3 text-xs text-gray-600">
           Your resume stays private in your account and only goes to an AI if you add your own key. Delete it any time.
         </p>
       )}
@@ -512,12 +507,12 @@ function StoredResume({ resume }: { resume: ResumeOut }) {
   const del = useDeleteResume()
   const [confirm, setConfirm] = useState(false)
   return (
-    <div className="mb-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 px-4 py-3">
+    <div className="mb-3 flex flex-wrap items-center justify-between gap-3 border-[1.5px] border-gray-900 px-4 py-3">
       <div className="flex min-w-0 items-center gap-3">
-        <FileIcon className="h-5 w-5 shrink-0 text-blue-700" />
+        <FileIcon className="h-5 w-5 shrink-0 text-air-700" />
         <div className="min-w-0">
-          <p className="truncate text-sm font-semibold text-gray-900">{resume.filename}</p>
-          <p className="text-xs text-gray-500">Uploaded {formatDate(resume.uploaded_at)}</p>
+          <p className="truncate text-sm font-bold text-gray-900">{resume.filename}</p>
+          <p className="text-xs text-gray-600">Uploaded {formatDate(resume.uploaded_at)}</p>
         </div>
       </div>
       {confirm ? (
@@ -527,16 +522,16 @@ function StoredResume({ resume }: { resume: ResumeOut }) {
             type="button"
             onClick={() => del.mutate(undefined, { onSuccess: () => setConfirm(false) })}
             disabled={del.isPending}
-            className="rounded-md bg-red-600 px-3 py-1 text-white hover:bg-red-700 disabled:opacity-50"
+            className="btn-primary px-3 py-1"
           >
             {del.isPending ? 'Deleting...' : 'Delete'}
           </button>
-          <button type="button" onClick={() => setConfirm(false)} className="rounded-md border border-gray-300 px-3 py-1">
+          <button type="button" onClick={() => setConfirm(false)} className="btn-secondary px-3 py-1">
             Cancel
           </button>
         </span>
       ) : (
-        <button type="button" onClick={() => setConfirm(true)} className="text-sm text-gray-500 hover:text-red-700">
+        <button type="button" onClick={() => setConfirm(true)} className="text-sm font-semibold text-gray-700 hover:text-post-700 hover:underline">
           Delete
         </button>
       )}
@@ -544,25 +539,25 @@ function StoredResume({ resume }: { resume: ResumeOut }) {
   )
 }
 
-// ── Results: matching jobs ────────────────────────────────────────────────────
+// Results. The matching jobs
 
 function scoreTone(score: number): { ring: string; label: string } {
-  if (score >= 70) return { ring: 'bg-blue-700 text-white', label: 'Strong match' }
-  if (score >= 40) return { ring: 'bg-blue-100 text-blue-900', label: 'Good match' }
-  return { ring: 'bg-gray-100 text-gray-700', label: 'Possible match' }
+  if (score >= 70) return { ring: 'text-post-600', label: 'Strong match' }
+  if (score >= 40) return { ring: 'text-air-700', label: 'Good match' }
+  return { ring: 'text-gray-600', label: 'Possible match' }
 }
 
 function SkillList({ title, items, have }: { title: string; items: string[]; have: boolean }) {
   if (items.length === 0) return null
   return (
     <div>
-      <p className="mb-1.5 text-xs font-medium text-gray-500">{title}</p>
+      <p className="label-form mb-1.5">{title}</p>
       <ul className="flex flex-wrap gap-1.5" role="list">
         {items.map((s) => (
           <li
             key={s}
-            className={`inline-flex items-center gap-1 rounded px-2 py-0.5 text-sm ${
-              have ? 'bg-blue-50 text-blue-900' : 'border border-dashed border-gray-300 text-gray-700'
+            className={`inline-flex items-center gap-1 rounded-sm border px-2 py-0.5 text-sm ${
+              have ? 'border-air-200 bg-air-50 font-semibold text-air-900' : 'border-dashed border-gray-500 text-gray-800'
             }`}
           >
             {have && <CheckIcon className="h-3.5 w-3.5" />}
@@ -578,45 +573,48 @@ function MatchCard({ match, rank }: { match: MatchResultOut; rank: number }) {
   const tone = scoreTone(match.score)
   const hasSkills = match.matched_skills.length > 0 || match.missing_skills.length > 0
   return (
-    <article className="rounded-lg border border-gray-200 bg-white p-5" aria-label={`${match.title} at ${match.company}`}>
+    <article className="border-b border-gray-300 py-6" aria-label={`${match.title} at ${match.company}`}>
       <div className="flex items-start gap-4">
-        <CompanyInitial name={match.company} />
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
             <div className="min-w-0">
-              <p className="text-xs text-gray-500">#{rank}</p>
-              <Link to={`/postings/${match.posting_id}`} className="font-semibold leading-snug text-gray-900 hover:text-blue-800">
+              <Link to={`/postings/${match.posting_id}`} className="stretch-semi text-xl font-extrabold leading-snug text-gray-900 hover:text-air-700">
+                <span className="mr-2 tabular-nums text-gray-400">{rank}</span>
                 {match.title}
               </Link>
-              <p className="mt-0.5 text-sm text-gray-600">
+              <p className="mt-0.5 text-sm text-gray-700">
                 {match.company}
                 <span className="mx-1.5 text-gray-300" aria-hidden="true">|</span>
-                <PinIcon className="mr-0.5 inline h-3.5 w-3.5 -translate-y-px text-gray-400" />
+                <PinIcon className="mr-0.5 inline h-3.5 w-3.5 -translate-y-px text-gray-500" />
                 {formatLocation(match.city, match.province, match.country)}
-                {match.work_mode ? ` · ${workModeLabel(match.work_mode)}` : ''}
+                {match.work_mode && match.city !== 'Remote' ? ` · ${workModeLabel(match.work_mode)}` : ''}
                 {match.term && match.term !== 'Open' ? ` · ${match.term}` : ''}
               </p>
             </div>
-            <div className="flex items-center gap-2" aria-label={`Match score ${match.score} out of 100`}>
-              <span className={`flex h-11 w-11 items-center justify-center rounded-full text-base font-bold tabular-nums ${tone.ring}`}>
-                {match.score}
+            <div className="flex items-center gap-2.5" aria-label={`Match score ${match.score} out of 100`}>
+              <span
+                className={`relative flex h-14 w-14 -rotate-6 flex-col items-center justify-center rounded-full border-2 border-current leading-none ${tone.ring}`}
+              >
+                <span className="absolute inset-[3px] rounded-full border border-current opacity-60" aria-hidden="true" />
+                <span className="stretch-condensed text-xl font-extrabold tabular-nums">{match.score}</span>
+                <span className="stretch-condensed text-[8px] font-bold uppercase tracking-wider">of 100</span>
               </span>
-              <span className="text-xs leading-tight text-gray-600">{tone.label}</span>
+              <span className="label-form w-16 leading-tight">{tone.label}</span>
             </div>
           </div>
 
-          {/* The free ranking's reason only repeats the skill lists below, so show AI reasons only */}
+          {/* The free ranking's reason just repeats the skill lists below so only show reasons from the AI */}
           {!(hasSkills && /^(You have|None of its listed skills)/.test(match.reason)) && (
-            <p className="mt-3 text-sm text-gray-700">{match.reason}</p>
+            <p className="mt-3 max-w-[70ch] text-[15px] text-gray-800">{match.reason}</p>
           )}
 
           {match.fit_notes.length > 0 && (
             <div className="mt-3">
-              <p className="mb-1.5 text-xs font-medium text-gray-500">Why it fits</p>
-              <ul className="grid gap-x-4 gap-y-1 text-sm text-gray-800 sm:grid-cols-2" role="list">
+              <p className="label-form mb-1.5">Why it fits</p>
+              <ul className="grid gap-x-4 gap-y-1 text-sm text-gray-900 sm:grid-cols-2" role="list">
                 {match.fit_notes.map((n) => (
                   <li key={n} className="flex items-start gap-1.5">
-                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-green-700" />
+                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-air-700" />
                     {n}
                   </li>
                 ))}
@@ -631,7 +629,7 @@ function MatchCard({ match, rank }: { match: MatchResultOut; rank: number }) {
             </div>
           )}
 
-          <div className="mt-4 border-t border-gray-100 pt-4 space-y-3">
+          <div className="mt-4 space-y-3 pt-1">
             <SaveAndApply postingId={match.posting_id} deadline={match.deadline} />
             <ConversationPanel postingId={match.posting_id} postingTitle={match.title} company={match.company} />
           </div>
@@ -641,19 +639,16 @@ function MatchCard({ match, rank }: { match: MatchResultOut; rank: number }) {
   )
 }
 
-/** Open the job to apply, or save it to the tracker (saving twice is harmless on the server). */
+/** Open the job to apply or save it to the tracker. Saving twice does no harm on the server. */
 function SaveAndApply({ postingId, deadline }: { postingId: string; deadline: string }) {
   const save = useSavePosting()
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-      <Link
-        to={`/postings/${postingId}`}
-        className="inline-flex items-center gap-1.5 rounded-lg bg-blue-700 px-3 py-1.5 font-medium text-white hover:bg-blue-800"
-      >
+      <Link to={`/postings/${postingId}`} className="btn-primary px-3 py-1.5">
         View job and apply <ExternalIcon className="h-3.5 w-3.5" />
       </Link>
       {save.isSuccess ? (
-        <Link to="/saved" className="inline-flex items-center gap-1 font-medium text-blue-800 hover:underline">
+        <Link to="/saved" className="inline-flex items-center gap-1 font-bold text-air-700 hover:underline">
           <CheckIcon className="h-4 w-4" /> Saved to tracker
         </Link>
       ) : (
@@ -661,12 +656,12 @@ function SaveAndApply({ postingId, deadline }: { postingId: string; deadline: st
           type="button"
           onClick={() => save.mutate(postingId)}
           disabled={save.isPending}
-          className="rounded-lg border border-gray-300 px-3 py-1.5 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+          className="btn-secondary px-3 py-1.5"
         >
           {save.isPending ? 'Saving...' : 'Save to tracker'}
         </button>
       )}
-      {deadline && <span className="text-gray-500">Apply by {formatDate(deadline)}</span>}
+      {deadline && <span className="text-gray-600">Apply by {formatDate(deadline)}</span>}
     </div>
   )
 }
@@ -679,7 +674,7 @@ function MatchesTab({ items, prefs }: { items: MatchResultOut[]; prefs: JobPrefe
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <p className="text-sm text-gray-600">
+        <p className="text-sm text-gray-700">
           {items.length > 0
             ? 'Best fits first. Scores weigh your skills, your program and graduation year, and the term you want.'
             : null}
@@ -689,26 +684,26 @@ function MatchesTab({ items, prefs }: { items: MatchResultOut[]; prefs: JobPrefe
             type="button"
             onClick={() => rematch.mutate()}
             disabled={rematch.isPending}
-            className="rounded-lg border border-gray-300 bg-white px-3 py-1.5 text-sm text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+            className="btn-secondary px-3 py-1.5"
           >
-            {rematch.isPending ? 'Re-ranking (about 30 seconds)...' : 'Re-rank with my AI'}
+            {rematch.isPending ? 'Ranking again, about 30 seconds...' : 'Rank again with my AI'}
           </button>
         )}
       </div>
-      {rematch.isError && <p role="alert" className="text-sm text-red-600">{rematch.error.message}</p>}
+      {rematch.isError && <p role="alert" className="text-sm font-semibold text-post-700">{rematch.error.message}</p>}
 
       {items.length === 0 ? (
-        <div className="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center">
-          <p className="font-medium text-gray-900">No open jobs fit yet</p>
-          <p className="mt-1 text-sm text-gray-600">
+        <div className="border-y-[1.5px] border-gray-900 px-6 py-10 text-center">
+          <p className="display text-xl text-gray-900">No open jobs fit yet</p>
+          <p className="mt-1 text-sm text-gray-700">
             {narrowed
               ? 'Try more job types, "Anywhere", adding the United States, or "Co-op, internship or entry-level" above.'
               : 'New jobs are imported every few hours.'}{' '}
-            You can also <Link to="/" className="font-medium text-blue-700 hover:underline">browse all jobs</Link>.
+            You can also <Link to="/" className="link">browse all jobs</Link>.
           </p>
         </div>
       ) : (
-        <ol className="space-y-4" aria-label="Matched jobs">
+        <ol className="border-t-[1.5px] border-gray-900" aria-label="Matched jobs">
           {items.map((m, i) => <li key={m.posting_id}><MatchCard match={m} rank={i + 1} /></li>)}
         </ol>
       )}
@@ -716,13 +711,13 @@ function MatchesTab({ items, prefs }: { items: MatchResultOut[]; prefs: JobPrefe
   )
 }
 
-// ── Results: resume feedback ──────────────────────────────────────────────────
+// Results. Resume feedback
 
 function Chips({ items }: { items: string[] }) {
   return (
     <ul className="flex flex-wrap gap-1.5" role="list">
       {items.map((s) => (
-        <li key={s} className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-sm text-blue-900">
+        <li key={s} className="inline-flex items-center gap-1 rounded-sm border border-air-200 bg-air-50 px-2 py-0.5 text-sm font-semibold text-air-900">
           <CheckIcon className="h-3.5 w-3.5" />{s}
         </li>
       ))}
@@ -734,8 +729,8 @@ function ReviewList({ title, items }: { title: string; items: string[] }) {
   if (items.length === 0) return null
   return (
     <div>
-      <h4 className="font-semibold text-gray-900">{title}</h4>
-      <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm text-gray-700">
+      <h4 className="label-form !text-gray-900">{title}</h4>
+      <ul className="mt-1.5 list-disc space-y-1 pl-5 text-sm text-gray-800 marker:text-air-700">
         {items.map((t) => <li key={t}>{t}</li>)}
       </ul>
     </div>
@@ -752,13 +747,13 @@ function AiReview({ review }: { review: AIInsights }) {
         <ReviewList title="How to tailor it" items={review.tailoring_tips} />
         {review.roles_to_search.length > 0 && (
           <div>
-            <h4 className="font-semibold text-gray-900">Roles to search for</h4>
+            <h4 className="label-form !text-gray-900">Roles to search for</h4>
             <ul className="mt-2 flex flex-wrap gap-2" role="list">
               {review.roles_to_search.map((r) => (
                 <li key={r}>
                   <Link
                     to={`/?q=${encodeURIComponent(r)}`}
-                    className="inline-flex items-center gap-1 rounded-full border border-gray-300 px-3 py-1 text-sm text-gray-800 hover:border-blue-600 hover:text-blue-800"
+                    className="chip"
                   >
                     {r} <ArrowRightIcon className="h-3.5 w-3.5" />
                   </Link>
@@ -770,8 +765,8 @@ function AiReview({ review }: { review: AIInsights }) {
       </div>
       {review.keywords_to_add.length > 0 && (
         <div>
-          <h4 className="font-semibold text-gray-900">Keywords to add, only if they're true for you</h4>
-          <p className="mt-1 text-sm text-gray-700">{review.keywords_to_add.join(', ')}</p>
+          <h4 className="label-form !text-gray-900">Keywords to add, only if they're true for you</h4>
+          <p className="mt-1 text-sm text-gray-800">{review.keywords_to_add.join(', ')}</p>
         </div>
       )}
     </div>
@@ -785,53 +780,53 @@ function FeedbackTab() {
   const aiKey = useAiKey()
 
   if (isLoading || !data) {
-    return <div className="h-40 animate-pulse rounded-lg border border-gray-200 bg-white" />
+    return <div className="h-40 animate-pulse bg-gray-100" />
   }
 
   return (
-    <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
-          <h3 className="flex items-center gap-2 font-semibold text-gray-900">
-            <CheckIcon className="h-5 w-5 text-blue-700" /> Skills employers can see
+    <div className="space-y-8">
+      <div className="grid gap-8 border-t-[1.5px] border-gray-900 pt-5 md:grid-cols-2">
+        <div>
+          <h3 className="flex items-center gap-2 text-lg font-extrabold text-gray-900">
+            <CheckIcon className="h-5 w-5 text-air-700" /> Skills employers can see
           </h3>
-          <p className="mb-3 mt-0.5 text-sm text-gray-500">On your resume and asked for in real job postings.</p>
+          <p className="mb-3 mt-0.5 text-sm text-gray-700">On your resume and asked for in real job postings.</p>
           {data.skills_found.length > 0 ? (
             <Chips items={data.skills_found} />
           ) : (
-            <p className="text-sm text-gray-700">
+            <p className="text-sm text-gray-800">
               We couldn't find any listed skills. Add a clear <strong>Skills</strong> section, for example
               "Python, SQL, React", so recruiters and filters can find them.
             </p>
           )}
         </div>
-        <div className="rounded-lg border border-gray-200 bg-white p-5">
-          <h3 className="flex items-center gap-2 font-semibold text-gray-900">
-            <TrendIcon className="h-5 w-5 text-blue-700" /> In demand, but not on your resume
+        <div>
+          <h3 className="flex items-center gap-2 text-lg font-extrabold text-gray-900">
+            <TrendIcon className="h-5 w-5 text-post-600" /> In demand, but not on your resume
           </h3>
-          <p className="mb-3 mt-0.5 text-sm text-gray-500">
+          <p className="mb-3 mt-0.5 text-sm text-gray-700">
             The skills open jobs ask for most. Add the ones you have, or pick one to learn next.
           </p>
           {data.in_demand_missing.length > 0 ? (
-            <ul className="divide-y divide-gray-100" role="list">
+            <ul className="divide-y divide-gray-200 border-y border-gray-200" role="list">
               {data.in_demand_missing.map((m) => (
                 <li key={m.skill} className="flex items-center justify-between py-1.5 text-sm">
-                  <span className="font-medium text-gray-900">{m.skill}</span>
-                  <span className="tabular-nums text-gray-500">{m.postings} job{m.postings === 1 ? '' : 's'}</span>
+                  <span className="font-semibold text-gray-900">{m.skill}</span>
+                  <span className="tabular-nums text-gray-600">{m.postings} job{m.postings === 1 ? '' : 's'}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-gray-700">You already list the most-requested skills.</p>
+            <p className="text-sm text-gray-800">You already list the most requested skills.</p>
           )}
         </div>
       </div>
 
-      <div className="space-y-4 rounded-lg border border-gray-200 bg-white p-5">
+      <div className="space-y-4 border-t-[1.5px] border-gray-900 pt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h3 className="font-semibold text-gray-900">Full resume review</h3>
-            <p className="text-sm text-gray-600">
+            <h3 className="text-lg font-extrabold text-gray-900">Full resume review</h3>
+            <p className="text-sm text-gray-700">
               Strengths, what to fix, how to tailor it, and roles to search for, written for your resume.
             </p>
           </div>
@@ -840,32 +835,32 @@ function FeedbackTab() {
               type="button"
               onClick={() => generate.mutate()}
               disabled={generate.isPending}
-              className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800 disabled:opacity-60"
+              className="btn-primary"
             >
-              {generate.isPending ? 'Reviewing (about 20 seconds)...' : data.ai ? 'Refresh review' : 'Review my resume'}
+              {generate.isPending ? 'Reviewing, about 20 seconds...' : data.ai ? 'Refresh review' : 'Review my resume'}
             </button>
           ) : (
-            <Link to="/ai-key" className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-800">
+            <Link to="/ai-key" className="btn-primary">
               Add a free AI key
             </Link>
           )}
         </div>
         {!canUseAi && !data.ai && (
-          <p className="text-sm text-gray-600">
+          <p className="text-sm text-gray-700">
             This part uses your own Claude, ChatGPT or Gemini key. Gemini has a free tier, and setup takes about two minutes.
           </p>
         )}
         {aiKey && !data.ai && !generate.isPending && (
-          <p className="text-xs text-gray-500">Runs on your {providerName(aiKey.provider)} key ({aiKey.model}).</p>
+          <p className="text-xs text-gray-600">Runs on your {providerName(aiKey.provider)} key ({aiKey.model}).</p>
         )}
-        {generate.isError && <p role="alert" className="text-sm text-red-600">{generate.error.message}</p>}
+        {generate.isError && <p role="alert" className="text-sm font-semibold text-post-700">{generate.error.message}</p>}
         {data.ai && <AiReview review={data.ai} />}
       </div>
     </div>
   )
 }
 
-// ── Page ──────────────────────────────────────────────────────────────────────
+// The page
 
 export default function ResumePage() {
   const { data: me, isLoading: meLoading } = useMe()
@@ -876,7 +871,7 @@ export default function ResumePage() {
   const [prefs, setPrefs] = useState<JobPreferences>(loadLocalPrefs)
   const [tab, setTab] = useState<'jobs' | 'feedback'>('jobs')
 
-  // Once a resume exists, the form starts from what's saved with it
+  // Once there is a resume the form starts from what is saved with it
   const resumeId = resume?.id
   useEffect(() => {
     if (resumeId && savedPrefs) setPrefs({ ...DEFAULT_PREFERENCES, ...savedPrefs })
@@ -891,12 +886,12 @@ export default function ResumePage() {
   const items = data?.items ?? []
 
   return (
-    <div className="mx-auto max-w-4xl space-y-6 px-4 py-6 sm:py-8">
-      <header>
-        <h1 className="text-3xl font-bold tracking-tight text-gray-900">Find co-op jobs that fit you</h1>
-        <p className="mt-2 max-w-2xl text-gray-600">
+    <div className="mx-auto max-w-4xl px-4 py-8 sm:py-10">
+      <header className="pb-8">
+        <h1 className="display text-4xl leading-[1.02] text-gray-900 sm:text-5xl">Find co-op jobs that fit you</h1>
+        <p className="mt-3 max-w-2xl text-[17px] text-gray-700">
           Tell us about your studies and what you want, upload your resume, and see the jobs you're a
-          good fit for: matched to your program, graduation year and skills, using what each job
+          good fit for. We match your program, graduation year and skills against what each job
           description asks for.
         </p>
       </header>
@@ -926,7 +921,7 @@ export default function ResumePage() {
         done={Boolean(resume)}
       >
         {meLoading || (me && isLoading) ? (
-          <div className="h-32 animate-pulse rounded-lg bg-gray-100" />
+          <div className="h-32 animate-pulse bg-gray-100" />
         ) : (
           <>
             {resume && <StoredResume resume={resume} />}
@@ -936,10 +931,10 @@ export default function ResumePage() {
       </StepCard>
 
       {resume && (
-        <section aria-label="Results" className="space-y-4">
-          <div className="flex gap-1 border-b border-gray-200" role="tablist">
+        <section aria-label="Results" className="space-y-5 pt-2">
+          <div className="flex gap-0 bg-gray-100" role="tablist">
             <TabButton active={tab === 'jobs'} onClick={() => setTab('jobs')} id="jobs">
-              Jobs that fit your resume <span className="ml-1 text-gray-500 tabular-nums">{items.length}</span>
+              Jobs that fit your resume <span className="ml-1 tabular-nums opacity-80">{items.length}</span>
             </TabButton>
             <TabButton active={tab === 'feedback'} onClick={() => setTab('feedback')} id="feedback">
               Resume feedback
@@ -964,8 +959,8 @@ function TabButton({
       id={`tab-${id}`}
       aria-selected={active}
       onClick={onClick}
-      className={`-mb-px border-b-2 px-4 py-2.5 text-sm font-medium ${
-        active ? 'border-blue-700 text-gray-900' : 'border-transparent text-gray-600 hover:text-gray-900'
+      className={`px-4 py-3 text-[15px] font-bold transition-colors ${
+        active ? 'bg-post-600 text-white' : 'text-gray-800 hover:bg-gray-200'
       }`}
     >
       {children}

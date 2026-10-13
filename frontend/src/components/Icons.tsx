@@ -1,6 +1,6 @@
 /**
- * Small line icons (24px grid, 1.75 stroke) used instead of emoji so the UI looks the same
- * on every device. Each takes a className for size and colour; all are aria-hidden.
+ * Small line icons on a 24px grid with a 1.75 stroke, so the site looks the same on every
+ * device. Each one takes a className for size and colour and is hidden from screen readers.
  */
 
 import type { ReactNode } from 'react'
@@ -13,8 +13,8 @@ function Icon({ className = 'h-5 w-5', children }: { className?: string; childre
       fill="none"
       stroke="currentColor"
       strokeWidth={1.75}
-      strokeLinecap="round"
-      strokeLinejoin="round"
+      strokeLinecap="square"
+      strokeLinejoin="miter"
       className={className}
       aria-hidden="true"
     >
@@ -25,13 +25,13 @@ function Icon({ className = 'h-5 w-5', children }: { className?: string; childre
 
 type P = { className?: string }
 
-export const LogoMark = ({ className = 'h-7 w-7' }: P) => (
+/** The CoopRadar mark. A postmark ring with a radar sweep, white on the red bar */
+export const LogoMark = ({ className = 'h-8 w-8' }: P) => (
   <svg viewBox="0 0 32 32" className={className} aria-hidden="true">
-    <rect width="32" height="32" rx="7" fill="#1f4a8f" />
-    <circle cx="16" cy="16" r="9" fill="none" stroke="#b9d0f0" strokeWidth="2" />
-    <circle cx="16" cy="16" r="4.5" fill="none" stroke="#b9d0f0" strokeWidth="2" />
-    <path d="M16 16 L23 9" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
-    <circle cx="16" cy="16" r="2" fill="#fff" />
+    <circle cx="16" cy="16" r="14" fill="none" stroke="currentColor" strokeWidth="2.2" />
+    <circle cx="16" cy="16" r="9.5" fill="none" stroke="currentColor" strokeWidth="1.2" />
+    <path d="M16 16 L24 8" stroke="currentColor" strokeWidth="2.6" strokeLinecap="square" />
+    <circle cx="16" cy="16" r="2.4" fill="currentColor" />
   </svg>
 )
 
@@ -82,4 +82,16 @@ export const TrendIcon = (p: P) => (
 )
 export const PenIcon = (p: P) => (
   <Icon {...p}><path d="M4 20h4L19 9a2.8 2.8 0 0 0-4-4L4 16z" /><path d="m13.5 6.5 4 4" /></Icon>
+)
+export const ChevronDownIcon = (p: P) => (
+  <Icon {...p}><path d="m6 9 6 6 6-6" /></Icon>
+)
+export const ArrowUpIcon = (p: P) => (
+  <Icon {...p}><path d="M12 19V5m-6 6 6-6 6 6" /></Icon>
+)
+export const ArrowDownIcon = (p: P) => (
+  <Icon {...p}><path d="M12 5v14m-6-6 6 6 6-6" /></Icon>
+)
+export const TableIcon = (p: P) => (
+  <Icon {...p}><rect x="3.5" y="5" width="17" height="14" /><path d="M3.5 10h17M3.5 14.5h17M9.5 5v14" /></Icon>
 )

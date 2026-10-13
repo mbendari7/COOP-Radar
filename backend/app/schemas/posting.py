@@ -1,10 +1,10 @@
 """
-Pydantic schemas for the postings endpoints.
+Shapes for the job posting endpoints.
 
-Shapes match the API contracts in specs/001-browse-search-postings/contracts/api.md.
-PostingListItem is the lean list payload; PostingDetail adds description.
-PostingListParams is the full query-param model — Pydantic validates and coerces it
-so the router stays thin and the service never sees invalid input.
+They match the contracts in specs/001-browse-search-postings/contracts/api.md.
+PostingListItem is the light version for lists and PostingDetail adds the description.
+PostingListParams holds every query param. Pydantic checks and converts it
+so the router stays thin and the service never sees bad input.
 """
 
 import re
@@ -21,7 +21,7 @@ from app.services.education import ProgramKey
 CountryCode = Literal["CA", "US"]
 RoleType = Literal["coop", "internship", "new_grad", "job"]
 
-# Python twins of the title patterns in app/services/postings.py, for the role badge
+# Python copies of the title patterns in app/services/postings.py, used for the role badge
 _COOP_TITLE = re.compile(r"(?i)\b(co-?op|stagiaire)\b")
 _INTERN_TITLE = re.compile(r"(?i)\b(intern|interns|internship|student|apprentice)\b")
 _NEW_GRAD_TITLE = re.compile(
@@ -30,7 +30,7 @@ _NEW_GRAD_TITLE = re.compile(
 
 
 def role_of(title: str) -> RoleType:
-    """Co-op, internship, new-grad or regular job, from the title."""
+    """Co-op, internship, new grad or regular job, worked out from the title."""
     if _COOP_TITLE.search(title):
         return "coop"
     if _INTERN_TITLE.search(title):
@@ -46,12 +46,12 @@ _PAGE_SIZES = {10, 25, 50}
 _POSTED_WITHIN = {1, 3, 7, 14, 30}
 
 
-# ── Response schemas ──────────────────────────────────────────────────────────
+# What we send back
 
 class PostingListItem(BaseModel):
     """
-    One row in the postings table.
-    Omits description to keep list payloads small (see contracts/api.md note).
+    One job in the list.
+    Leaves out the description to keep lists small.
     """
     model_config = ConfigDict(from_attributes=True)
 
@@ -68,13 +68,13 @@ class PostingListItem(BaseModel):
     posted_at: datetime
     skills: list[str]
     source_url: str | None
-    # What the description asks for: graduation years and programs of study (empty = not stated)
+    # What the description asks for, grad years and programs. Empty means it did not say
     grad_years: list[int] = []
     fields_of_study: list[str] = []
     closed_at: datetime | None = None
-    # Set for postings imported from a live employer career board (None = sample/manual/CSV)
+    # Set when the job came from a live employer career board. None for sample, manual or CSV jobs
     source_id: UUID | None = None
-    # Populated for authenticated requests only; None means unauthenticated
+    # Only filled in when someone is signed in. None means nobody is
     is_saved: bool | None = None
 
     @computed_field  # type: ignore[prop-decorator]
@@ -84,15 +84,15 @@ class PostingListItem(BaseModel):
 
 
 class PostingDetail(PostingListItem):
-    """Full posting detail — includes description for the detail page."""
+    """Everything about one job, description included."""
     description: str
     low_confidence_fields: dict[str, float] | None = None
 
 
 class Page[T](BaseModel):
     """
-    Generic paginated response wrapper.
-    All list endpoints return Page[SomeItem] so the frontend knows the shape.
+    The wrapper every list sends back.
+    All list endpoints return Page[SomeItem] so the site always knows the shape.
     """
     items: list[T]
     total: int
@@ -100,14 +100,14 @@ class Page[T](BaseModel):
     page_size: int
 
 
-# Concrete alias so the router return type is explicit
+# A named version so the router's return type is clear
 PostingsPage = Page[PostingListItem]
 
 
-# ── Filter metadata ───────────────────────────────────────────────────────────
+# Filter choices
 
 class CategoryCount(BaseModel):
-    """A job type for the filter list, with how many open postings it has."""
+    """A job type for the filter list with how many open jobs it has."""
     key: CategoryKey
     label: str
     count: int
@@ -131,9 +131,9 @@ class ProgramOption(BaseModel):
 
 class FilterMeta(BaseModel):
     """
-    Distinct values available for each filter dropdown.
-    Populated from the postings table so the frontend never shows a city
-    that has zero postings.
+    The choices for each filter menu.
+    They come from the jobs table so the site never offers a city
+    that has no jobs.
     """
     cities: list[str]
     provinces: list[str]
@@ -141,18 +141,18 @@ class FilterMeta(BaseModel):
     skills: list[str]
     companies: list[str] = []
     categories: list[CategoryCount] = []
-    # Open postings in total (job types overlap, so their counts don't add up to this)
+    # Open jobs in total. Job types overlap so their counts do not add up to this
     open_jobs: int = 0
     countries: list[CountryCount] = []
     work_modes: list[WorkModeCount] = []
-    # Programs of study a student can pick (see app/services/education.py)
+    # Programs a student can pick (see app/services/education.py)
     programs: list[ProgramOption] = []
 
 
-# ── Query params ──────────────────────────────────────────────────────────────
+# Query params
 
 class ManualPostingIn(BaseModel):
-    """Schema for manually submitted postings via POST /api/postings."""
+    """A job someone adds by hand through POST /api/postings."""
 
     title: str
     company: str
@@ -168,7 +168,7 @@ class ManualPostingIn(BaseModel):
 
 
 class RowError(BaseModel):
-    """A single per-row validation error from a CSV upload."""
+    """One problem with one row of a CSV upload."""
 
     row: int
     column: str
@@ -176,7 +176,7 @@ class RowError(BaseModel):
 
 
 class CsvUploadResult(BaseModel):
-    """Response from POST /api/postings/upload."""
+    """What POST /api/postings/upload sends back."""
 
     added: int
     skipped_duplicates: int
@@ -184,7 +184,7 @@ class CsvUploadResult(BaseModel):
 
 
 class SimilarPostingOut(BaseModel):
-    """One item in the similar postings response."""
+    """One job in the similar jobs list."""
 
     model_config = ConfigDict(from_attributes=True)
 
@@ -200,23 +200,22 @@ class SimilarPostingOut(BaseModel):
 
 
 class SimilarPostingsResponse(BaseModel):
-    """Response from GET /api/postings/{id}/similar."""
+    """What GET /api/postings/{id}/similar sends back."""
 
     items: list[SimilarPostingOut]
 
 
 class PostingListParams(BaseModel):
     """
-    All query parameters accepted by GET /api/postings.
+    Every query param GET /api/postings accepts.
 
-    Pydantic validates these before the router calls the service, so the service
-    only receives clean, typed values.  Unknown sort values produce a 422
-    automatically via the Literal type — no manual whitelist needed.
+    Pydantic checks these before the router calls the service so the service
+    only ever gets clean typed values. A sort value we do not know is a 422
+    right away thanks to the Literal type, so there is no list to keep by hand.
 
-    CHK012 decision: multi-value params (duration, skills) use repeated query
-    params (?skills=React&skills=TypeScript) which FastAPI handles natively.
-    CHK014 decision: invalid values produce 422 (Pydantic rejects them);
-    the frontend catches 422s and resets affected params to their defaults.
+    Params with more than one value like duration and skills just repeat
+    in the URL like ?skills=React&skills=TypeScript and FastAPI handles it.
+    Bad values get a 422 and the site resets those params to their defaults.
     """
 
     q: str | None = Field(default=None, max_length=200)
@@ -224,38 +223,38 @@ class PostingListParams(BaseModel):
     province: str | None = None
     term: str | None = None
     work_mode: WorkMode | None = None
-    # duration accepts a list so multiple values can be OR'd (4 and/or 8 months)
+    # duration takes a list so you can pick more than one, like 4 or 8 months
     duration: list[int] | None = None
     skills: list[str] | None = None
-    # Job types (OR'd), inferred from the title: see app/services/categories.py
+    # Job types, any of them, worked out from the title (see app/services/categories.py)
     category: list[CategoryKey] | None = None
-    # Employers (OR'd), exact names from /meta/filters
+    # Employers, any of them, using the exact names from /meta/filters
     company: list[str] | None = None
-    # Only postings published in the last N days
+    # Only jobs posted in the last N days
     posted_within: int | None = None
-    # Countries (OR'd): CA, US. None = all
+    # Countries, any of CA and US. None means all
     country: list[CountryCode] | None = None
-    # Jobs for a program of study: they name it in the description or fit its job types
+    # Jobs for a program. The description names it or the job fits its job types
     program: ProgramKey | None = None
-    # Hide jobs that ask for a different graduation year (jobs that don't say are kept)
+    # Hide jobs that ask for a different grad year. Jobs that do not say stay in
     grad_year: int | None = Field(default=None, ge=2000, le=2100)
     show_expired: bool = False
     show_closed: bool = False
-    # Only internships, co-ops, student and new-grad roles (matched on the job title)
+    # Only internships, co-ops, student and new grad roles, judged by the title
     students_only: bool = False
-    # Hide senior / staff / lead / manager / director roles (matched on the job title)
+    # Hide senior, staff, lead, manager and director roles, judged by the title
     hide_senior: bool = False
     search_mode: Literal["keyword", "semantic"] = "keyword"
 
-    # Whitelisted sort columns — anything else is a 422 before service is called
+    # The only sort columns we allow. Anything else is a 422 before the service runs
     sort: Literal["posted_at", "deadline", "company", "title"] = "posted_at"
     order: Literal["asc", "desc"] = "desc"
 
     page: int = Field(default=1, ge=1)
     page_size: int = 25
 
-    # Query strings arrive as text, and Literal[...] int fields reject "10" — so these
-    # are plain ints validated against the allowed values (still a 422 when invalid).
+    # Query strings come in as text and Literal int fields reject "10", so these are
+    # plain ints checked against the allowed values. Still a 422 when wrong
     @field_validator("duration")
     @classmethod
     def _valid_durations(cls, v: list[int] | None) -> list[int] | None:

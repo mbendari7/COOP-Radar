@@ -16,16 +16,16 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # ── Extensions ────────────────────────────────────────────────────────────
+    # Extensions
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
-    # ── users.is_admin ────────────────────────────────────────────────────────
+    # users.is_admin
     op.add_column(
         "users",
         sa.Column("is_admin", sa.Boolean(), nullable=False, server_default=sa.text("FALSE")),
     )
 
-    # ── ingest_sources ────────────────────────────────────────────────────────
+    # ingest_sources
     op.create_table(
         "ingest_sources",
         sa.Column(
@@ -56,7 +56,7 @@ def upgrade() -> None:
     )
     op.create_index("idx_ingest_sources_enabled", "ingest_sources", ["enabled", "auto_paused"])
 
-    # ── ingest_runs ───────────────────────────────────────────────────────────
+    # ingest_runs
     op.create_table(
         "ingest_runs",
         sa.Column(
@@ -94,7 +94,7 @@ def upgrade() -> None:
         "idx_ingest_runs_started_at", "ingest_runs", [sa.text("started_at DESC")]
     )
 
-    # ── skills ────────────────────────────────────────────────────────────────
+    # skills
     op.create_table(
         "skills",
         sa.Column(
@@ -118,7 +118,7 @@ def upgrade() -> None:
     op.create_index("idx_skills_name", "skills", ["name"], unique=True)
     op.create_index("idx_skills_aliases", "skills", ["aliases"], postgresql_using="gin")
 
-    # ── postings additions ────────────────────────────────────────────────────
+    # New columns on postings
     op.add_column(
         "postings",
         sa.Column(
@@ -148,7 +148,7 @@ def upgrade() -> None:
         postgresql_where=sa.text("source_ref IS NOT NULL"),
     )
 
-    # ── posting_embeddings (vector table) ─────────────────────────────────────
+    # posting_embeddings, the vector table
     op.create_table(
         "posting_embeddings",
         sa.Column(
@@ -157,7 +157,7 @@ def upgrade() -> None:
             sa.ForeignKey("postings.id", ondelete="CASCADE"),
             primary_key=True,
         ),
-        sa.Column("embedding", sa.Text(), nullable=False),  # DDL override below
+        sa.Column("embedding", sa.Text(), nullable=False),  # swapped for the real type below
         sa.Column("model", sa.Text(), nullable=False),
         sa.Column(
             "generated_at",
@@ -166,9 +166,9 @@ def upgrade() -> None:
             server_default=sa.text("NOW()"),
         ),
     )
-    # Replace the text placeholder column with the actual vector type
+    # Swap the text placeholder column for the real vector type
     op.execute("ALTER TABLE posting_embeddings ALTER COLUMN embedding TYPE vector(1536) USING embedding::vector(1536)")
-    # HNSW index for fast cosine similarity queries
+    # HNSW index so closest match lookups stay fast
     op.execute(
         "CREATE INDEX idx_posting_embeddings_hnsw ON posting_embeddings "
         "USING hnsw (embedding vector_cosine_ops) WITH (m=16, ef_construction=64)"

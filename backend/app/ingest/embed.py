@@ -1,16 +1,16 @@
 """
-Embedding generation and storage (OpenAI text-embedding-3-small, 1536 dims).
+Making and saving embeddings with OpenAI text-embedding-3-small, which gives 1536 numbers.
 
-generate_embedding  — calls OpenAI and returns a list[float].
-store_embedding     — upserts the vector into posting_embeddings (no commit).
-embed_posting       — builds the text for one posting, embeds it, and stores it.
-enqueue_embed_job   — embeds a posting in the background (best effort).
-backfill            — embeds every posting that has no vector yet.
+generate_embedding  calls OpenAI and gives back a list of floats
+store_embedding     saves the vector in posting_embeddings without committing
+embed_posting       builds the text for one job, embeds it and saves it
+enqueue_embed_job   embeds a job in the background if it can
+backfill            embeds every job that has no vector yet
 
-Postings need embeddings for semantic search, "similar postings", and resume
-matching. After seeding or bulk-importing postings, run:
+Jobs need embeddings for smart search, similar jobs and resume matching.
+After seeding or a bulk import run
 
-    python -m app.ingest.embed            # embeds postings that are missing a vector
+    python -m app.ingest.embed            # embeds jobs that are missing a vector
 """
 
 import asyncio
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 
 async def generate_embedding(text: str) -> list[float]:
-    """Generate a 1536-dimensional embedding vector for the given text."""
+    """Make a 1536 number embedding for this text."""
     import openai
 
     settings = get_settings()
@@ -41,8 +41,8 @@ async def store_embedding(
     embedding: list[float],
 ) -> None:
     """
-    Upsert the embedding for a posting into posting_embeddings.
-    The caller owns the transaction (commit happens there).
+    Save or update the embedding for a job in posting_embeddings.
+    The caller owns the transaction and commits.
     """
     from sqlalchemy.dialects.postgresql import insert as pg_insert
 
@@ -61,12 +61,12 @@ async def store_embedding(
 
 
 def embedding_text(title: str, company: str, description: str | None, skills: list[str]) -> str:
-    """The text we embed for a posting — kept in one place so all callers agree."""
+    """The text we embed for a job. Kept in one place so every caller agrees."""
     return f"{title} at {company}\nSkills: {', '.join(skills)}\n\n{description or ''}"[:8000]
 
 
 async def embed_posting(db: AsyncSession, posting_id: UUID) -> bool:
-    """Embed one posting and store the vector. Returns False if the posting is gone."""
+    """Embed one job and save the vector. Gives back False if the job is gone."""
     from app.models.posting import Posting
 
     posting = await db.get(Posting, posting_id)
@@ -81,11 +81,11 @@ async def embed_posting(db: AsyncSession, posting_id: UUID) -> bool:
 
 def enqueue_embed_job(posting_id: UUID) -> None:
     """
-    Embed the posting in the background so the request that created it doesn't wait
-    on OpenAI. Failures are logged, never raised: a posting without a
-    vector still works for keyword search and can be backfilled later.
-    Skipped when the site has no OPENAI_API_KEY (smart search off), so no job is started
-    only to fail.
+    Embed the job in the background so the request that made it does not wait
+    on OpenAI. Failures get logged and never raised. A job without a vector
+    still works for keyword search and can be filled in later.
+    Skipped when the site has no OPENAI_API_KEY, since smart search is off
+    and the job would only fail.
     """
     from app.config import get_settings
 
@@ -100,7 +100,7 @@ def enqueue_embed_job(posting_id: UUID) -> None:
 
 
 async def embed_one(posting_id: UUID) -> None:
-    """Background job entry point: embed one posting and commit."""
+    """Where the background job starts. Embed one job and commit."""
     from app.db import AsyncSessionLocal
 
     async with AsyncSessionLocal() as db:
@@ -109,7 +109,7 @@ async def embed_one(posting_id: UUID) -> None:
 
 
 async def backfill(db: AsyncSession, batch_size: int = 50) -> int:
-    """Embed every posting that doesn't have a vector yet. Returns how many were embedded."""
+    """Embed every job that has no vector yet. Gives back how many got done."""
     from app.models.posting import Posting
     from app.models.posting_embedding import PostingEmbedding
 
@@ -125,7 +125,7 @@ async def backfill(db: AsyncSession, batch_size: int = 50) -> int:
         if await embed_posting(db, posting_id):
             done += 1
         if i % batch_size == 0:
-            await db.commit()  # commit in batches so a failure doesn't lose everything
+            await db.commit()  # commit in batches so one failure does not lose everything
     await db.commit()
     return done
 

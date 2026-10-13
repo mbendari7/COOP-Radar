@@ -1,13 +1,12 @@
 """
-Shared FastAPI dependencies for authentication.
+Shared FastAPI helpers for knowing who is signed in.
 
-get_current_user — reads the session cookie, validates it against the session store,
-returns the User ORM object, and resets the rolling TTL.  Raises 401 if
-anything is missing or invalid.
+get_current_user reads the session cookie, checks it in the session store, gives back
+the User and pushes the expiry forward again. Answers 401 if anything is off.
 
-get_optional_user — same logic but returns None instead of raising 401.
-Used by routes that work for both authenticated and unauthenticated users
-(e.g. GET /api/postings must work without login but can personalise when logged in).
+get_optional_user does the same but gives back None instead of a 401.
+Public routes use it when they work for everyone but can do more for signed in people,
+like the job list.
 """
 
 from uuid import UUID
@@ -29,16 +28,16 @@ async def get_current_user(
     store: Store = Depends(get_store),
 ) -> User:
     """
-    Resolve the session cookie to a User ORM object.
+    Turn the session cookie into a User.
 
-    Steps:
-    1. Read the `session` cookie value (the raw 64-char hex token)
-    2. Look up `session:<token>` in the store — must contain `user_id`
-    3. SELECT the User row from PostgreSQL
-    4. Reset the session TTL (rolling 7-day expiry per FR-004)
-    5. Return the User, or raise HTTP 401
+    What happens
+    1. Read the session cookie which holds a 64 character token
+    2. Look up session:<token> in the store and get the user_id
+    3. Load that User from Postgres
+    4. Push the 7 day expiry forward again
+    5. Give back the User or answer 401
 
-    Raises HTTP 503 if the session store is unreachable (signals clients to retry).
+    Answers 503 if the session store cannot be reached so the browser knows to retry.
     """
     not_auth = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -52,7 +51,7 @@ async def get_current_user(
 
     try:
         user_id = await store.hget(session_key, "user_id")
-    except Exception as exc:  # noqa: BLE001 — any store failure means "retry later"
+    except Exception as exc:  # noqa: BLE001 any store problem means try again later
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail={
@@ -66,15 +65,15 @@ async def get_current_user(
 
     try:
         user = await db.get(User, UUID(str(user_id)))
-    except ValueError:  # malformed id in the store
+    except ValueError:  # the store had a broken id
         user = None
 
     if user is None:
-        # Session key exists but user was deleted — clean up stale key
+        # The session is there but the user was deleted so clean up the old key
         await store.delete(session_key)
         raise not_auth
 
-    # Reset rolling TTL so active users never get logged out unexpectedly
+    # Push the expiry forward so active people never get signed out by surprise
     await store.expire(session_key, _SESSION_TTL)
 
     return user
@@ -84,8 +83,8 @@ async def get_admin_user(
     current_user: User = Depends(get_current_user),
 ) -> User:
     """
-    Require the authenticated user to have is_admin = True.
-    Raises HTTP 403 FORBIDDEN if the user is not an admin.
+    Only lets admins through.
+    Answers 403 FORBIDDEN for everyone else.
     """
     if not current_user.is_admin:
         raise HTTPException(
@@ -102,8 +101,8 @@ async def get_optional_user(
     store: Store = Depends(get_store),
 ) -> User | None:
     """
-    Like get_current_user but returns None instead of raising 401.
-    Safe to use on public endpoints that benefit from knowing who's asking.
+    Same as get_current_user but gives back None instead of a 401.
+    Fine for public endpoints that just like knowing who is asking.
     """
     if not session:
         return None

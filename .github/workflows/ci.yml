@@ -34,7 +34,7 @@ jobs:
 
     env:
       DATABASE_URL: postgresql+asyncpg://coopradar:coopradar@localhost:5432/coopradar_test
-      # Tests mock the session store, background jobs, Claude, and OpenAI — no keys needed.
+      # Tests mock the session store, background jobs, Claude and OpenAI, so no keys are needed.
       COOKIE_SECURE: "false"
 
     steps:

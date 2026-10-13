@@ -20,8 +20,8 @@ class ResumeOut(BaseModel):
 
 class JobPreferences(BaseModel):
     """
-    What the student is looking for, set before or after uploading. Matching only considers
-    open postings that fit these; keywords (e.g. "data analyst") rank fitting postings higher.
+    What the student is looking for, set before or after uploading. Matching only looks at
+    open jobs that fit these. Keywords like "data analyst" push fitting jobs higher.
     """
 
     categories: list[CategoryKey] = Field(default=[], max_length=9)
@@ -29,20 +29,20 @@ class JobPreferences(BaseModel):
     province: str = Field(default="", max_length=2)
     city: str = Field(default="", max_length=100)
     work_modes: list[WorkMode] = Field(default=[], max_length=3)
-    # entry: students + entry-level (no senior titles) · students: co-op/intern only · all
+    # entry is students plus entry level with no senior titles. students is co-op and intern only
     level: Literal["entry", "students", "all"] = "entry"
-    # About the student. Blank = read from the resume (see detect_education)
+    # About the student. Leave blank and we read it from the resume (see detect_education)
     program: ProgramKey | Literal[""] = ""
     degree: Degree = ""
     grad_year: int | None = Field(default=None, ge=2000, le=2100)
-    # Co-op term they want, e.g. "Summer 2027" (jobs for that term rank higher)
+    # The co-op term they want like "Summer 2027". Jobs for that term rank higher
     term: str = Field(default="", max_length=20)
-    # Countries to include; most students want Canada, some also do a US co-op term
+    # Countries to include. Most students want Canada and some also do a US term
     countries: list[Literal["CA", "US"]] = Field(default=["CA"], max_length=2)
 
 
 class DetectedEducation(BaseModel):
-    """What was read from the resume's education section (blank when not found)."""
+    """What we read from the education part of the resume. Blank when we could not find it."""
 
     program: ProgramKey | Literal[""] = ""
     program_label: str = ""
@@ -61,11 +61,11 @@ class MatchResultOut(BaseModel):
     score: int
     reason: str
     work_mode: str = ""
-    # The posting's listed skills, split into ones the resume shows and ones it doesn't
+    # The job's skills split into ones the resume shows and ones it does not
     matched_skills: list[str] = []
     missing_skills: list[str] = []
     country: str = "CA"
-    # Why this job fits the student, from its description: program, graduation year, term, role
+    # Why this job fits the student based on its description. Program, grad year, term and role
     fit_notes: list[str] = []
 
     @field_validator("score")
@@ -99,9 +99,9 @@ class MatchesResponse(BaseModel):
 
 class AskRequest(BaseModel):
     """
-    mode "question": answer `question` with citations (question required)
-    mode "tailor":   how to tailor this resume for the posting (question optional)
-    mode "cover_letter": a short cover-letter opening for the posting (question optional)
+    mode "question"      answers `question` with sources and needs a question
+    mode "tailor"        says how to tailor this resume for the job
+    mode "cover_letter"  writes a short cover letter opening for the job
     """
 
     question: str = Field(default="", max_length=2000)

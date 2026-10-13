@@ -1,4 +1,4 @@
-"""Tests for admin source management endpoints."""
+"""Tests for the admin source endpoints."""
 
 
 import pytest
@@ -33,7 +33,7 @@ async def _create_source(db: AsyncSession, name: str = "Test Source") -> str:
 
 @pytest.mark.asyncio
 async def test_non_admin_gets_403(client: AsyncClient, db_session: AsyncSession):
-    """Non-admin user cannot access GET /api/admin/sources."""
+    """Someone who is not an admin cannot open GET /api/admin/sources."""
     session = await _register_login(client, "student_admin_test@example.com")
     resp = await client.get("/api/admin/sources", cookies={"session": session})
     assert resp.status_code == 403
@@ -42,7 +42,7 @@ async def test_non_admin_gets_403(client: AsyncClient, db_session: AsyncSession)
 
 @pytest.mark.asyncio
 async def test_admin_lists_sources(client: AsyncClient, db_session: AsyncSession):
-    """Admin user receives list of sources."""
+    """An admin gets the list of sources."""
     await _register_login(client, "admin_list@example.com")
     await _make_admin(db_session, "admin_list@example.com")
     await _create_source(db_session, "Admin List Source")
@@ -62,7 +62,7 @@ async def test_admin_lists_sources(client: AsyncClient, db_session: AsyncSession
 
 @pytest.mark.asyncio
 async def test_trigger_run_returns_202(client: AsyncClient, db_session: AsyncSession):
-    """POST /api/admin/sources/{id}/run returns 202 ACCEPTED."""
+    """POST /api/admin/sources/{id}/run answers 202 ACCEPTED."""
     await _register_login(client, "admin_trigger@example.com")
     await _make_admin(db_session, "admin_trigger@example.com")
     source_id = await _create_source(db_session, "Trigger Source")
@@ -83,7 +83,7 @@ async def test_trigger_run_returns_202(client: AsyncClient, db_session: AsyncSes
 
 @pytest.mark.asyncio
 async def test_trigger_already_running_409(client: AsyncClient, db_session: AsyncSession):
-    """POST /api/admin/sources/{id}/run returns 409 when a run is already running."""
+    """POST /api/admin/sources/{id}/run answers 409 when a run is already going."""
     await _register_login(client, "admin_running@example.com")
     await _make_admin(db_session, "admin_running@example.com")
     source_id = await _create_source(db_session, "Running Source")
@@ -100,7 +100,7 @@ async def test_trigger_already_running_409(client: AsyncClient, db_session: Asyn
     )
     assert resp1.status_code == 202
 
-    # Second run while first is still "running"
+    # Second run while the first is still running
     resp2 = await client.post(
         f"/api/admin/sources/{source_id}/run", cookies={"session": session}
     )
@@ -110,11 +110,11 @@ async def test_trigger_already_running_409(client: AsyncClient, db_session: Asyn
 
 @pytest.mark.asyncio
 async def test_patch_source_re_enables(client: AsyncClient, db_session: AsyncSession):
-    """PATCH auto_paused=false resets consecutive_failures to 0."""
+    """PATCH auto_paused=false sets consecutive_failures back to 0."""
     await _register_login(client, "admin_patch@example.com")
     await _make_admin(db_session, "admin_patch@example.com")
 
-    # Create a paused source
+    # Make a paused source
     result = await db_session.execute(
         text(
             "INSERT INTO ingest_sources (id, name, adapter_type, config, auto_paused, consecutive_failures) "

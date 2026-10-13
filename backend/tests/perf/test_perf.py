@@ -1,12 +1,12 @@
 """
-Performance test — asserts that GET /api/postings p95 latency stays under
-300 ms when the table has 10,000 rows (Constitution III).
+Speed test. Checks that GET /api/postings answers within 300 ms for 95% of requests
+when the table has 10,000 rows.
 
-Run separately from the main test suite:
+Run it on its own
     pytest -q -m perf
 
-Excluded from CI default run (pytest -m "not perf") because it inserts 10k rows
-and takes ~10 seconds, which would slow down the fast feedback loop.
+Normal CI runs skip it (pytest -m "not perf") because it adds 10k rows and takes
+about 10 seconds, which would slow down the quick checks.
 """
 
 import statistics
@@ -23,7 +23,7 @@ from app.main import create_app
 from app.models.posting import Posting, WorkMode
 from tests.conftest import MockRedis, get_test_db_url
 
-# Skill pool for random assignment
+# Skills to hand out at random
 SKILLS = ["Python", "Java", "Go", "TypeScript", "React", "SQL", "Docker", "AWS",
           "Kubernetes", "C++", "Rust", "PostgreSQL", "Redis", "Node.js", "Django"]
 
@@ -39,7 +39,7 @@ QUERIES = [
     "/api/postings?skills=Python&skills=Docker&sort=deadline&order=asc",
     "/api/postings?term=Summer%202027&work_mode=remote&page=3&page_size=50",
     "/api/postings?q=developer&duration=4&duration=8&sort=company",
-    # Worst case: keyword + every filter + sort + a later page
+    # Worst case. Keyword plus every filter plus sort plus a later page
     "/api/postings?q=python&city=Waterloo&province=ON&term=Summer%202027&work_mode=hybrid"
     "&duration=4&duration=8&skills=Python&skills=SQL&students_only=false&hide_senior=true"
     "&sort=deadline&order=desc&page=2&page_size=10",
@@ -68,10 +68,10 @@ def make_bulk_posting(i: int) -> Posting:
 @pytest.mark.perf
 async def test_list_postings_p95_under_300ms(db_engine) -> None:  # type: ignore[no-untyped-def]
     """
-    Insert 10,000 postings into the TEST database, time 100 list/search requests,
-    assert p95 <= 300 ms. Only the rows it inserted are deleted afterwards, and it
-    never touches the dev database (it uses TEST_DATABASE_URL / DATABASE_URL like
-    the rest of the suite — point those at a throwaway DB).
+    Add 10,000 jobs to the TEST database, time 100 list and search requests and check
+    that 95% finish within 300 ms. Only the rows it added get deleted after, and it
+    never touches the dev database. It uses TEST_DATABASE_URL or DATABASE_URL like
+    the rest of the tests, so point those at a throwaway database.
     """
     engine = create_async_engine(get_test_db_url(), echo=False)
     session_factory = async_sessionmaker(bind=engine, expire_on_commit=False)
@@ -79,10 +79,10 @@ async def test_list_postings_p95_under_300ms(db_engine) -> None:  # type: ignore
     async with session_factory() as session:
         session.add_all([make_bulk_posting(i) for i in range(10_000)])
         await session.commit()
-        await session.execute(text("ANALYZE postings"))  # fresh planner stats, like production
+        await session.execute(text("ANALYZE postings"))  # fresh planner stats like in production
 
     app = create_app()
-    app.state.store = MockRedis()  # lifespan doesn't run under ASGITransport
+    app.state.store = MockRedis()  # the lifespan does not run under ASGITransport
     latencies: list[float] = []
 
     try:
@@ -92,19 +92,19 @@ async def test_list_postings_p95_under_300ms(db_engine) -> None:  # type: ignore
         ) as client:
             first = (await client.get("/api/postings?page_size=10")).json()["items"][0]["id"]
             queries = [q.replace("{id}", first) for q in QUERIES]
-            # Warm up (first requests pay for connection setup and query planning)
+            # Warm up since the first requests pay for connecting and query planning
             for url in queries:
                 await client.get(url)
 
-            # Measure per-request latency (the constitution's budget) across a mix of
-            # realistic list/search queries. Requests run one at a time: firing many
-            # concurrently into a single in-process app measures event-loop throughput,
-            # not the latency a user sees.
+            # Time each request across a mix of realistic list and search queries.
+            # Requests run one at a time. Firing lots at once into one app in the
+            # same process measures how much the event loop can push through
+            # and not the wait a real user sees
             for i in range(120):
                 url = queries[i % len(queries)]
                 start = time.perf_counter()
                 resp = await client.get(url)
-                latencies.append((time.perf_counter() - start) * 1000)  # ms
+                latencies.append((time.perf_counter() - start) * 1000)  # in ms
                 assert resp.status_code == 200
     finally:
         async with session_factory() as session:

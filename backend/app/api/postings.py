@@ -1,11 +1,11 @@
 """
-Postings router — thin layer that delegates straight to the service.
+Job postings. A thin layer that hands everything to the service.
 
-Route order matters: /meta/filters MUST come before /{id} so FastAPI doesn't
-try to interpret "meta" as a UUID and return a 422.
+Order matters here. /meta/filters has to come before /{id} or FastAPI tries
+to read "meta" as an id and answers 422.
 
-For authenticated requests (cookie present), each posting item gets an
-is_saved: bool field injected.  Unauthenticated requests leave it as None.
+When someone is signed in each job gets is_saved set to true or false.
+Everyone else just gets None.
 """
 
 from typing import Annotated
@@ -38,15 +38,15 @@ from app.services.postings import (
 
 router = APIRouter(prefix="/postings", tags=["postings"])
 
-_CSV_RATE_LIMIT = 3  # uploads per user per hour
+_CSV_RATE_LIMIT = 3  # uploads per person per hour
 _CSV_RATE_WINDOW = 3600  # seconds
 
 
 @router.get("/meta/filters", response_model=FilterMeta)
 async def postings_filter_meta(db: AsyncSession = Depends(get_db)) -> FilterMeta:
     """
-    Return distinct values for filter dropdowns (cities, provinces, terms, skills).
-    Cached by the frontend for 5 minutes — values change only when new postings arrive.
+    The choices for the filter menus like cities, provinces, terms and skills.
+    The site caches this for 5 minutes since it only changes when new jobs come in.
     """
     return await get_filter_meta(db)
 
@@ -59,8 +59,8 @@ async def upload_csv_endpoint(
     current_user: User = Depends(get_current_user),
 ) -> CsvUploadResult:
     """
-    Bulk-import postings from a CSV file.
-    Rate-limited to 3 uploads per user per hour.
+    Import a bunch of jobs from a CSV file.
+    Limited to 3 uploads per person per hour.
     """
     store = request.app.state.store
     rate_key = f"csv_upload:{current_user.id}"
@@ -83,7 +83,7 @@ async def create_manual_posting(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> PostingListItem:
-    """Add a single posting manually. Returns 409 if a duplicate already exists."""
+    """Add one job by hand. Answers 409 if it is already there."""
     return await create_manual(db, current_user.id, data)
 
 
@@ -94,10 +94,10 @@ async def get_postings(
     current_user: User | None = Depends(get_optional_user),
 ) -> PostingsPage:
     """
-    List postings with optional keyword/semantic search, filters, sort, and pagination.
-    FastAPI validates every query param against PostingListParams, so an unknown
-    sort column or page size is a 422 before the service runs.
-    Authenticated users also get is_saved on each item.
+    List jobs with search, filters, sorting and pages.
+    FastAPI checks every query param against PostingListParams so a sort column or
+    page size we do not allow is a 422 before the service even runs.
+    Signed in people also get is_saved on each job.
     """
     return await list_postings(params, db, user_id=current_user.id if current_user else None)
 
@@ -107,7 +107,7 @@ async def get_similar_postings(
     posting_id: UUID,
     db: AsyncSession = Depends(get_db),
 ) -> SimilarPostingsResponse:
-    """Return up to 5 postings most similar by embedding cosine similarity."""
+    """Up to 5 jobs that are most alike by embedding."""
     return await similar_postings(db, posting_id)
 
 
@@ -117,9 +117,9 @@ async def get_posting_detail(
     db: AsyncSession = Depends(get_db),
     current_user: User | None = Depends(get_optional_user),
 ) -> PostingDetail:
-    """Full detail for a single posting. Returns 404 if the ID doesn't exist."""
+    """Everything about one job. Answers 404 if the id is not there."""
     detail = await get_posting(posting_id, db)
-    # low_confidence_fields only visible to admins
+    # Only admins see low_confidence_fields
     if not (current_user and current_user.is_admin):
         detail.low_confidence_fields = None
     return detail

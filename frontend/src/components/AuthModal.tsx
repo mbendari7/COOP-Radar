@@ -1,15 +1,16 @@
 /**
- * AuthModal — register / login dialog.
+ * The sign up and sign in box.
  *
- * Rendered as a proper dialog element for accessibility:
- * - role="dialog" with aria-modal and aria-labelledby
- * - Focus trapped inside while open
- * - Closes on Escape key or backdrop click
- * - Switches between Register and Login tabs
+ * Built as a real dialog so screen readers get it right
+ *   role="dialog" with aria-modal and aria-labelledby
+ *   focus goes to the first field when it opens
+ *   Escape or a click outside closes it
+ *   tabs switch between making an account and signing in
  */
 
 import { useEffect, useRef, useState } from 'react'
 import { useLogin, useRegister } from '../api/auth'
+import { XIcon } from './Icons'
 
 interface Props {
   open: boolean
@@ -29,7 +30,7 @@ export default function AuthModal({ open, onClose, initialTab = 'register' }: Pr
   const register = useRegister()
   const login = useLogin()
 
-  // Reset form when modal opens or tab changes
+  // Clear the form when it opens or the tab changes
   useEffect(() => {
     if (open) {
       setEmail('')
@@ -39,7 +40,7 @@ export default function AuthModal({ open, onClose, initialTab = 'register' }: Pr
     }
   }, [open, tab])
 
-  // Close on Escape
+  // Escape closes it
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
       if (e.key === 'Escape' && open) onClose()
@@ -76,9 +77,9 @@ export default function AuthModal({ open, onClose, initialTab = 'register' }: Pr
   }
 
   return (
-    // Backdrop
+    // The dark layer behind
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-gray-950/50"
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
     >
       <div
@@ -86,31 +87,25 @@ export default function AuthModal({ open, onClose, initialTab = 'register' }: Pr
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-modal-title"
-        className="relative w-full max-w-md mx-4 bg-white rounded-xl shadow-xl p-6"
+        className="relative mx-4 w-full max-w-md bg-white shadow-xl"
       >
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-gray-500 hover:text-gray-600"
-          aria-label="Close"
-        >
-          ✕
-        </button>
+        <div className="flex items-center justify-between bg-post-600 px-6 py-3.5 text-white">
+          <h2 id="auth-modal-title" className="stretch-condensed text-xl font-extrabold uppercase tracking-[0.03em]">
+            {tab === 'register' ? 'Create account' : 'Sign in'}
+          </h2>
+          <button onClick={onClose} className="rounded-sm p-1 hover:bg-white/15" aria-label="Close">
+            <XIcon className="h-5 w-5" />
+          </button>
+        </div>
 
-        <h2 id="auth-modal-title" className="text-xl font-semibold text-gray-900 mb-4">
-          {tab === 'register' ? 'Create account' : 'Sign in'}
-        </h2>
-
+        <div className="p-6">
         {/* Tabs */}
-        <div className="flex border-b border-gray-200 mb-5" role="tablist">
+        <div className="mb-5 flex border-[1.5px] border-gray-900 text-sm font-bold" role="tablist">
           <button
             role="tab"
             aria-selected={tab === 'register'}
             onClick={() => { setTab('register'); setError(null) }}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-              tab === 'register'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={`flex-1 px-4 py-2 ${tab === 'register' ? 'bg-gray-900 text-white' : 'text-gray-800 hover:bg-gray-100'}`}
           >
             Register
           </button>
@@ -118,11 +113,7 @@ export default function AuthModal({ open, onClose, initialTab = 'register' }: Pr
             role="tab"
             aria-selected={tab === 'login'}
             onClick={() => { setTab('login'); setError(null) }}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px ${
-              tab === 'login'
-                ? 'border-blue-600 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700'
-            }`}
+            className={`flex-1 border-l-[1.5px] border-gray-900 px-4 py-2 ${tab === 'login' ? 'bg-gray-900 text-white' : 'text-gray-800 hover:bg-gray-100'}`}
           >
             Sign in
           </button>
@@ -130,7 +121,7 @@ export default function AuthModal({ open, onClose, initialTab = 'register' }: Pr
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div>
-            <label htmlFor="auth-email" className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="auth-email" className="label-form mb-1 block !text-gray-900">
               Email
             </label>
             <input
@@ -141,14 +132,14 @@ export default function AuthModal({ open, onClose, initialTab = 'register' }: Pr
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="field"
               aria-describedby={error ? 'auth-error' : undefined}
             />
           </div>
 
           <div>
-            <label htmlFor="auth-password" className="block text-sm font-medium text-gray-700 mb-1">
-              Password {tab === 'register' && <span className="text-gray-500 font-normal">(min 10 characters)</span>}
+            <label htmlFor="auth-password" className="label-form mb-1 block !text-gray-900">
+              Password {tab === 'register' && <span className="font-normal normal-case tracking-normal text-gray-600">10 characters or more</span>}
             </label>
             <input
               id="auth-password"
@@ -158,12 +149,12 @@ export default function AuthModal({ open, onClose, initialTab = 'register' }: Pr
               minLength={tab === 'register' ? 10 : 1}
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="field"
             />
           </div>
 
           {error && (
-            <p id="auth-error" role="alert" className="text-sm text-red-600">
+            <p id="auth-error" role="alert" className="text-sm font-semibold text-post-700">
               {error}
             </p>
           )}
@@ -171,11 +162,12 @@ export default function AuthModal({ open, onClose, initialTab = 'register' }: Pr
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full py-2 px-4 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50"
+            className="btn-primary w-full py-2.5"
           >
             {isLoading ? 'Please wait...' : tab === 'register' ? 'Create account' : 'Sign in'}
           </button>
         </form>
+        </div>
       </div>
     </div>
   )

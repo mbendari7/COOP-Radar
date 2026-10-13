@@ -1,5 +1,5 @@
 /**
- * FilterBar tests: the sidebar controls, and the removable chips above the results.
+ * Tests for the filters. The panel controls and the chips you can remove above the results.
  */
 
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
@@ -168,7 +168,7 @@ describe('ActiveFilterChips', () => {
   it('keeps keyboard focus on the next chip after removing one', async () => {
     const { rerender } = renderChips({ ...EMPTY_FILTERS, skills: ['Python', 'SQL'] })
     fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Python' }))
-    // The parent applies the change: re-render without Python
+    // The parent applies the change so draw it again without Python
     rerender(
       <ActiveFilterChips filters={{ ...EMPTY_FILTERS, skills: ['SQL'] }} meta={META} onChange={vi.fn()} onClearAll={vi.fn()} />,
     )

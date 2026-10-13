@@ -1,13 +1,13 @@
 """
-Background jobs, run inside the web server process — no separate worker or queue to host.
+Background jobs that run inside the web server, so there is no extra worker or queue to host.
 
-enqueue(job, *args)  start a job without making the request wait (errors are logged)
-scheduler()          started at app startup: every 10 minutes, imports each career board
-                     whose last run is older than INGEST_INTERVAL_HOURS (default 6), one at
-                     a time, and clears expired sessions. On a fresh site the first pass
-                     imports every board, so real jobs appear a minute or two after start.
+enqueue(job, *args)  starts a job without making the request wait and logs any error
+scheduler()          starts with the app. Every 10 minutes it imports each career board
+                     that has not run in INGEST_INTERVAL_HOURS (6 by default), one at a
+                     time, and clears old sessions. On a brand new site the first pass
+                     imports every board so real jobs show up a minute or two after start.
 
-At most three jobs run at once, so a big import can't use up the database connections
+Only three jobs run at once so a big import cannot hog the database connections
 that page requests need.
 """
 
@@ -26,7 +26,7 @@ INGEST_INTERVAL = timedelta(hours=float(os.getenv("INGEST_INTERVAL_HOURS", "6"))
 _CHECK_EVERY_SECONDS = 600
 _MAX_CONCURRENT_JOBS = 3
 
-_tasks: set[asyncio.Task[None]] = set()  # strong refs so running tasks aren't garbage-collected
+_tasks: set[asyncio.Task[None]] = set()  # keep running tasks so they are not garbage collected
 _slots: asyncio.Semaphore | None = None
 
 
@@ -55,14 +55,14 @@ async def _run(name: str, args: tuple[str, ...]) -> None:
     async with _slots:
         try:
             await JOBS[name](*args)
-        except Exception:  # noqa: BLE001 — a failed job must never crash the server
+        except Exception:  # noqa: BLE001 a failed job should never take down the server
             logger.exception("Background job %s%s failed", name, args)
 
 
 def enqueue(name: str, *args: str) -> None:
     """
-    Start job `name` in the background. Must be called from async code (any request
-    handler). Raises KeyError for an unknown job, RuntimeError outside an event loop.
+    Start job `name` in the background. Call it from async code like any request handler.
+    Raises KeyError for a job we do not know and RuntimeError outside an event loop.
     """
     if name not in JOBS:
         raise KeyError(name)
@@ -72,7 +72,7 @@ def enqueue(name: str, *args: str) -> None:
 
 
 async def _due_source_ids() -> list[str]:
-    """IDs of enabled, non-paused sources that haven't run within INGEST_INTERVAL."""
+    """Ids of sources that are on, not paused and have not run within INGEST_INTERVAL."""
     from sqlalchemy import or_, select
 
     from app.db import AsyncSessionLocal
@@ -89,7 +89,7 @@ async def _due_source_ids() -> list[str]:
 
 
 async def run_due_sources() -> int:
-    """Import every due source, one after another. Returns how many ran."""
+    """Import every source that is due, one after another. Gives back how many ran."""
     source_ids = await _due_source_ids()
     for source_id in source_ids:
         logger.info("Scheduled import for source %s", source_id)
@@ -98,7 +98,7 @@ async def run_due_sources() -> int:
 
 
 async def scheduler(store: object | None = None) -> None:
-    """Runs forever (cancelled at shutdown). `store` is purged of expired keys each cycle."""
+    """Runs until shutdown. Clears expired keys out of `store` every round."""
     if get_settings().openai_api_key:
         await _backfill_embeddings()
     while True:
@@ -107,13 +107,13 @@ async def scheduler(store: object | None = None) -> None:
             purge = getattr(store, "purge_expired", None)
             if purge is not None:
                 await purge()
-        except Exception:  # noqa: BLE001 — keep the scheduler alive
+        except Exception:  # noqa: BLE001 keep the scheduler going no matter what
             logger.exception("Scheduler cycle failed")
         await asyncio.sleep(_CHECK_EVERY_SECONDS)
 
 
 async def _backfill_embeddings() -> None:
-    """Smart search on: embed postings that don't have a vector yet (e.g. after a key was added)."""
+    """With smart search on, embed postings that have no vector yet, like after adding a key."""
     from app.db import AsyncSessionLocal
     from app.ingest.embed import backfill
 

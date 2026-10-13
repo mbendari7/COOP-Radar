@@ -1,6 +1,6 @@
 """
-Tests for the streaming Q&A endpoint.
-Claude streaming and OpenAI embeddings are mocked; no live API calls.
+Tests for the streamed Q and A endpoint.
+Claude streaming and OpenAI embeddings are faked so there are no live API calls.
 """
 
 import json
@@ -24,7 +24,7 @@ async def _setup_user_with_match(
     sample_pdf_bytes: bytes,
     mock_claude_create: Callable[[str], AsyncMock],
 ) -> str:
-    """Create an embedded posting, upload a resume that matches it, return the posting id."""
+    """Make a job with an embedding, upload a resume that matches it and give back the job id."""
     posting = Posting(
         title="Python Developer Co-op",
         company="Acme",
@@ -56,7 +56,7 @@ async def _setup_user_with_match(
 
 
 def _deltas(body: str) -> str:
-    """Join the delta payloads of an SSE body."""
+    """Join the pieces of an SSE body."""
     out = []
     for line in body.splitlines():
         if line.startswith("data: ") and "[DONE]" not in line:
@@ -87,7 +87,7 @@ async def test_ask_streams_response(
     assert resp.text.rstrip().endswith("data: [DONE]")
     assert _deltas(resp.text) == response_text
 
-    # The posting description and resume text are both sent as context
+    # The job description and resume text both get sent as context
     kwargs: dict[str, Any] = stream.call_args.kwargs
     user_content = kwargs["messages"][0]["content"]
     assert "Requires Python, Django and PostgreSQL." in user_content

@@ -1,13 +1,13 @@
 """
-Resume router — upload, view, delete, match results, and streaming Q&A.
+Resume routes for upload, view, delete, matches and the streamed Q and A.
 
-Route order:
-  POST   /api/resume                      upload + match
-  GET    /api/resume                      metadata
-  DELETE /api/resume                      delete
-  GET    /api/resume/matches              stored match results
-  PUT    /api/resume/preferences          save what you're looking for + re-match
-  POST   /api/resume/matches/{posting_id}/ask  SSE stream Q&A
+The routes
+  POST   /api/resume                           upload and match
+  GET    /api/resume                           details about the file
+  DELETE /api/resume                           delete it
+  GET    /api/resume/matches                   saved match results
+  PUT    /api/resume/preferences               save what you want and match again
+  POST   /api/resume/matches/{posting_id}/ask  streamed answers about one job
 """
 
 from uuid import UUID
@@ -56,11 +56,11 @@ async def upload_resume_endpoint(
     creds: AICredentials | None = Depends(ai_credentials("rank", optional=True)),
 ) -> UploadResponse:
     """
-    Upload a resume (PDF/DOCX, ≤5 MB), extract text, run match pipeline,
-    store results, and return ranked matches. With the visitor's AI key (X-AI-* headers) the
-    AI ranks and explains matches; without any key, matches are ranked by skill overlap for
-    free. Only the site owner's fallback key counts toward the daily AI limit.
-    `preferences` (optional) is a JobPreferences JSON object: what the student is looking for.
+    Upload a resume as PDF or DOCX up to 5 MB, read the text, match it and save
+    and return the ranked matches. With the visitor's own AI key the AI ranks and
+    explains the matches. With no key at all we rank by skill overlap for free.
+    Only the owner's backup key counts toward the daily AI limit.
+    `preferences` is optional JSON for what the student is looking for.
     """
     prefs = _parse_preferences(preferences)
     if creds is not None and creds.source == "server":
@@ -87,7 +87,7 @@ async def get_resume_endpoint(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ResumeOut:
-    """Return stored resume metadata for the authenticated user."""
+    """Details about the saved resume for the signed in person."""
     resume = await get_resume(db, current_user.id)
     if resume is None:
         raise HTTPException(
@@ -102,7 +102,7 @@ async def delete_resume_endpoint(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> Response:
-    """Permanently delete the resume and all match results."""
+    """Delete the resume and every match for good."""
     await delete_resume(db, current_user.id)
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
@@ -112,7 +112,7 @@ async def get_matches_endpoint(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> MatchesResponse:
-    """Return stored ranked match results. Empty list if no resume on file."""
+    """Saved ranked matches. An empty list if there is no resume yet."""
     return await get_matches(db, current_user.id)
 
 
@@ -126,14 +126,14 @@ async def ask_about_posting(
     creds: AICredentials = Depends(ai_credentials("chat")),
 ) -> StreamingResponse:
     """
-    Stream a cited Q&A response about a matched posting.
-    Response is text/event-stream with delta chunks ending in [DONE].
+    Stream an answer with sources about one matched job.
+    It is a text/event-stream of small pieces that ends with [DONE].
     """
     from app.agent.resume_qa import stream_answer
     from app.models.match_result import MatchResult
     from app.models.posting import Posting
 
-    # Verify the user has a resume
+    # Make sure they have a resume
     resume = await get_resume(db, current_user.id)
     if resume is None:
         raise HTTPException(
@@ -141,7 +141,7 @@ async def ask_about_posting(
             detail={"detail": "No resume on file.", "code": "RESUME_NOT_FOUND"},
         )
 
-    # Verify posting is in the user's match results
+    # Make sure this job is one of their matches
     match_row = (
         await db.execute(
             select(MatchResult).where(
@@ -156,11 +156,11 @@ async def ask_about_posting(
             detail={"detail": "Posting not in your match results.", "code": "MATCH_NOT_FOUND"},
         )
 
-    # Only the site owner's key is limited; visitors' own keys are theirs to spend
+    # Only the owner's key has a limit. Visitors can spend their own key however they like
     if creds.source == "server":
         await consume_ai_quota(store, current_user.id)
 
-    # Fetch posting description
+    # Get the job description
     posting = (
         await db.execute(select(Posting).where(Posting.id == posting_id))
     ).scalar_one_or_none()
@@ -192,7 +192,7 @@ async def resume_insights(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> ResumeInsights:
-    """Skills found + in-demand skills you're missing (free), plus the cached AI review if any."""
+    """Skills we found and popular skills you are missing for free, plus the saved AI review."""
     return await get_insights(db, await _require_resume(db, current_user))
 
 
@@ -203,7 +203,7 @@ async def generate_resume_insights(
     store: Store = Depends(get_store),
     creds: AICredentials = Depends(ai_credentials("chat")),
 ) -> ResumeInsights:
-    """Run the AI resume review on the visitor's key (strengths, tips, roles) and cache it."""
+    """Run the AI resume review on the visitor's key and save it."""
     resume = await _require_resume(db, current_user)
     if creds.source == "server":
         await consume_ai_quota(store, current_user.id)
@@ -218,9 +218,9 @@ async def update_preferences_endpoint(
     creds: AICredentials | None = Depends(ai_credentials("rank", optional=True)),
 ) -> UploadResponse:
     """
-    Save what the student is looking for (job types, location, work mode, level, keywords)
-    and re-match the stored resume against it. Uses the visitor's own AI key if they set one;
-    otherwise the free ranking, so changing filters never spends the site owner's AI quota.
+    Save what the student wants like job type, place, work mode, level and keywords
+    and match the saved resume again. Uses their own AI key if they set one
+    and the free ranking if not, so changing filters never spends the owner's AI quota.
     """
     resume = await _require_resume(db, current_user)
     if creds is not None and creds.source == "server":
@@ -235,7 +235,7 @@ async def rematch_endpoint(
     store: Store = Depends(get_store),
     creds: AICredentials = Depends(ai_credentials("rank")),
 ) -> UploadResponse:
-    """Re-rank the stored resume against today's postings with the visitor's AI."""
+    """Rank the saved resume against today's jobs again with the visitor's AI."""
     resume = await _require_resume(db, current_user)
     if creds.source == "server":
         await consume_ai_quota(store, current_user.id)

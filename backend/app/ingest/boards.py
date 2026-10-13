@@ -1,21 +1,21 @@
 """
-Company career-board adapters: Greenhouse, Lever, Ashby and SmartRecruiters.
+Career board adapters for Greenhouse, Lever, Ashby and SmartRecruiters.
 
-Hundreds of employers host their careers page on one of these applicant-tracking systems, and
-each offers an official, public, key-free JSON API intended for showing a company's open jobs on
-other sites. CoopRadar uses them to pull *real* postings and always links back to the employer's
+Hundreds of employers run their careers page on one of these hiring systems, and each one
+has an official public JSON API with no key, made for showing a company's open jobs on
+other sites. CoopRadar uses them to pull real jobs and always links back to the employer's
 own page to apply.
 
-source.config:
-  - board:    the company's board name in the URL, e.g. "stripe" (boards.greenhouse.io/stripe)
-  - company:  display name, e.g. "Stripe"
+source.config
+  board     the company's board name in the URL, like "stripe" for boards.greenhouse.io/stripe
+  company   the name we show, like "Stripe"
 
-Which jobs are kept:
-  - Canada: every job whose location matches settings.ingest_location_filter (Canada, Canadian
-    provinces and cities, "Remote - Canada").
-  - United States: settings.ingest_us_jobs, by default only co-op / intern / student / new-grad
-    roles (many Canadian students do a US co-op term). Set it to "all" or "none".
-Anything else (Dublin, London UK, ...) is skipped.
+Which jobs we keep
+  Canada. Every job whose location matches settings.ingest_location_filter, which covers
+  Canada, the provinces, Canadian cities and Remote Canada.
+  United States. Up to settings.ingest_us_jobs, which by default keeps only co-op, intern,
+  student and new grad roles since lots of Canadian students do a US term. Can be "all" or "none".
+Anywhere else, like Dublin or London UK, gets skipped.
 """
 
 import asyncio
@@ -35,7 +35,7 @@ _PROVINCES = {
     "newfoundland": "NL", "prince edward island": "PE",
 }
 _PROVINCE_CODES = set(_PROVINCES.values())
-# Major cities → province, for boards that only give a city ("Toronto")
+# Big cities and their province, for boards that only give a city like "Toronto"
 _CITY_PROVINCE = {
     "toronto": "ON", "waterloo": "ON", "kitchener": "ON", "ottawa": "ON", "guelph": "ON",
     "hamilton": "ON", "mississauga": "ON", "markham": "ON", "oakville": "ON",
@@ -80,10 +80,10 @@ _US_LOCATION = re.compile(
     + "|".join(re.escape(c) for c in sorted(_US_CITY_STATE, key=len, reverse=True) if len(c) > 2)
     + r"|(?-i:(?:^|,\s*)(?:" + "|".join(sorted(_US_CODES)) + r")\b)"
 )
-# A US state code after a comma ("Vancouver, WA") means the US, even for a Canadian-sounding city
+# A US state code after a comma like "Vancouver, WA" means the US even if the city sounds Canadian
 _US_STATE_SUFFIX = re.compile(r"(?-i:,\s*(?:" + "|".join(sorted(_US_CODES - {"CA"})) + r")\b)")
 
-# Python twin of STUDENT_TITLE_PATTERN in app/services/postings.py
+# Python copy of STUDENT_TITLE_PATTERN in app/services/postings.py
 STUDENT_TITLE = re.compile(
     r"(?i)\b(intern|interns|internship|co-?op|student|new grad(uate)?|apprentice|stagiaire)\b"
 )
@@ -92,10 +92,10 @@ _DETAIL_CONCURRENCY = 6
 
 
 def html_to_text(raw: str | None) -> str:
-    """Turn (possibly entity-escaped) job-description HTML into readable plain text."""
+    """Turn job description HTML, even double escaped, into plain readable text."""
     if not raw:
         return ""
-    text = html.unescape(html.unescape(raw))  # Greenhouse double-escapes its HTML
+    text = html.unescape(html.unescape(raw))  # Greenhouse escapes its HTML twice
     text = re.sub(r"(?i)<\s*(br|/p|/div|/li|/h\d)\s*/?>", "\n", text)
     text = re.sub(r"(?i)<\s*li[^>]*>", "• ", text)
     text = re.sub(r"<[^>]+>", "", text)
@@ -111,9 +111,9 @@ def _province(token: str) -> str:
 
 
 def _known_city(token: str) -> str | None:
-    """Canonical name if the token is a known Canadian city ("Toronto Canada" → "Toronto")."""
+    """The proper name if the text is a Canadian city we know. "Toronto Canada" gives "Toronto"."""
     name = re.sub(r"\bcanada\b", "", token, flags=re.IGNORECASE).strip(" ,").lower()
-    if name.startswith("montr"):  # also catches a mis-encoded "Montréal"
+    if name.startswith("montr"):  # also catches a badly encoded "Montréal"
         return "Montréal"
     return name.title() if name in _CITY_PROVINCE else None
 
@@ -122,18 +122,21 @@ _MODE_WORDS = re.compile(r"(?i)^(remote|hybrid|on-?site|in[- ]office|in[- ]perso
 
 
 def _tokens(location: str) -> list[str]:
-    """Location parts, without work-mode words ("Hybrid - New York" -> ["New York"])."""
+    """Location parts without work mode words, so "Hybrid - New York" gives ["New York"]."""
     parts = [t.strip() for t in re.split(r"[,;/|()]| - | or ", location) if t.strip()]
     return [t for t in parts if not _MODE_WORDS.match(t)]
 
 
 def parse_location(location: str) -> tuple[str, str]:
     """
-    Best-effort (city, province) from the free-text location boards publish, e.g.
-      "Toronto, Ontario, Canada" → ("Toronto", "ON")    "Vancouver, BC" → ("Vancouver", "BC")
-      "SEA, SF, NY, Toronto"     → ("Toronto", "ON")    "US / Canada"   → ("Canada", "")
-      "Calgary, Canada; Vancouver, Canada" → ("Calgary", "AB")
-      "Remote Canada"            → ("Remote", "")       "Ontario, Canada" → ("", "ON")
+    Our best guess at city and province from the free text location a board gives us
+      "Toronto, Ontario, Canada"            gives Toronto ON
+      "Vancouver, BC"                       gives Vancouver BC
+      "SEA, SF, NY, Toronto"                gives Toronto ON
+      "US / Canada"                         gives Canada with no province
+      "Calgary, Canada; Vancouver, Canada"  gives Calgary AB
+      "Remote Canada"                       gives Remote with no province
+      "Ontario, Canada"                     gives no city and ON
     """
     loc = (location or "").strip()
     if not loc:
@@ -142,16 +145,16 @@ def parse_location(location: str) -> tuple[str, str]:
     if not tokens:
         return ("Remote", "") if "remote" in loc.lower() else ("", "")
 
-    # "City, Province" — works for any city, known or not ("Lethbridge, AB")
+    # "City, Province" works for any city even ones we do not know, like "Lethbridge, AB"
     if len(tokens) >= 2 and _province(tokens[1]) and not _province(tokens[0]):
         city = _known_city(tokens[0]) or tokens[0]
         return city, _province(tokens[1])
-    # A known Canadian city anywhere in a multi-city list
+    # A Canadian city we know anywhere in a list of cities
     for token in tokens:
         known = _known_city(token)
         if known:
             return known, _CITY_PROVINCE.get(known.lower(), "QC" if known == "Montréal" else "")
-    # Just a province ("Ontario, Canada")
+    # Only a province, like "Ontario, Canada"
     for token in tokens:
         if _province(token):
             return "", _province(token)
@@ -164,16 +167,18 @@ def parse_location(location: str) -> tuple[str, str]:
 
 def _state(token: str) -> str:
     t = token.strip()
-    if t in _US_CODES:  # codes are upper case on every board; "in" or "or" are not states
+    if t in _US_CODES:  # every board writes codes in capitals, so "in" or "or" are not states
         return t
     return _US_STATES.get(t.lower(), "")
 
 
 def parse_us_location(location: str) -> tuple[str, str]:
     """
-    Best-effort (city, state) for a US location:
-      "San Francisco, CA" → ("San Francisco", "CA")    "New York City" → ("New York City", "NY")
-      "Seattle, Washington, USA" → ("Seattle", "WA")   "Remote - US" → ("Remote", "")
+    Our best guess at city and state for a US location
+      "San Francisco, CA"          gives San Francisco CA
+      "New York City"              gives New York City NY
+      "Seattle, Washington, USA"   gives Seattle WA
+      "Remote - US"                gives Remote with no state
     """
     loc = (location or "").strip()
     if re.search(r"(?i)washington,?\s*d\.?\s?c\b", loc):
@@ -215,17 +220,17 @@ def _is_canadian(location: str) -> bool:
 
 def _pick_location(*locations: str) -> str | None:
     """
-    The first of a job's locations in Canada (the one to display), or None. A role listed as
-    "London" + "Remote, Canada" is shown as the Canadian option, never mislabelled as London, ON.
+    The first of a job's locations that is in Canada, which is the one we show, or None.
+    A role listed as "London" and "Remote, Canada" shows as the Canadian one and never as London ON.
     """
     return next((loc for loc in locations if _is_canadian(loc)), None)
 
 
 def choose_location(title: str, *locations: str) -> tuple[str, str] | None:
     """
-    (location to display, country) for a job, or None to skip it. Canadian locations win; a US
-    location is used only when settings.ingest_us_jobs allows this job ("students" = the title
-    is a co-op / intern / student / new-grad role).
+    The location to show and the country for a job, or None to skip it. Canadian places win.
+    A US place is only used when settings.ingest_us_jobs allows this job, where "students"
+    means the title is a co-op, intern, student or new grad role.
     """
     canadian = _pick_location(*locations)
     if canadian is not None:
@@ -241,7 +246,7 @@ def _parse_dt(value: Any) -> datetime | None:
     if value is None or value == "":
         return None
     if isinstance(value, (int, float)) or (isinstance(value, str) and value.isdigit()):
-        return datetime.fromtimestamp(int(value) / 1000, tz=UTC)  # Lever: epoch milliseconds
+        return datetime.fromtimestamp(int(value) / 1000, tz=UTC)  # Lever sends epoch milliseconds
     try:
         return datetime.fromisoformat(str(value).replace("Z", "+00:00"))
     except ValueError:
@@ -262,7 +267,7 @@ async def _get_json(client: httpx.AsyncClient, url: str) -> Any:
 
 
 class _BoardAdapter(BaseAdapter):
-    """Shared HTTP + config handling for the career-board APIs."""
+    """HTTP and config handling shared by all the career board APIs."""
 
     url_template: str = ""
 
@@ -283,7 +288,7 @@ class _BoardAdapter(BaseAdapter):
     async def collect(
         self, client: httpx.AsyncClient, board: str, company: str
     ) -> list[RawPosting | None]:
-        """Default: one request returns every job with its description."""
+        """By default one request gets every job with its description."""
         data = await _get_json(client, self.url_template.format(board=board))
         return self.parse(data, company)
 
@@ -308,7 +313,7 @@ class _BoardAdapter(BaseAdapter):
             city=city or ("United States" if country == "US" else "Canada"),
             province=province,
             country=country,
-            term="",  # filled from the title/description by extract_fields ("Winter 2027")
+            term="",  # extract_fields fills this from the title or description like "Winter 2027"
             work_mode=work_mode,
             deadline=deadline,
             description=description,
@@ -321,7 +326,7 @@ class _BoardAdapter(BaseAdapter):
 async def _details(
     client: httpx.AsyncClient, urls: list[str]
 ) -> list[Any]:
-    """Fetch several detail pages a few at a time; a failed one comes back as None."""
+    """Get a few detail pages at a time. One that fails comes back as None."""
     gate = asyncio.Semaphore(_DETAIL_CONCURRENCY)
 
     async def one(url: str) -> Any:
@@ -336,8 +341,8 @@ async def _details(
 
 class GreenhouseAdapter(_BoardAdapter):
     """
-    Lists the board without descriptions (big boards are 30 MB with them), keeps the jobs in
-    Canada / allowed US ones, then fetches only those jobs' descriptions.
+    Lists the board without descriptions since big boards are 30 MB with them, keeps the jobs
+    in Canada and the US ones we allow, then gets descriptions only for those jobs.
     """
 
     url_template = "https://boards-api.greenhouse.io/v1/boards/{board}/jobs"
@@ -361,7 +366,9 @@ class GreenhouseAdapter(_BoardAdapter):
             deadline = _parse_dt(job.get("application_deadline"))
             out.append(self._posting(
                 title=job.get("title", ""),
-                company=job.get("company_name") or company,
+                # Our own name from the seed list. Greenhouse's company_name is sometimes a board
+                # label like "Astera Labs Early Career - North America 2027"
+                company=company,
                 picked=picked,
                 work_mode=_work_mode(picked[0]),
                 description=html_to_text((detail or {}).get("content")),
@@ -431,8 +438,8 @@ class AshbyAdapter(_BoardAdapter):
 
 class SmartRecruitersAdapter(_BoardAdapter):
     """
-    SmartRecruiters' public Posting API: pages of 100 job summaries, then one request per kept
-    job for its description. Board = the company identifier (jobs.smartrecruiters.com/<board>).
+    The SmartRecruiters public Posting API. Pages of 100 job summaries, then one request per job
+    we keep to get its description. Board is the company id from jobs.smartrecruiters.com/<board>.
     """
 
     url_template = "https://api.smartrecruiters.com/v1/companies/{board}/postings?limit=100&offset={offset}"
@@ -482,7 +489,7 @@ class SmartRecruitersAdapter(_BoardAdapter):
             )
             out.append(self._posting(
                 title=job.get("name", ""),
-                company=company,  # the API's name can be a parent company ("General Dynamics UK")
+                company=company,  # the API name can be a parent company like "General Dynamics UK"
                 picked=picked,
                 work_mode=_work_mode(picked[0], hint),
                 description=description,

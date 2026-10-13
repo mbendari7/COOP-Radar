@@ -1,13 +1,13 @@
 /**
- * Shared fetch helper for every API call.
+ * The one fetch helper every API call uses.
  *
- * - Always sends cookies (`credentials: 'include'`) so the HTTP-only session works.
- * - Turns error responses into an ApiError carrying the backend's error shape:
- *     { "detail": "Human-readable message", "code": "SNAKE_CASE" }
- *   (FastAPI's 422 validation errors have a list `detail`; those get code VALIDATION_ERROR.)
+ * It always sends cookies so the HTTP only session works.
+ * It turns error replies into an ApiError with the backend's error shape
+ *     { "detail": "Message a person can read", "code": "SNAKE_CASE" }
+ * FastAPI's 422 errors have a list in detail and those get the code VALIDATION_ERROR.
  */
 
-// Empty = same origin: the Vite dev server proxies /api to the backend.
+// Empty means same origin. The Vite dev server passes /api on to the backend
 export const API_BASE: string = import.meta.env.VITE_API_URL ?? ''
 
 export class ApiError extends Error {
@@ -22,7 +22,7 @@ export class ApiError extends Error {
   }
 }
 
-/** Build an ApiError from a failed Response, tolerating any body shape. */
+/** Build an ApiError from a failed response, whatever shape the body has. */
 export async function toApiError(res: Response): Promise<ApiError> {
   const body: unknown = await res.json().catch(() => null)
   if (body && typeof body === 'object' && 'detail' in body) {
@@ -30,7 +30,7 @@ export async function toApiError(res: Response): Promise<ApiError> {
     if (Array.isArray(detail)) {
       return new ApiError(res.status, 'VALIDATION_ERROR', 'Some fields are invalid.')
     }
-    // Older nested shape: { detail: { detail, code } }
+    // The older nested shape { detail: { detail, code } }
     if (detail && typeof detail === 'object') {
       const nested = detail as { detail?: unknown; code?: unknown }
       return new ApiError(res.status, String(nested.code ?? `HTTP_${res.status}`), String(nested.detail ?? ''))
@@ -41,8 +41,8 @@ export async function toApiError(res: Response): Promise<ApiError> {
 }
 
 /**
- * fetch() wrapper: prefixes API_BASE, includes cookies, sets the JSON header when a
- * JSON body is given, throws ApiError on non-2xx, and parses JSON (undefined for 204).
+ * A wrapper around fetch(). Adds API_BASE, sends cookies, sets the JSON header when there
+ * is a JSON body, throws ApiError when the answer is not 2xx and reads the JSON. 204 gives undefined.
  */
 export async function apiFetch<T>(
   path: string,

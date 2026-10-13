@@ -1,9 +1,9 @@
 """
-Per-user daily limit on AI-backed actions (resume uploads and Q&A questions).
+A daily limit per person on actions that use the owner's AI, like resume uploads and questions.
 
-On a public site every Claude/OpenAI call is billed to the site owner, so each user
-gets AI_DAILY_LIMIT actions per UTC day (0 = unlimited). Counters live in the session
-store (app/store.py).
+On a public site every call on the owner's key costs the owner money, so each person
+gets AI_DAILY_LIMIT actions per UTC day. 0 means no limit. The counters live in the
+session store (app/store.py).
 """
 
 from datetime import UTC, datetime
@@ -14,11 +14,11 @@ from fastapi import HTTPException, status
 from app.config import get_settings
 from app.store import Store
 
-_KEY_TTL = 60 * 60 * 48  # keep counters a little past the day they belong to
+_KEY_TTL = 60 * 60 * 48  # keep counters a little past the day they are for
 
 
 async def consume_ai_quota(store: Store, user_id: UUID) -> None:
-    """Count one AI action for this user; raise 429 AI_LIMIT_REACHED when over the limit."""
+    """Count one AI action for this person. Answers 429 AI_LIMIT_REACHED when over the limit."""
     limit = get_settings().ai_daily_limit
     if limit <= 0:
         return

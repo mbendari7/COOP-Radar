@@ -30,7 +30,8 @@ account.
 
 ## 2. Find jobs
 
-The **Find jobs** page works like Indeed or LinkedIn.
+The **Find jobs** page works like Indeed or LinkedIn. The look is borrowed from a Canadian post office: a red bar
+at the top, plain white rows split by thin lines, and a round **postmark** on every job.
 
 **Search bar.** Type a job title, keyword or company in the first box ("data analyst", "React", "Shopify"), pick a
 province or state in the second, and click **Find jobs**.
@@ -47,13 +48,17 @@ or major, your graduation year, province or state and city, date posted, term an
 Every filter you turn on shows up as a small tag above the results; click its **x** to remove it, or
 **Clear all**.
 
-**Reading a job.** On a computer, click a job in the list and its details open on the right: who it's for (the
-programs and graduation years the description mentions), the skills it mentions, and the full description. Click
-**Apply on (company)'s site** to apply. On a phone, tapping a job opens its own page.
+**Reading a job.** On a computer, click a job in the list and its details open on the right. You see a row of
+facts (type, term, length, when it was posted, the deadline), a bar showing **how many days are left to apply**,
+who it's for (the programs and graduation years the description mentions), the skills it mentions, and the full
+description. Click **Apply on (company)'s site** to apply. On a phone, tapping a job opens its own page.
 
-Tags on each job tell you at a glance: **Co-op**, **Internship** or **New grad**, the term ("Summer 2027"),
+Each job in the list shows at a glance: **Co-op**, **Internship** or **New grad**, the term ("Summer 2027"),
 **Grads 2027** when the posting says which graduation years it wants, and a few of the skills. **New** means it
-was posted in the last three days.
+was posted in the last three days. The **postmark** on the right shows the city and the day the job was posted.
+It turns red on the job you're looking at.
+
+Some career pages don't give a deadline. Then the deadline is our guess and the page says so.
 
 CoopRadar never applies for you. You always apply on the employer's own website.
 
@@ -65,7 +70,7 @@ Click **Match my resume** at the top. There are three short steps.
 
 ### Step 1: About you
 - **Program or major**, **Degree** and **Graduating in**. Leave them on *Read it from my resume* and CoopRadar reads
-  them from the education section of your resume. After you upload, a blue box shows what it found, for example
+  them from the education section of your resume. After you upload, a box with a blue border shows what it found, for example
   "Computer Science, Bachelor's, graduating 2028". If it got something wrong, pick the right answer.
 - **Looking for**: *Co-op or internship* (most students), *Co-op, internship or entry-level*, or *Any level*.
 - **Co-op term** (optional): the term you want, like "Summer 2027". Jobs for that term are ranked higher.
@@ -81,11 +86,11 @@ job title or keywords ("data analyst"), a province, and a work mode.
 Drag your resume onto the box, or click to choose it. PDF or Word, up to 5 MB.
 
 You don't need to sign up. The site makes you a **private temporary account** that's kept for 7 days. To keep it,
-click **Keep my account** in the yellow bar and add an email and password.
+click **Keep my account** in the light blue strip under the top bar and add an email and password.
 
 ### Your results
 **Jobs that fit your resume** shows your 20 best matches, best first. Each one has:
-- a **score out of 100**. Skills count the most; the rest comes from the job being a co-op or internship, naming
+- a **score out of 100**, shown in a round stamp (red for a strong match). Skills count the most. The rest comes from the job being a co-op or internship, naming
   your program, wanting your graduation year, and being for the term you picked. Only a job that fits on every
   count gets 100.
 - **Why it fits**, in plain words, taken from the job description: "Internship", "Asks for Computer Science /
@@ -108,7 +113,8 @@ ask for most that your resume doesn't show.
 
 Click the bookmark on any job (or **Save to tracker**). The **Tracker** page lets you move each job through
 *Applying, Applied, Interview, Offer*, add notes and dates, see deadlines coming up this week, and export
-everything to a spreadsheet.
+everything to a spreadsheet. Switch between **List** and **Board**. On the board you drag a job from one column
+to the next.
 
 ---
 
@@ -175,7 +181,8 @@ Want it on the internet for others? See **Host it for free** in the [main README
 
 | What you see | What to do |
 |---|---|
-| The site takes a minute to load | It was asleep (free hosting). Wait a minute; it's quick after that. |
+| The site takes a minute to load | It was asleep (free hosting). Wait a minute. It's quick after that. |
+| "The jobs didn't load" on a site you host yourself | Wait a minute and click **Try again** (the server may be waking up). If it never works, open `vercel.json` and check the `/api` line ends with `/api/:path*`, like `https://your-site.onrender.com/api/:path*`. See **Host it for free** in the [main README](../../README.md#host-it-for-free). |
 | "Could not extract text" | Your PDF is probably a scanned image. Export it again from Word or Google Docs. |
 | "That file is over 5 MB" | Export a smaller PDF (remove photos). |
 | "We read your resume" got my program wrong | Pick the right one in **About you** and click **Update my matches**. |

@@ -1,13 +1,13 @@
 """
-Saved postings business logic.
+The logic for saved jobs.
 
-All DB work happens here — routers are thin wrappers.
-Design decisions:
-- save_posting uses INSERT … ON CONFLICT DO NOTHING (idempotent, FR-007)
-- list_saved JOINs posting in one query; events are loaded via selectin
-- status_counts come from a GROUP BY on all user's saved postings (not the current page)
-- update_status auto-creates an ApplicationEvent for every change
-- export_csv streams a CSV built with pandas for the user's full tracker data
+All the database work happens here and the routers just call it.
+A few choices worth knowing
+  save_posting uses INSERT ON CONFLICT DO NOTHING so saving twice is safe
+  list_saved joins the job in one query and loads events with selectin
+  status_counts come from a GROUP BY over all their saved jobs and not just this page
+  update_status logs an ApplicationEvent for every change
+  export_csv builds a CSV of their whole tracker with pandas
 """
 
 import io
@@ -29,7 +29,7 @@ from app.schemas.saved_posting import (
     SavedPostingsPage,
 )
 
-# Statuses where the deadline no longer matters to the student
+# Stages where the deadline does not matter to the student anymore
 _CLOSED_STATUSES = [
     ApplicationStatus.offer,
     ApplicationStatus.rejected,
@@ -45,9 +45,9 @@ async def list_saved(
     page_size: int,
 ) -> SavedPostingsPage:
     """
-    Return paginated saved postings for a user, joined with the posting data.
-    Events are loaded via selectin (avoids N+1).
-    Includes deadlines this week and stats in the response.
+    A page of saved jobs for a person with the job data joined in.
+    Events load with selectin so we avoid one query per row.
+    Also sends this week's deadlines and the stats.
     """
     from sqlalchemy.orm import selectinload
 
@@ -75,12 +75,12 @@ async def list_saved(
     )
     rows = (await db.execute(stmt)).scalars().all()
 
-    # Status counts across ALL saved postings (not filtered subset)
+    # Status counts across every saved job and not just the filtered ones
     counts_stmt = (
         select(
             case(
                 (SavedPosting.status.is_(None), "none"),
-                # Cast the enum to text so both CASE branches have the same type
+                # Cast the enum to text so both CASE branches are the same type
                 else_=cast(SavedPosting.status, String),
             ).label("s"),
             func.count().label("n"),
@@ -96,9 +96,9 @@ async def list_saved(
     for s, n in counts_rows:
         status_counts[str(s)] = n
 
-    # Deadlines within the next 7 days (all saved postings, not just current page).
-    # deadline is a DATE column, so compare against dates. Postings with no status
-    # (NULL) must be included explicitly — NULL NOT IN (...) is NULL, not TRUE.
+    # Deadlines in the next 7 days across every saved job, not just this page.
+    # deadline is a DATE column so compare it to dates. Jobs with no status (NULL)
+    # have to be added on purpose because NULL NOT IN (...) is NULL and not TRUE
     today = date.today()
     week_end = today + timedelta(days=7)
     deadlines_stmt = (
@@ -158,13 +158,13 @@ async def save_posting(
     posting_id: UUID,
 ) -> tuple[SavedPosting, bool]:
     """
-    Bookmark a posting for a user.
+    Save a job for a person.
 
-    Idempotent — if the (user_id, posting_id) pair already exists, returns
-    the existing record without error (FR-007).
+    Safe to repeat. If they already saved it we just give back the one
+    that is there with no error.
 
-    Returns (saved_posting, created: bool).
-    Raises 404 if the posting_id doesn't exist.
+    Gives back the saved job and whether it was new.
+    Answers 404 if the job does not exist.
     """
     posting = (
         await db.execute(select(Posting).where(Posting.id == posting_id))
@@ -207,7 +207,7 @@ async def unsave_posting(
     user_id: UUID,
     saved_posting_id: UUID,
 ) -> None:
-    """Remove a saved posting (and all its events via CASCADE)."""
+    """Unsave a job and its events go with it."""
     row = (
         await db.execute(
             select(SavedPosting).where(
@@ -236,9 +236,9 @@ async def update_status(
     event_date: date | None = None,
 ) -> SavedPosting:
     """
-    Update (or clear) the application status on a saved posting.
-    Automatically creates an ApplicationEvent for every status change.
-    Raises 404 if not found or owned by another user.
+    Change or clear the application status on a saved job.
+    Logs an ApplicationEvent for every change.
+    Answers 404 if it is not there or belongs to someone else.
     """
     row = (
         await db.execute(
@@ -258,7 +258,7 @@ async def update_status(
     row.status = new_status
     row.last_status_at = datetime.now(UTC)
 
-    # Record the status change in the event history (skip if clearing status)
+    # Log the change in the history unless they are clearing the status
     if new_status is not None:
         event = ApplicationEvent(
             saved_posting_id=row.id,
@@ -282,8 +282,8 @@ async def add_event(
     event_date: date | None,
 ) -> SavedPosting:
     """
-    Manually add a status event (e.g. note an interview date retroactively).
-    Also updates the current status on the SavedPosting.
+    Add a status event by hand, like noting an interview date after the fact.
+    This also changes the current status on the saved job.
     """
     return await update_status(db, user_id, saved_posting_id, new_status, notes, event_date)
 
@@ -293,12 +293,12 @@ async def export_csv(
     user_id: UUID,
 ) -> bytes:
     """
-    Build a CSV file of the user's full tracker data using pandas.
-    Returns raw bytes ready to be streamed as a file download.
+    Build a CSV of the person's whole tracker with pandas.
+    Gives back raw bytes ready to download.
     """
-    import pandas as pd  # local import keeps pandas off the hot path of other endpoints
+    import pandas as pd  # imported here so pandas does not slow down other endpoints
 
-    # Fetch all saved postings with their posting data
+    # Get every saved job with its job data
     from sqlalchemy.orm import selectinload
 
     stmt = (

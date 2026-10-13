@@ -1,8 +1,8 @@
-/** Small badge for jobs imported live from an employer's own career board. */
+/** A small mark for jobs that come live from an employer's own career board. */
 export default function LiveBadge() {
   return (
     <span
-      className="ml-2 align-middle inline-block text-[10px] font-semibold uppercase tracking-wide px-1.5 py-0.5 rounded bg-blue-50 text-blue-800 border border-blue-200"
+      className="label-form ml-2 inline-block rounded-sm border border-air-700 px-1.5 py-px align-middle !text-[10px] !text-air-700"
       title="Imported from the employer's own careers page. You apply there."
     >
       Live

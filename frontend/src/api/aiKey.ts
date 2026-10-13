@@ -1,10 +1,10 @@
 /**
- * The visitor's own AI key ("bring your own key").
+ * The visitor's own AI key.
  *
- * - Lives only in this browser: sessionStorage by default (gone when the tab closes), or
- *   localStorage if the visitor ticks "Remember on this device".
- * - Sent only with AI requests (resume matching + Q&A) as X-AI-* headers. The server forwards
- *   it to the provider for that one request and never stores it.
+ * It lives only in this browser. sessionStorage by default so it is gone when the tab closes,
+ * or localStorage if the visitor ticks Remember on this device.
+ * It only goes along with AI requests like matching and questions, as X-AI headers. The server
+ * passes it to the provider for that one request and never keeps it.
  */
 
 import { useMutation } from '@tanstack/react-query'
@@ -28,11 +28,11 @@ function read(): SavedAiKey | null {
     const raw = sessionStorage.getItem(STORAGE_KEY) ?? localStorage.getItem(STORAGE_KEY)
     return raw ? (JSON.parse(raw) as SavedAiKey) : null
   } catch {
-    return null // storage blocked (private mode) or corrupt value
+    return null // storage is blocked in private mode or the value is broken
   }
 }
 
-// useSyncExternalStore needs a stable snapshot; cache the parsed value per raw string
+// useSyncExternalStore needs a steady snapshot so we cache the parsed value for each raw string
 let cachedRaw: string | null = null
 let cachedValue: SavedAiKey | null = null
 function snapshot(): SavedAiKey | null {
@@ -64,7 +64,7 @@ function clearStorage(): void {
     sessionStorage.removeItem(STORAGE_KEY)
     localStorage.removeItem(STORAGE_KEY)
   } catch {
-    // ignore
+    // nothing to do if storage is blocked
   }
 }
 
@@ -82,12 +82,12 @@ function subscribe(onChange: () => void): () => void {
   }
 }
 
-/** The saved key (or null), re-rendering when it changes anywhere in the app. */
+/** The saved key or null. Redraws whenever it changes anywhere in the app. */
 export function useAiKey(): SavedAiKey | null {
   return useSyncExternalStore(subscribe, snapshot, () => null)
 }
 
-/** Headers for AI requests; empty when no key is saved (the server may then use its own). */
+/** Headers for AI requests. Empty when no key is saved, and then the server may use its own. */
 export function aiHeaders(): Record<string, string> {
   const key = read()
   return key
@@ -95,7 +95,7 @@ export function aiHeaders(): Record<string, string> {
     : {}
 }
 
-// ── Check a key with its provider ─────────────────────────────────────────────
+// Checking a key with its provider
 
 export interface AiModelOption {
   id: string
@@ -115,7 +115,7 @@ export function useCheckAiKey() {
   })
 }
 
-// ── How to get a key, per provider ───────────────────────────────────────────
+// How to get a key from each provider
 
 export interface ProviderGuide {
   id: AiProvider

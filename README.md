@@ -35,7 +35,19 @@ python start.py      # sets everything up the first time, then opens http://loca
 | **Co-op matching** | One SQL query filters out jobs for other graduation years and other fields (job types follow the student's program), then scores skills, student roles, program, graduation year and wanted term. Top 20, each with plain "why it fits" reasons and the skills they have or are missing. |
 | **Resume feedback** | Skills employers can see on the resume, and the most-requested skills it's missing. Free. |
 | **AI, bring your own key** | Resume review, AI re-ranking, per-job tailoring plans, cover letter openers and cited Q&A, streamed. The key stays in the visitor's browser. |
-| **Tracker** | Save jobs, move them through statuses with dated notes, deadlines this week, CSV export. |
+| **Tracker** | Save jobs, move them through statuses with dated notes, deadlines this week, CSV export. List or drag and drop board. |
+
+## Design
+
+CoopRadar looks like a Canadian post office, not a template job board. A postal red top bar, airmail blue for
+links and anything picked, white rows split by thin ink rules instead of rounded cards, square corners, and narrow
+capital labels like a customs form, set in Archivo. Every job wears a round **postmark** with its city and the
+day it was posted, which stamps red when you pick the job. Match scores use the same stamp, and the time left to
+apply is drawn as a bar to scale.
+
+The tokens live in `frontend/tailwind.config.ts`, the shared buttons, fields and chips in `frontend/src/index.css`,
+and the reasons behind each choice in [`DESIGN.md`](DESIGN.md). Product facts the design worked from are in
+[`PRODUCT.md`](PRODUCT.md).
 
 ## How it works
 
@@ -81,10 +93,10 @@ The full walkthrough is in **[How it works](guides/how-it-works/README.md)**.
 |---|---|
 | Frontend | **React 18**, **TypeScript**, **Vite**, **Tailwind CSS**, **TanStack Query** and **TanStack Table**, **React Router**, dnd-kit, types generated from the API's OpenAPI schema |
 | Backend | **Python 3.12**, **FastAPI**, **Pydantic v2**, **SQLAlchemy 2.0** (async, typed), asyncpg, httpx, argon2, pypdf, python-docx |
-| Database | **PostgreSQL 16**: generated `tsvector` + GIN full-text search, array overlap, title regex, JSONB, **pgvector** (optional smart search); **Alembic** migrations `0001`–`0010` |
+| Database | **PostgreSQL 16**: generated `tsvector` + GIN full-text search, array overlap, title regex, JSONB, **pgvector** (optional smart search); **Alembic** migrations `0001` to `0010` |
 | Background work | asyncio tasks inside the web process with a 6-hourly scheduler; no separate worker or queue |
 | AI | Bring your own key: Claude, ChatGPT or Gemini via their official SDKs; Server-Sent Events streaming |
-| Testing | **pytest** (~290 tests, incl. a p95 < 300 ms budget on 10,000 jobs), **Vitest** + Testing Library (42), **Playwright** end-to-end in a real browser (7) |
+| Testing | **pytest** (~290 tests, incl. a p95 < 300 ms budget on 10,000 jobs), **Vitest** + Testing Library (45), **Playwright** end-to-end in a real browser (7) |
 | Quality | ruff, mypy `--strict`, ESLint, `tsc`; OpenAPI types checked for drift |
 | Delivery | **GitHub Actions** CI (lint, types, migration round-trip, tests, then boots the real site and runs Playwright against it); **Render** + **Neon** free hosting; optional **Vercel** front |
 
@@ -132,14 +144,18 @@ The best free setup, at no cost and with no credit card:
    your copy of this repo. Render reads `render.yaml`.
 3. When it asks for settings, paste the Neon string into **`DATABASE_URL`**. Leave `ANTHROPIC_API_KEY` and
    `OPENAI_API_KEY` blank: visitors bring their own AI key. Click **Apply**.
-4. Wait about 5–10 minutes for the first build. Your site is at `https://coopradar-xxxx.onrender.com`. Within a few
+4. Wait about 5 to 10 minutes for the first build. Your site is at `https://coopradar-xxxx.onrender.com`. Within a few
    minutes it imports ~2,800 jobs.
 5. **Keep jobs fresh.** On GitHub: your repo, **Settings**, **Secrets and variables**, **Actions**, **Variables**,
    **New repository variable**: name `SITE_URL`, value your Render address (no trailing slash). The *Refresh jobs*
    workflow then wakes the site every 6 hours.
-6. **Optional: Vercel.** Edit the `destination` in `vercel.json` to your Render address and commit. At
-   [vercel.com](https://vercel.com), **Add New**, **Project**, import the repo, **Deploy**. Visitors use the
-   `*.vercel.app` address; `/api` is forwarded to Render, so logins keep working.
+6. **Optional: Vercel.** In `vercel.json`, change the `/api` `destination` to your Render address **and keep
+   `/api/:path*` on the end**, for example `"destination": "https://coopradar-xxxx.onrender.com/api/:path*"`.
+   Commit and push. At [vercel.com](https://vercel.com), **Add New**, **Project**, import the repo, **Deploy**.
+   Visitors use the `*.vercel.app` address and `/api` is forwarded to Render, so logins keep working.
+7. **Check it.** Open `https://<your-project>.vercel.app/api/postings?page_size=10`. You should see JSON with
+   `items`. If you see a web page instead, the `/api/:path*` ending is missing and the jobs page will say the jobs
+   didn't load.
 
 **What "free" means here:** the first visit after the site has been idle for ~15 minutes waits about a minute while
 Render wakes it up. Before a demo or interview, open the site a minute early. For an always-on site, Render's
@@ -186,6 +202,7 @@ Errors are always `{"detail": "...", "code": "SNAKE_CASE"}`. AI routes read `X-A
 ```
 COOP-Radar/
 ├── README.md                     This file
+├── PRODUCT.md · DESIGN.md        Who it's for · the postal design system
 ├── guides/
 │   ├── using-coopradar/          For visitors: use it, run it, troubleshoot
 │   └── how-it-works/             For the builder: stack, flow, testing, hosting, interview prep
@@ -199,7 +216,7 @@ COOP-Radar/
 │   │   ├── services/             postings, resume (matching), education, categories, insights, auth, ...
 │   │   ├── ingest/               boards.py (Greenhouse/Lever/Ashby/SmartRecruiters), runner, dedup, skill_match
 │   │   ├── schemas/ · models/ · agent/ · ai.py · jobs.py · store.py
-│   ├── alembic/versions/         0001–0010
+│   ├── alembic/versions/         0001 to 0010
 │   ├── seed/                     skills · job_boards (~120 employers) · sample postings
 │   └── tests/                    api/ · ingest/ · resume/ · eval/ · perf/
 └── frontend/
@@ -228,6 +245,7 @@ governed by `.specify/memory/constitution.md` (filter in SQL, every endpoint has
 - [x] Search and tracker · ingestion · resume matching · bring-your-own-key AI
 - [x] One command to run (`python start.py`), free hosting (Render + Neon + GitHub Actions), optional Vercel front
 - [x] Job-board redesign; co-op matching by program, graduation year and term; ~120 employers; US internships; Playwright
+- [x] Postal look (postmarks, no card boxes, Archivo), plain language comments across the code
 - [ ] Email alerts for new matches · school job boards with public feeds · learning from which jobs students save
 
 ## License

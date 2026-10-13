@@ -1,4 +1,4 @@
-"""KVEntry ORM model — login sessions and counters when Redis isn't configured (app/store.py)."""
+"""Login sessions and counters when there is no Redis (see app/store.py)."""
 
 from datetime import datetime
 from typing import Any

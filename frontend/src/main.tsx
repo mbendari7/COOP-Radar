@@ -5,8 +5,8 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import './index.css'
 
-// Shared QueryClient — staleTime 30s keeps the postings list fresh without
-// hammering the API on every tab focus.
+// One shared QueryClient. A 30 second staleTime keeps the job list fresh without
+// hitting the API every time you come back to the tab
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

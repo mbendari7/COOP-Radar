@@ -1,9 +1,9 @@
 """
-Seed the skills taxonomy (~110 entries, editable here).
+The list of skills we look for, about 110 of them. Edit it right here.
 
-Re-running updates aliases/categories of existing skills, so edits here reach a
-deployed database on the next start. Keep aliases specific: a broad alias like
-"security" or "http" tags almost every job description with the wrong skill.
+Running it again updates the aliases and categories of skills already there, so edits
+reach a live database on the next start. Keep aliases specific. A broad alias like
+"security" or "http" would tag almost every job with the wrong skill.
 """
 
 import asyncio
@@ -56,7 +56,7 @@ SKILLS = [
     ("Elasticsearch", ["elastic search", "opensearch"], "Tool"),
     ("Cassandra", ["apache cassandra"], "Tool"),
     ("DynamoDB", ["dynamo db", "aws dynamodb"], "Tool"),
-    # DevOps / Infra
+    # DevOps and infrastructure
     ("Docker", ["containerization", "docker compose"], "Tool"),
     ("Kubernetes", ["k8s", "kubectl", "helm"], "Tool"),
     ("Git", ["github", "gitlab", "version control"], "Tool"),
@@ -69,7 +69,7 @@ SKILLS = [
     ("Jenkins", ["jenkins pipeline"], "Tool"),
     ("GitHub Actions", ["github ci", "gha"], "Tool"),
     ("GitLab CI", ["gitlab pipeline"], "Tool"),
-    # Data / ML
+    # Data and ML
     ("Machine Learning", ["ml", "supervised learning"], "Domain"),
     ("Deep Learning", ["neural networks", "neural network"], "Domain"),
     ("TensorFlow", ["tf", "tensorflow 2"], "Framework"),
@@ -83,7 +83,7 @@ SKILLS = [
     ("NLP", ["natural language processing", "text mining"], "Domain"),
     ("Computer Vision", ["image recognition", "object detection"], "Domain"),
     ("LLMs", ["large language models", "large language model", "llm"], "Domain"),
-    # Embedded / Hardware
+    # Embedded and hardware
     ("Embedded Systems", ["embedded software", "bare metal"], "Domain"),
     ("RTOS", ["real time os", "freertos", "zephyr"], "Tool"),
     ("PCB Design", ["pcb", "schematic design", "altium", "kicad"], "Domain"),
@@ -97,7 +97,7 @@ SKILLS = [
     ("ARM", ["arm cortex", "arm microcontroller"], "Hardware"),
     ("STM32", ["stm32 microcontroller", "stm32cubemx"], "Hardware"),
     ("Arduino", ["arduino uno", "arduino ide"], "Hardware"),
-    # Networking / Security
+    # Networking and security
     ("REST API", ["restful api", "http api", "openapi"], "Domain"),
     ("GraphQL", ["graphql api", "apollo graphql"], "Domain"),
     ("WebSockets", ["websocket", "real-time communication"], "Domain"),
@@ -105,7 +105,7 @@ SKILLS = [
     ("Networking", ["tcp/ip", "computer networking", "network protocols"], "Domain"),
     ("Cybersecurity", ["cyber security", "infosec", "penetration testing", "owasp"], "Domain"),
     ("Cryptography", ["encryption", "tls", "ssl"], "Domain"),
-    # Project / Process
+    # Project and process
     ("Agile", ["scrum", "kanban", "sprint"], "Process"),
     ("JIRA", ["jira software"], "Tool"),
     ("Confluence", ["atlassian confluence"], "Tool"),
@@ -120,7 +120,7 @@ SKILLS = [
     ("Selenium", ["selenium webdriver", "browser testing"], "Tool"),
     ("Jest", ["jest testing", "vitest"], "Tool"),
     ("pytest", ["pytest-asyncio", "python testing"], "Tool"),
-    # Miscellaneous
+    # Everything else
     ("Microservices", ["microservice", "service mesh"], "Domain"),
     ("System Design", ["distributed systems", "software architecture"], "Domain"),
     ("Data Structures", ["data structures and algorithms", "algorithms", "competitive programming"], "Domain"),

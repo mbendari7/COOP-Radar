@@ -1,12 +1,12 @@
 /**
- * RichText — renders the small subset of Markdown the AI assistant uses:
- * "## Heading" lines, "- " / "* " / "• " bullets, **bold**, and the "Resume: " / "Posting: "
- * citation prefixes (bolded). Everything is rendered as text — never as HTML.
+ * Draws the little bit of Markdown the AI helper uses. Heading lines that start with ##,
+ * bullet lines, **bold** words, and the Resume and Posting source labels in bold.
+ * Everything is drawn as text and never as HTML.
  */
 
 import type { ReactNode } from 'react'
 
-/** Bold "**x**" spans and the "Resume: " / "Posting: " citation prefixes. */
+/** Bold **x** words and the Resume and Posting source labels. */
 function inline(text: string, key: string): ReactNode[] {
   return text.split(/(\*\*[^*]+\*\*|(?:Resume|Posting):\s)/g).map((part, i) => {
     if (/^\*\*[^*]+\*\*$/.test(part)) return <strong key={`${key}-${i}`}>{part.slice(2, -2)}</strong>

@@ -1,4 +1,4 @@
-/** Browsing jobs like a job board: search, quick filters, all filters, details panel. */
+/** Browsing jobs like a job board. Search, quick filters, all filters and the details panel. */
 
 import { expect, test } from '@playwright/test'
 
@@ -13,7 +13,7 @@ test.describe('jobs page', () => {
     await expect(first).toBeVisible()
     const title = await first.locator('h3').innerText()
 
-    // The details panel shows the same job, with the apply button and description
+    // The details panel shows the same job with the apply button and description
     const panel = page.getByRole('complementary', { name: 'Job details' })
     await expect(panel.getByRole('heading', { level: 2 })).toHaveText(title)
     await expect(panel.getByText('About the job')).toBeVisible()

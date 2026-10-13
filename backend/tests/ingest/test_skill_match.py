@@ -1,4 +1,4 @@
-"""Tests for skill detection in job descriptions and resumes (no DB, no network)."""
+"""Tests for spotting skills in job descriptions and resumes. No database and no network."""
 
 import pytest
 
@@ -8,7 +8,7 @@ from app.ingest.skill_match import match_skills, mentions
 @pytest.mark.parametrize(
     ("skill", "text", "expected"),
     [
-        # Single letters: the language, not the letter
+        # Single letters mean the language and not the letter
         ("C", "Strong C and C++ skills", True),
         ("C", "Experience with C++ and C#", False),
         ("C", "Report to the C-suite after Series C funding", True),  # "Series C" is accepted
@@ -16,16 +16,16 @@ from app.ingest.skill_match import match_skills, mentions
         ("R", "Statistics in R or Python", True),
         ("R", "Join our R&D team", False),
         ("R", "Use the r key", False),
-        # Go: the language, not the verb
+        # Go means the language and not the verb
         ("Go", "Backend services in Go and Python", True),
         ("Go", "Go to market with our sales team.", False),
         ("Go", "We go above and beyond", False),
         ("Go", "Ready to Go further? Apply now", False),
-        # Spring: the Java framework, not the season
+        # Spring means the Java framework and not the season
         ("Spring", "Java and Spring microservices", True),
         ("Spring", "Java developer intern for Spring 2027", False),
         ("Spring", "Python intern, spring term", False),
-        # Ordinary skills: whole words only
+        # Normal skills only match whole words
         ("CSS", "HTML and CSS", True),
         ("CSS", "SCSS only", False),
         ("node.js", "Built APIs with Node.js", True),

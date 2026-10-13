@@ -1,8 +1,9 @@
 """
-Tests for public-hosting features: demo accounts, the daily AI limit, /api/config,
-serving the built website, and DATABASE_URL normalization.
+Tests for things a public site needs. Demo accounts, the daily AI limit, /api/config,
+serving the built website and cleaning up DATABASE_URL.
 """
 
+import json
 from collections.abc import Callable
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -36,14 +37,14 @@ async def postings(db_session: AsyncSession) -> list[Posting]:
     return rows
 
 
-# ── Demo accounts ─────────────────────────────────────────────────────────────
+# Demo accounts
 
 async def test_demo_login_creates_prefilled_account(client: AsyncClient, postings: list[Posting]) -> None:
     res = await client.post("/api/auth/demo")
 
     assert res.status_code == 201
     assert res.json()["is_demo"] is True
-    assert (await client.get("/api/me")).json()["is_demo"] is True  # cookie session works
+    assert (await client.get("/api/me")).json()["is_demo"] is True  # the cookie session works
 
     saved = (await client.get("/api/saved")).json()
     assert saved["total"] == 6
@@ -53,7 +54,7 @@ async def test_demo_login_creates_prefilled_account(client: AsyncClient, posting
     assert matches["resume"]["filename"] == "alex-rivera-resume.pdf"
     assert matches["items"], "demo should have matches without any AI call"
     assert all("Demo match" in m["reason"] for m in matches["items"])
-    assert matches["items"][0]["score"] == 100  # Python+SQL postings fully covered
+    assert matches["items"][0]["score"] == 100  # jobs asking for Python and SQL are fully covered
 
 
 async def test_each_demo_login_gets_its_own_account(client: AsyncClient, postings: list[Posting]) -> None:
@@ -95,10 +96,10 @@ async def test_cleanup_removes_only_expired_demo_users(db_session: AsyncSession)
 def test_skill_overlap_match_scores_and_explains() -> None:
     score, reason = skill_overlap_match(["Python", "Go", "SQL", "Rust"], ["python", "SQL"])
     assert score == 50
-    assert "Python, SQL" in reason and "missing Go, Rust" in reason
+    assert "Python, SQL" in reason and "Missing Go, Rust" in reason
 
 
-# ── Daily AI limit ────────────────────────────────────────────────────────────
+# Daily AI limit
 
 def _docx_bytes(text: str) -> bytes:
     import io
@@ -118,7 +119,7 @@ async def test_ai_daily_limit_applies_to_the_site_owners_key(
     mock_claude_create: Callable[[str], AsyncMock],
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Visitors without their own key use the owner's key, limited per day; own keys are not."""
+    """People with no key of their own use the owner's key with a daily limit. Own keys have none."""
     monkeypatch.setattr(get_settings(), "ai_daily_limit", 1)
     monkeypatch.setattr(get_settings(), "anthropic_api_key", "sk-owner-key")
     mock_claude_create("[]")
@@ -131,11 +132,11 @@ async def test_ai_daily_limit_applies_to_the_site_owners_key(
     assert second.status_code == 429
     assert second.json()["code"] == "AI_LIMIT_REACHED"
 
-    # The visitor's own key is never limited
+    # The visitor's own key never has a limit
     assert (await client.post("/api/resume", files=files)).status_code == 200
 
 
-# ── /api/config ───────────────────────────────────────────────────────────────
+# /api/config
 
 async def test_public_config_reports_flags_without_secrets(client: AsyncClient) -> None:
     body = (await client.get("/api/config")).json()
@@ -143,7 +144,7 @@ async def test_public_config_reports_flags_without_secrets(client: AsyncClient) 
     assert body["demo_enabled"] is True
 
 
-# ── Serving the built website ─────────────────────────────────────────────────
+# Serving the built website
 
 async def test_api_serves_spa_with_history_fallback(tmp_path: Path) -> None:
     (tmp_path / "assets").mkdir()
@@ -155,16 +156,16 @@ async def test_api_serves_spa_with_history_fallback(tmp_path: Path) -> None:
     mount_frontend(app, tmp_path)
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
         assert (await ac.get("/")).text == "<html>app</html>"
-        assert (await ac.get("/saved")).text == "<html>app</html>"        # client-side route
+        assert (await ac.get("/saved")).text == "<html>app</html>"        # a page the site routes itself
         assert (await ac.get("/assets/app.js")).text == "console.log(1)"
         assert (await ac.get("/favicon.svg")).text == "<svg/>"
-        assert (await ac.get("/api/health")).json() == {"status": "ok"}   # API still wins
+        assert (await ac.get("/api/health")).json() == {"status": "ok"}   # the API still wins
         missing = await ac.get("/api/does-not-exist")
         assert missing.status_code == 404 and missing.json()["code"] == "HTTP_404"
         assert (await ac.get("/../../etc/passwd")).text == "<html>app</html>"
 
 
-# ── DATABASE_URL normalization ────────────────────────────────────────────────
+# Cleaning up DATABASE_URL
 
 @pytest.mark.parametrize(
     "raw,expected",
@@ -172,7 +173,7 @@ async def test_api_serves_spa_with_history_fallback(tmp_path: Path) -> None:
         ("postgres://u:p@h:5432/db", "postgresql+asyncpg://u:p@h:5432/db"),
         ("postgresql://u:p@h/db?sslmode=require", "postgresql+asyncpg://u:p@h/db?ssl=require"),
         ("postgresql+asyncpg://u:p@h/db", "postgresql+asyncpg://u:p@h/db"),
-        # Neon's copied connection string
+        # A connection string copied from Neon
         (
             "postgresql://u:p@ep-x.neon.tech/neondb?sslmode=require&channel_binding=require",
             "postgresql+asyncpg://u:p@ep-x.neon.tech/neondb?ssl=require",
@@ -185,3 +186,14 @@ async def test_api_serves_spa_with_history_fallback(tmp_path: Path) -> None:
 )
 def test_database_url_normalized_for_hosting_providers(raw: str, expected: str) -> None:
     assert Settings(database_url=raw).database_url == expected
+
+
+# The Vercel front
+
+def test_vercel_api_rewrite_keeps_the_path() -> None:
+    """The /api rewrite has to pass the path along. Without it every job request hit the Render home page."""
+    config = json.loads((Path(__file__).parents[3] / "vercel.json").read_text(encoding="utf-8"))
+    api = [r for r in config["rewrites"] if r["source"] == "/api/:path*"]
+    assert len(api) == 1
+    assert api[0]["destination"].startswith("https://")
+    assert api[0]["destination"].endswith("/api/:path*")

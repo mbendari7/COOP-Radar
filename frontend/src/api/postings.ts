@@ -9,7 +9,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { apiFetch } from './client'
 import type { components } from './types.gen'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// Types
 
 // Response types come from the backend's OpenAPI schema (src/api/types.gen.ts), so they can't
 // drift from the Pydantic models. Regenerate after changing a schema:
@@ -17,7 +17,7 @@ import type { components } from './types.gen'
 type Schemas = components['schemas']
 
 export type WorkMode = Schemas['WorkMode']
-/** `source_id` is set for jobs imported live from an employer's career board; `is_saved` only when signed in */
+/** `source_id` is there for jobs that came live from an employer's career board. `is_saved` only when signed in */
 export type PostingListItem = Schemas['PostingListItem']
 export type PostingDetail = Schemas['PostingDetail']
 export type SimilarPostingOut = Schemas['SimilarPostingOut']
@@ -25,13 +25,13 @@ export type SimilarPostingsResponse = Schemas['SimilarPostingsResponse']
 export type PostingsPage = Schemas['Page_PostingListItem_']
 export type FilterMeta = Schemas['FilterMeta']
 export type CategoryCount = Schemas['CategoryCount']
-/** Job type keys ("software", "data", ...) inferred from job titles on the server */
+/** Job type keys like software and data, worked out from job titles on the server */
 export type CategoryKey = CategoryCount['key']
-/** Programs of study a student can pick ("computer_science", "business", ...) */
+/** Programs a student can pick, like computer_science and business */
 export type ProgramOption = Schemas['ProgramOption']
 export type ProgramKey = ProgramOption['key']
 export type CountryCode = 'CA' | 'US'
-/** Co-op, internship, new-grad or regular job, from the title */
+/** Co-op, internship, new grad or regular job, judged by the title */
 export type RoleType = PostingListItem['role']
 export type SearchMode = 'keyword' | 'semantic'
 
@@ -51,17 +51,17 @@ export interface PostingListParams {
   company?: string[]
   /** Only jobs posted in the last N days (1, 3, 7, 14 or 30) */
   posted_within?: number
-  /** Countries to include; none = all */
+  /** Countries to include. None means all */
   country?: CountryCode[]
-  /** Jobs for a program of study (named in the description, or fitting its job types) */
+  /** Jobs for a program. Named in the description or fitting its job types */
   program?: ProgramKey
   /** Hide jobs asking for a different graduation year */
   grad_year?: number
   show_expired?: boolean
   show_closed?: boolean
-  /** Only intern / co-op / student / new-grad roles */
+  /** Only intern, co-op, student and new grad roles */
   students_only?: boolean
-  /** Hide senior / staff / lead / manager roles */
+  /** Hide senior, staff, lead and manager roles */
   hide_senior?: boolean
   search_mode?: SearchMode
   sort?: SortField
@@ -70,7 +70,7 @@ export interface PostingListParams {
   page_size?: PageSize
 }
 
-// ── Fetcher ───────────────────────────────────────────────────────────────────
+// Calls to the server
 
 function buildQueryString(params: PostingListParams): string {
   const sp = new URLSearchParams()
@@ -116,10 +116,10 @@ const fetchSimilar = (postingId: string) =>
 
 const fetchFilterMeta = () => apiFetch<FilterMeta>('/api/postings/meta/filters')
 
-// ── Imports: CSV upload + manual entry ────────────────────────────────────────
+// Adding jobs with a CSV or by hand
 
 export interface RowError {
-  row: number      // spreadsheet line number (header = line 1)
+  row: number      // spreadsheet line number where the header is line 1
   column: string
   message: string
 }
@@ -144,7 +144,7 @@ export interface ManualPostingIn {
   source_url?: string
 }
 
-/** Upload a CSV of postings (max 1,000 rows, 3 uploads per hour). */
+/** Upload a CSV of jobs. Up to 1,000 rows and 3 uploads an hour. */
 export function useUploadCsv() {
   const qc = useQueryClient()
   return useMutation({
@@ -160,7 +160,7 @@ export function useUploadCsv() {
   })
 }
 
-/** Add one posting by hand. Fails with code DUPLICATE when a near-identical one exists. */
+/** Add one job by hand. Fails with code DUPLICATE when almost the same job is already there. */
 export function useCreatePosting() {
   const qc = useQueryClient()
   return useMutation({
@@ -173,21 +173,21 @@ export function useCreatePosting() {
   })
 }
 
-// ── Hooks ─────────────────────────────────────────────────────────────────────
+// Hooks
 
 /**
- * Fetch a paginated, filtered, sorted list of postings.
- * keepPreviousData ensures the old page stays visible while the next loads.
+ * One filtered and sorted page of jobs.
+ * The old page stays on screen while the next one loads.
  */
 export function usePostings(params: PostingListParams) {
   return useQuery({
     queryKey: ['postings', params],
     queryFn: () => fetchPostings(params),
-    placeholderData: (prev) => prev,   // keeps previous page visible during fetch
+    placeholderData: (prev) => prev,   // keep the last page showing while loading
   })
 }
 
-/** Fetch a single posting by ID for the detail page. */
+/** One job by id for the details. */
 export function usePosting(id: string | undefined) {
   return useQuery({
     queryKey: ['posting', id],
@@ -196,7 +196,7 @@ export function usePosting(id: string | undefined) {
   })
 }
 
-/** Fetch up to 5 similar postings for a given posting ID. */
+/** Up to 5 jobs like this one. */
 export function useSimilarPostings(postingId: string | undefined) {
   return useQuery({
     queryKey: ['similar', postingId],
@@ -207,8 +207,8 @@ export function useSimilarPostings(postingId: string | undefined) {
 }
 
 /**
- * Fetch filter metadata (cities, provinces, terms, skills).
- * Stale for 5 minutes — values only change when postings are ingested.
+ * The choices for the filters like cities, provinces, terms and skills.
+ * Kept for 5 minutes since they only change when new jobs come in.
  */
 export function useFilterMeta() {
   return useQuery({

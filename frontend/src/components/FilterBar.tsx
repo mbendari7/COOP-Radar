@@ -1,13 +1,13 @@
 /**
  * Job filters.
- *  - FilterBar: every filter, in sections (job type, level, program and graduation year,
- *    country and location, work mode, date posted, term and length, company, skills)
- *  - FilterDrawer: FilterBar in a panel that slides in from the side ("All filters"), the way
- *    LinkedIn and Indeed do it; the most used filters also sit in the bar above the results
- *  - ActiveFilterChips: what's switched on, each removable, plus "Clear all"
+ *   FilterBar has every filter in sections. Job type, level, program and grad year,
+ *   country and place, work mode, date posted, term and length, company and skills
+ *   FilterDrawer puts FilterBar in a panel that slides in from the side for All filters.
+ *   The most used filters also sit in the strip above the results
+ *   ActiveFilterChips shows what is switched on, each one removable, plus Clear all
  *
- * Every value comes from and goes back to the URL (see PostingsListPage), and all
- * filtering happens in SQL on the server.
+ * Every value comes from the URL and goes back to it (see PostingsListPage), and all
+ * the filtering happens in SQL on the server.
  */
 
 import { useEffect, useRef, type ReactNode } from 'react'
@@ -33,22 +33,22 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
   )
   const countryCount = (code: string) => meta?.countries?.find((c) => c.code === code)?.count
   const modeCount = (key: string) => meta?.work_modes?.find((m) => m.key === key)?.count
-  // Provinces for Canada, states for the US, both for "Canada and US"
+  // Provinces for Canada, states for the US and both for Canada and US
   const regions = (meta?.provinces ?? []).filter((p) =>
     filters.country === 'all' ? true : filters.country === 'US' ? !isProvince(p) : isProvince(p),
   )
 
   return (
-    <div className="divide-y divide-gray-200">
+    <div className="divide-y divide-gray-300">
       <Section title="Job type">
-        {metaLoading && <p className="text-sm text-gray-500">Loading...</p>}
+        {metaLoading && <p className="text-sm text-gray-600">Loading...</p>}
         <ul className="grid gap-1.5 sm:grid-cols-2">
           {categories.map((c) => (
             <li key={c.key}>
               <label className="flex cursor-pointer items-center gap-2.5 text-sm text-gray-800">
                 <input
                   type="checkbox"
-                  className="h-4 w-4 rounded border-gray-400 text-blue-600 focus:ring-blue-600"
+                  className="h-4 w-4"
                   checked={filters.category.includes(c.key)}
                   onChange={(e) =>
                     onChange({
@@ -59,7 +59,7 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
                   }
                 />
                 <span className="flex-1">{c.label}</span>
-                <span className="text-xs tabular-nums text-gray-500">{c.count}</span>
+                <span className="text-xs tabular-nums text-gray-600">{c.count}</span>
               </label>
             </li>
           ))}
@@ -91,7 +91,7 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
             placeholder="Any year"
           />
         </div>
-        <p className="mt-2 text-xs text-gray-500">
+        <p className="mt-2 text-xs text-gray-600">
           Program shows jobs that name it or fit it. Graduation year hides jobs that ask for a different one.
         </p>
       </Section>
@@ -109,7 +109,7 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
           onChange={(country: CountryChoice) => onChange({ country, province: '', city: '' })}
         />
         {filters.country !== '' && (
-          <p className="mt-1.5 text-xs text-gray-500">US jobs here are student roles: co-op, internships and new grad.</p>
+          <p className="mt-1.5 text-xs text-gray-600">US jobs here are student roles like co-op, internships and new grad.</p>
         )}
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <Select
@@ -131,7 +131,7 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
             placeholder="Any city"
           />
         </div>
-        <p className="mt-2 text-xs text-gray-500">Remote jobs show up for every city.</p>
+        <p className="mt-2 text-xs text-gray-600">Remote jobs show up for every city.</p>
       </Section>
 
       <Section title="Work mode">
@@ -170,13 +170,13 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
             placeholder="Any term"
           />
           <fieldset>
-            <legend className="mb-1.5 text-xs font-medium text-gray-600">Length</legend>
+            <legend className="label-form mb-1.5">Length</legend>
             <div className="flex flex-wrap gap-x-5 gap-y-1.5">
               {DURATIONS.map((d) => (
                 <label key={d} className="flex cursor-pointer items-center gap-2 text-sm text-gray-800">
                   <input
                     type="checkbox"
-                    className="h-4 w-4 rounded border-gray-400 text-blue-600 focus:ring-blue-600"
+                    className="h-4 w-4"
                     checked={filters.duration.includes(d)}
                     onChange={(e) =>
                       onChange({
@@ -231,7 +231,7 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
           onRemove={(s) => onChange({ skills: filters.skills.filter((x) => x !== s) })}
         />
         {filters.skills.length > 1 && (
-          <p className="mt-2 text-xs text-gray-500">Showing jobs that ask for all of these.</p>
+          <p className="mt-2 text-xs text-gray-600">Showing jobs that ask for all of these.</p>
         )}
       </Section>
 
@@ -239,7 +239,7 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
         <label className="flex cursor-pointer items-center gap-2.5 text-sm text-gray-800">
           <input
             type="checkbox"
-            className="h-4 w-4 rounded border-gray-400 text-blue-600 focus:ring-blue-600"
+            className="h-4 w-4"
             checked={filters.show_expired}
             onChange={(e) => onChange({ show_expired: e.target.checked })}
           />
@@ -250,7 +250,7 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
   )
 }
 
-/** "All filters": the full FilterBar in a side panel, with the live result count. */
+/** All filters. The whole FilterBar in a side panel with the live job count. */
 export function FilterDrawer({
   open, onClose, total, ...props
 }: Props & { open: boolean; onClose: () => void; total: number | undefined }) {
@@ -272,21 +272,21 @@ export function FilterDrawer({
   if (!open) return null
   return (
     <div className="fixed inset-0 z-50 flex">
-      <div className="absolute inset-0 bg-black/40" onClick={onClose} aria-hidden="true" />
+      <div className="absolute inset-0 bg-gray-950/50" onClick={onClose} aria-hidden="true" />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="filters-title"
         className="relative flex h-full w-full max-w-lg flex-col bg-white shadow-xl"
       >
-        <div className="flex items-center justify-between border-b border-gray-200 px-5 py-4">
-          <h2 id="filters-title" className="text-lg font-semibold text-gray-900">All filters</h2>
+        <div className="flex items-center justify-between bg-post-600 px-5 py-3.5 text-white">
+          <h2 id="filters-title" className="stretch-condensed text-xl font-extrabold uppercase tracking-[0.03em]">All filters</h2>
           <button
             ref={closeRef}
             type="button"
             onClick={onClose}
             aria-label="Close filters"
-            className="rounded p-1 text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-600"
+            className="rounded-sm p-1 text-white hover:bg-white/15"
           >
             <XIcon className="h-5 w-5" />
           </button>
@@ -294,15 +294,11 @@ export function FilterDrawer({
         <div className="flex-1 overflow-y-auto px-5">
           <FilterBar {...props} />
         </div>
-        <div className="flex items-center justify-between gap-3 border-t border-gray-200 px-5 py-3">
-          <button type="button" onClick={props.onClearAll} className="text-sm font-medium text-gray-700 hover:underline">
+        <div className="flex items-center justify-between gap-3 border-t-[1.5px] border-gray-900 px-5 py-3">
+          <button type="button" onClick={props.onClearAll} className="text-sm font-semibold text-gray-800 hover:underline">
             Reset all
           </button>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-md bg-blue-600 px-5 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-          >
+          <button type="button" onClick={onClose} className="btn-primary px-5">
             {total === undefined ? 'Show jobs' : `Show ${total.toLocaleString()} job${total === 1 ? '' : 's'}`}
           </button>
         </div>
@@ -311,7 +307,7 @@ export function FilterDrawer({
   )
 }
 
-/** The filters that are on, as removable chips above the results. */
+/** The filters that are on, as chips you can remove, above the results. */
 export function ActiveFilterChips({
   filters, meta, onChange, onClearAll,
 }: Omit<Props, 'metaLoading'>) {
@@ -319,7 +315,7 @@ export function ActiveFilterChips({
   const label = (key: CategoryKey) => meta?.categories?.find((c) => c.key === key)?.label ?? key
   const programLabel = meta?.programs?.find((p) => p.key === filters.program)?.label ?? filters.program
 
-  /** After a chip is removed its button disappears: keep keyboard focus nearby. */
+  /** Once a chip is gone its button goes too, so keep keyboard focus close by. */
   const remove = (patch: Partial<Filters>) => {
     onChange(patch)
     requestAnimationFrame(() => {
@@ -328,7 +324,7 @@ export function ActiveFilterChips({
     })
   }
 
-  // Level, country and work mode have their own controls in the bar, so they get no chip
+  // Level, country and work mode have their own controls in the strip so they get no chip
   const chips: { key: string; text: string; patch: Partial<Filters> }[] = [
     ...filters.category.map((c) => ({
       key: `cat-${c}`, text: label(c), patch: { category: filters.category.filter((x) => x !== c) },
@@ -360,7 +356,7 @@ export function ActiveFilterChips({
       <button
         type="button"
         onClick={onClearAll}
-        className="text-sm text-gray-600 underline underline-offset-2 hover:text-gray-900"
+        className="text-sm font-semibold text-gray-700 underline underline-offset-2 hover:text-gray-900"
       >
         Clear all
       </button>
@@ -368,13 +364,13 @@ export function ActiveFilterChips({
   )
 }
 
-// ── Pieces ────────────────────────────────────────────────────────────────────
+// Small pieces
 
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <fieldset className="py-4">
       <legend className="sr-only">{title}</legend>
-      <h3 className="mb-2.5 text-sm font-semibold text-gray-900" aria-hidden="true">{title}</h3>
+      <h3 className="label-form mb-3 !text-gray-900" aria-hidden="true">{title}</h3>
       {children}
     </fieldset>
   )
@@ -389,15 +385,11 @@ export function Pill({
       role="checkbox"
       aria-checked={on}
       onClick={onClick}
-      className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium ${
-        on
-          ? 'border-blue-600 bg-blue-600 text-white'
-          : 'border-gray-400 bg-white text-gray-800 hover:border-gray-600 hover:bg-gray-50'
-      }`}
+      className={`chip ${on ? 'chip-on' : ''}`}
     >
       {children}
       {count !== undefined && (
-        <span className={`text-xs tabular-nums ${on ? 'text-blue-100' : 'text-gray-500'}`}>{count.toLocaleString()}</span>
+        <span className={`text-xs tabular-nums ${on ? 'text-air-100' : 'text-gray-600'}`}>{count.toLocaleString()}</span>
       )}
     </button>
   )
@@ -418,12 +410,12 @@ function RadioList<T extends string | number>({
           <input
             type="radio"
             name={name}
-            className="h-4 w-4 border-gray-400 text-blue-600 focus:ring-blue-600"
+            className="h-4 w-4"
             checked={value === o.value}
             onChange={() => onChange(o.value)}
           />
           <span className="flex-1">{o.label}</span>
-          {o.count !== undefined && <span className="text-xs tabular-nums text-gray-500">{o.count.toLocaleString()}</span>}
+          {o.count !== undefined && <span className="text-xs tabular-nums text-gray-600">{o.count.toLocaleString()}</span>}
         </label>
       ))}
     </div>
@@ -444,7 +436,7 @@ function Select({
 }) {
   return (
     <div>
-      <label htmlFor={id} className={hideLabel ? 'sr-only' : 'mb-1 block text-xs font-medium text-gray-600'}>
+      <label htmlFor={id} className={hideLabel ? 'sr-only' : 'label-form mb-1 block'}>
         {label}
       </label>
       <select
@@ -452,7 +444,7 @@ function Select({
         value={value}
         disabled={loading}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full rounded-md border border-gray-400 bg-white px-2.5 py-1.5 text-sm text-gray-900 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600 disabled:opacity-50"
+        className="field py-1.5"
       >
         <option value="">{loading ? 'Loading...' : placeholder}</option>
         {options.map((o) => (
@@ -476,13 +468,13 @@ function Chip({
   label, onRemove, removeLabel = `Remove filter: ${label}`,
 }: { label: string; onRemove: () => void; removeLabel?: string }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-gray-300 bg-white py-0.5 pl-3 pr-1 text-sm text-gray-800">
+    <span className="inline-flex items-center gap-1 rounded-sm border-[1.5px] border-air-700 bg-air-50 py-0.5 pl-2.5 pr-1 text-sm font-semibold text-air-800">
       {label}
       <button
         type="button"
         onClick={onRemove}
         aria-label={removeLabel}
-        className="rounded-full p-0.5 text-gray-500 hover:bg-gray-100 hover:text-gray-900 focus:outline-none focus:ring-1 focus:ring-blue-600"
+        className="rounded-sm p-0.5 text-air-700 hover:bg-air-100 hover:text-air-900"
       >
         <XIcon className="h-3.5 w-3.5" />
       </button>

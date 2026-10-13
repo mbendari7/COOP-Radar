@@ -16,7 +16,7 @@ Docs: `README.md` (technical + free hosting), `guides/using-coopradar/` (simple:
   6-hourly import scheduler started in the app lifespan). No separate worker or queue.
 - Auth: argon2id passwords, HTTP-only session cookie → `session:<token>` in the store (`app/store.py`:
   Postgres `kv_store` table by default, Redis if `REDIS_URL` is set; 7-day rolling TTL)
-- AI: **bring your own key** — visitors' Claude / ChatGPT / Gemini keys via `app/ai.py` (official `anthropic`,
+- AI: **bring your own key**. Visitors' Claude / ChatGPT / Gemini keys via `app/ai.py` (official `anthropic`,
   `openai`, `google-genai` SDKs). Optional owner keys: `ANTHROPIC_API_KEY` fallback (`AGENT_MODEL`/`FAST_MODEL`)
   and `OPENAI_API_KEY` for embeddings (smart search)
 - Frontend: React 18 + TypeScript + Vite 6, TanStack Query/Table, React Router, Tailwind, dnd-kit; Playwright e2e
@@ -26,19 +26,19 @@ Docs: `README.md` (technical + free hosting), `guides/using-coopradar/` (simple:
   every 6 h when the `SITE_URL` variable is set)
 
 ## Layout
-- `backend/app/` — `api/` routers · `services/` business logic + SQL · `schemas/` Pydantic · `models/` ORM ·
+- `backend/app/`: `api/` routers · `services/` business logic + SQL · `schemas/` Pydantic · `models/` ORM ·
   `ingest/` career-board + feed adapters, runner, dedup, skill matching, extraction, embeddings ·
   `agent/` streamed tailor / cover letter / Q&A · `llm.py` Claude helpers ·
   `deps.py` auth deps · `store.py` session store · `jobs.py` background jobs
-- `backend/alembic/versions/` migrations (0001–0010) · `backend/seed/` skills, ~120 career boards (`job_boards.py`),
+- `backend/alembic/versions/` migrations (0001 to 0010) · `backend/seed/` skills, ~120 career boards (`job_boards.py`),
   sample postings (`SEED_*` flags) · `backend/tests/` pytest
-- `frontend/src/` — `api/` (`client.ts` + query hooks) · `pages/` · `components/` · `frontend/tests/` vitest ·
+- `frontend/src/`: `api/` (`client.ts` + query hooks) · `pages/` · `components/` · `frontend/tests/` vitest ·
   `frontend/e2e/` Playwright (`*.e2e.ts`, run against a started site)
 - `specs/NNN-*/` Spec Kit feature specs · `.specify/` Spec Kit config, templates, constitution
-- `.claude/skills/` — `speckit-*` workflow skills + project skills (api-conventions, frontend-tables,
+- `.claude/skills/`: `speckit-*` workflow skills + project skills (api-conventions, frontend-tables,
   agent-tools, db-migration, log-agentic-work)
-- `guides/` — using-coopradar (visitors), how-it-works (builder / interviews)
-- `docs/` — DEPLOY, PROJECT_GUIDE, images/, agentic-workflow, progress, speckit-prompts, history/
+- `guides/`: using-coopradar (visitors), how-it-works (builder / interviews)
+- `docs/`: DEPLOY, PROJECT_GUIDE, images/, agentic-workflow, progress, speckit-prompts, history/
 - Production: `render.yaml` builds with `pip install -e backend && npm ci/build --prefix frontend`, starts with
   `python start.py --hosted` (migrate → seed → uvicorn on $PORT). `app/main.py → mount_frontend` serves the built site.
 
@@ -61,7 +61,7 @@ Docs: `README.md` (technical + free hosting), `guides/using-coopradar/` (simple:
 - Model IDs come from settings/env, never hard-coded at call sites. AI failures degrade gracefully.
 - All AI calls go through `app/ai.py`. Visitors' API keys are never stored, logged, or echoed; AI routes use
   `Depends(ai_credentials(...))` and call `consume_ai_quota` only for the owner's key.
-- Posting and resume text sent to Claude is data, not instructions — keep it tagged and say so in the prompt.
+- Posting and resume text sent to Claude is data, not instructions. Keep it tagged and say so in the prompt.
 - Secrets only from env vars (`.env`, never committed). Keep `.env.example` current.
 - Ingestion uses public job-board APIs/feeds first; respect robots.txt and site terms; no scraping behind logins.
 - Matching must work without any AI key (SQL skill coverage + student fit); AI only adds to it.

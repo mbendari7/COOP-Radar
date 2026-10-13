@@ -1,13 +1,14 @@
 """
-Real employers whose public career boards CoopRadar imports from (Greenhouse, Lever, Ashby,
-SmartRecruiters).
+Real employers whose public career boards CoopRadar imports from. They use Greenhouse,
+Lever, Ashby or SmartRecruiters.
 
-Each board's public API is meant for showing that company's jobs elsewhere; every posting
-links back to the employer's own page to apply. Each had jobs in Canada, or US internships, when
-added (checked 2026-10-12). Add a company by appending (company, adapter_type, board): the board
-name is the last part of its careers URL, e.g. boards.greenhouse.io/<board>, jobs.lever.co/<board>,
-jobs.ashbyhq.com/<board>, jobs.smartrecruiters.com/<board>. Admins can pause or re-enable any
-source on the Admin page; a board that fails three runs in a row pauses itself.
+Each board's public API is made for showing that company's jobs on other sites, and every
+job links back to the employer's own page to apply. Each one had jobs in Canada or US
+internships when we added it on 2026-10-12. To add a company, add a line with the company,
+adapter_type and board. The board is the last part of the careers URL, like
+boards.greenhouse.io/<board>, jobs.lever.co/<board>, jobs.ashbyhq.com/<board> or
+jobs.smartrecruiters.com/<board>. Admins can pause or turn on any source on the Admin page,
+and a board that fails three runs in a row pauses itself.
 """
 
 import asyncio
@@ -18,8 +19,8 @@ from sqlalchemy import text
 from app.db import AsyncSessionLocal
 
 JOB_BOARDS: list[tuple[str, str, str]] = [
-    # (company display name, adapter_type, board name)
-    # --- Canadian companies and Canadian offices -------------------------------------------
+    # Company name we show, adapter_type, board name
+    # Canadian companies and Canadian offices
     ("Stripe", "greenhouse", "stripe"),
     ("Robinhood", "greenhouse", "robinhood"),
     ("Databricks", "greenhouse", "databricks"),
@@ -124,7 +125,7 @@ JOB_BOARDS: list[tuple[str, str, str]] = [
     ("Clearco", "ashby", "clearco"),
     ("AbCellera", "greenhouse", "abcellera"),
     ("Spare", "ashby", "spare"),
-    # --- US employers with many internships (US jobs: student roles only by default) -------
+    # US employers with lots of internships. By default we only keep their student roles
     ("Palantir", "lever", "palantir"),
     ("Rocket Lab", "greenhouse", "rocketlab"),
     ("Astera Labs", "greenhouse", "asteraearlycareer2027"),
@@ -148,8 +149,8 @@ JOB_BOARDS: list[tuple[str, str, str]] = [
 
 async def seed_job_boards() -> None:
     """
-    Insert one ingest source per board (idempotent). A board that moved to another system
-    (Hootsuite: Greenhouse to SmartRecruiters) is repointed and un-paused.
+    Add one import source per board, safe to rerun. A board that moved to another system,
+    like Hootsuite going from Greenhouse to SmartRecruiters, gets pointed at the new one and unpaused.
     """
     async with AsyncSessionLocal() as db:
         for company, adapter_type, board in JOB_BOARDS:

@@ -1,4 +1,4 @@
-"""Adapter registry — maps adapter_type string to the appropriate adapter class."""
+"""Maps each adapter_type name to its adapter class."""
 
 from app.ingest.base import BaseAdapter
 from app.ingest.boards import (
@@ -22,9 +22,9 @@ _ADAPTERS: dict[str, type[BaseAdapter]] = {
 
 def adapter_for(source: object) -> BaseAdapter:
     """
-    Factory that returns the correct BaseAdapter instance for the given source.
+    Gives back the right adapter for this source.
 
-    Raises ValueError for unknown adapter_type values.
+    Raises ValueError for an adapter_type we do not know.
     """
     adapter_type = getattr(source, "adapter_type", "")
     if adapter_type not in _ADAPTERS:

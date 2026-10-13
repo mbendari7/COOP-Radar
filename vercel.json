@@ -7,7 +7,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://coopradar-u7in.onrender.com"
+      "destination": "https://coopradar-u7in.onrender.com/api/:path*"
     },
     {
       "source": "/(.*)",

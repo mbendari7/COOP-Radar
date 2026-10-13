@@ -1,7 +1,7 @@
 """
-Tests for the Greenhouse / Lever / Ashby career-board adapters.
+Tests for the Greenhouse, Lever and Ashby career board adapters.
 
-HTTP is mocked with respx using trimmed copies of real API responses — no live network calls.
+HTTP is faked with respx using trimmed copies of real API replies, so nothing goes over the network.
 """
 
 from datetime import UTC, datetime
@@ -35,7 +35,7 @@ def make_source(board: str, company: str = "Acme") -> object:
     return FakeSource()
 
 
-# ── Location parsing (real strings seen on live boards) ───────────────────────
+# Reading locations, using real text seen on live boards
 
 @pytest.mark.parametrize(
     ("location", "expected"),
@@ -58,7 +58,7 @@ def test_parse_location(location: str, expected: tuple[str, str]) -> None:
 
 
 def test_london_is_not_mistaken_for_london_ontario() -> None:
-    """London (UK) is skipped; the role's Canadian location is the one shown."""
+    """London UK gets skipped and the role's Canadian location is the one shown."""
     assert _pick_location("London", "Remote, Canada") == "Remote, Canada"
     assert _pick_location("London", "New York") is None
 
@@ -138,9 +138,9 @@ def test_registry_knows_board_adapters() -> None:
     assert isinstance(adapter_for(src("smartrecruiters")), SmartRecruitersAdapter)
 
 
-# ── Adapters ──────────────────────────────────────────────────────────────────
+# Adapters
 
-# The list has no descriptions; each kept job's description comes from its own URL
+# The list has no descriptions. Each kept job's description comes from its own URL
 GREENHOUSE = {
     "jobs": [
         {
@@ -149,7 +149,7 @@ GREENHOUSE = {
             "location": {"name": "Toronto, Ontario, Canada"},
             "absolute_url": "https://boards.greenhouse.io/acme/jobs/101",
             "first_published": "2026-09-20T10:00:00-04:00",
-            "company_name": "Acme Inc.",
+            "company_name": "Acme Early Careers - North America 2027",
         },
         {
             "id": 102,
@@ -226,7 +226,7 @@ async def test_greenhouse_adapter_keeps_canadian_jobs_and_us_internships() -> No
         mock.get("https://boards-api.greenhouse.io/v1/boards/acme/jobs/101").mock(
             return_value=Response(200, json=GREENHOUSE_DETAIL)
         )
-        # A failed description fetch keeps the job, without a description
+        # A failed description fetch keeps the job, just without a description
         mock.get("https://boards-api.greenhouse.io/v1/boards/acme/jobs/103").mock(
             return_value=Response(500)
         )
@@ -237,8 +237,9 @@ async def test_greenhouse_adapter_keeps_canadian_jobs_and_us_internships() -> No
     assert (us.city, us.province, us.country, us.description) == ("Austin", "TX", "US", "")
     p = postings[0]
     assert p.country == "CA"
+    # The board label in company_name is ignored and our clean name is used
     assert (p.title, p.company, p.city, p.province) == (
-        "Software Engineering Intern (Winter 2027)", "Acme Inc.", "Toronto", "ON"
+        "Software Engineering Intern (Winter 2027)", "Acme", "Toronto", "ON"
     )
     assert p.work_mode == "onsite"
     assert "Python & Go." in p.description

@@ -1,6 +1,6 @@
 /**
- * StatsPanel — shows application funnel stats: applied, interview, offer counts.
- * Displayed at the top of SavedPostingsPage.
+ * How the applications are going, in one ruled line. Applied, how many got an interview and offers.
+ * It sits at the top of the tracker.
  */
 
 interface Props {
@@ -15,28 +15,22 @@ export default function StatsPanel({ totalApplied, totalInterview, totalOffer }:
     : 0
 
   const stats = [
-    { label: 'Applied', value: totalApplied, color: 'text-blue-600' },
-    {
-      label: 'Interview Rate',
-      value: `${interviewRate}%`,
-      color: 'text-indigo-600',
-      sub: `${totalInterview} of ${totalApplied}`,
-    },
-    { label: 'Offers', value: totalOffer, color: 'text-green-600' },
+    { label: 'Applied', value: String(totalApplied), sub: '' },
+    { label: 'Interview rate', value: `${interviewRate}%`, sub: `${totalInterview} of ${totalApplied}` },
+    { label: 'Offers', value: String(totalOffer), sub: '' },
   ]
 
   return (
-    <div className="grid grid-cols-3 gap-4 mb-6">
+    <dl className="mb-6 flex flex-wrap divide-x divide-gray-300 border-y-[1.5px] border-gray-900">
       {stats.map((s) => (
-        <div
-          key={s.label}
-          className="bg-white rounded-lg border border-gray-200 px-4 py-3 text-center"
-        >
-          <p className={`text-2xl font-bold ${s.color}`}>{s.value}</p>
-          <p className="text-xs text-gray-500 mt-0.5">{s.label}</p>
-          {s.sub && <p className="text-xs text-gray-500">{s.sub}</p>}
+        <div key={s.label} className="flex items-baseline gap-2 px-5 py-3 first:pl-0">
+          <dt className="label-form">{s.label}</dt>
+          <dd className="stretch-semi text-2xl font-extrabold tabular-nums text-gray-900">
+            {s.value}
+            {s.sub && <span className="ml-1.5 text-sm font-semibold text-gray-600">{s.sub}</span>}
+          </dd>
         </div>
       ))}
-    </div>
+    </dl>
   )
 }

@@ -1,4 +1,4 @@
-"""CSV upload validation helpers."""
+"""Checks for CSV uploads."""
 
 from dataclasses import dataclass, field
 from datetime import date
@@ -25,8 +25,8 @@ _VALID_WORK_MODES = {"onsite", "hybrid", "remote"}
 
 def validate_csv_row(row: dict[str, Any], row_num: int) -> list[RowError]:
     """
-    Validate a single CSV row (as a dict from pandas).
-    Returns a list of RowErrors; empty list means the row is valid.
+    Check one CSV row that pandas gave us as a dict.
+    Gives back a list of RowErrors. An empty list means the row is fine.
     """
     errors: list[RowError] = []
 
@@ -39,7 +39,7 @@ def validate_csv_row(row: dict[str, Any], row_num: int) -> list[RowError]:
                 )
             )
 
-    # Validate deadline format (only if the column was present)
+    # Check the deadline format, only if that column was there
     deadline_val = row.get("deadline")
     if deadline_val and str(deadline_val).strip() and str(deadline_val).lower() != "nan":
         try:
@@ -53,7 +53,7 @@ def validate_csv_row(row: dict[str, Any], row_num: int) -> list[RowError]:
                 )
             )
 
-    # Validate optional work_mode if present
+    # Check work_mode if it was given
     work_mode_val = row.get("work_mode")
     work_mode = str(work_mode_val or "").strip().lower()
     if work_mode and work_mode != "nan" and work_mode not in _VALID_WORK_MODES:

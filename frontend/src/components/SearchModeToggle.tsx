@@ -1,3 +1,5 @@
+/** Switch between plain keyword search and smart search by meaning. */
+
 import type { SearchMode } from '../api/postings'
 
 interface SearchModeToggleProps {
@@ -10,16 +12,14 @@ export function SearchModeToggle({ value, onChange }: SearchModeToggleProps) {
     <div
       role="group"
       aria-label="Search mode"
-      className="inline-flex rounded-lg border border-gray-300 overflow-hidden bg-white"
+      className="inline-flex overflow-hidden rounded-sm border-[1.5px] border-gray-400 bg-white"
     >
       <button
         type="button"
         aria-pressed={value === 'keyword'}
         onClick={() => onChange('keyword')}
-        className={`px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:z-10 ${
-          value === 'keyword'
-            ? 'bg-blue-600 text-white'
-            : 'bg-white text-gray-700 hover:bg-gray-50'
+        className={`px-3 py-1 text-sm font-semibold transition-colors focus:z-10 ${
+          value === 'keyword' ? 'bg-air-700 text-white' : 'bg-white text-gray-800 hover:bg-gray-100'
         }`}
       >
         Keyword
@@ -28,10 +28,8 @@ export function SearchModeToggle({ value, onChange }: SearchModeToggleProps) {
         type="button"
         aria-pressed={value === 'semantic'}
         onClick={() => onChange('semantic')}
-        className={`px-3 py-1.5 text-sm font-medium transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:z-10 border-l border-gray-300 ${
-          value === 'semantic'
-            ? 'bg-blue-600 text-white'
-            : 'bg-white text-gray-700 hover:bg-gray-50'
+        className={`border-l-[1.5px] border-gray-400 px-3 py-1 text-sm font-semibold transition-colors focus:z-10 ${
+          value === 'semantic' ? 'bg-air-700 text-white' : 'bg-white text-gray-800 hover:bg-gray-100'
         }`}
       >
         Smart search

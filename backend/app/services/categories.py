@@ -1,10 +1,10 @@
 """
-Job types ("Software & web", "Data & AI", ...) used by the job filters and resume matching.
+Job types like "Software & web" and "Data & AI" for the job filters and resume matching.
 
-Imported postings don't come with a category, so one is inferred from the job title with a
-case-insensitive Postgres regex. The patterns are constants (never user input) and a title
-can belong to more than one type ("Data Engineer" is both software and data).
-Postgres regex: \\m = start of word, \\M = end of word.
+Imported jobs do not come with a category so we work one out from the title with a
+Postgres regex that ignores case. The patterns are fixed and never come from users, and
+a title can fit more than one type, like "Data Engineer" being software and data.
+In Postgres regex \\m means start of word and \\M means end of word.
 """
 
 import re
@@ -20,7 +20,7 @@ CategoryKey = Literal[
     "sales_marketing", "customer",
 ]
 
-# key -> (label shown in the UI, title pattern)
+# key maps to the label people see and the title pattern
 CATEGORIES: dict[str, tuple[str, str]] = {
     "software": (
         "Software & web",
@@ -82,16 +82,16 @@ CATEGORIES: dict[str, tuple[str, str]] = {
 
 
 def category_clause(key: str) -> Any:
-    """SQL condition: the posting's title fits this job type."""
+    """SQL check that the job title fits this job type."""
     return Posting.title.op("~*")(CATEGORIES[key][1])
 
 
 def title_fits(key: str, title: str) -> bool:
-    """The same check as category_clause, in Python (Postgres \\m and \\M become \\b)."""
+    """Same check as category_clause but in Python, where Postgres \\m and \\M become \\b."""
     pattern = CATEGORIES[key][1].replace(r"\m", r"\b").replace(r"\M", r"\b")
     return re.search(pattern, title, re.IGNORECASE) is not None
 
 
 def any_category(keys: Sequence[str]) -> Any:
-    """SQL condition: the title fits at least one of the chosen job types."""
+    """SQL check that the title fits at least one of the picked job types."""
     return or_(*(category_clause(k) for k in keys))

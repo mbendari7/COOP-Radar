@@ -45,15 +45,36 @@ README, this table is your answer.
 
 | Technology | What it is | Why CoopRadar uses it | Where |
 |---|---|---|---|
-| **React 18** | A library for building UIs out of components | Each part of the page (job card, filter panel, match card) is a reusable component | `frontend/src/components/`, `pages/` |
+| **React 18** | A library for building UIs out of components | Each part of the page (job row, postmark, filter panel, match) is a reusable component | `frontend/src/components/`, `pages/` |
 | **TypeScript** | JavaScript with types | Catches mistakes before the browser does; the API's types are generated from the backend, so frontend and backend can't drift apart | everywhere in `frontend/src/` |
 | **Vite** | Build tool and dev server | Instant reloads while developing; builds the optimized site for production | `vite.config.ts` |
-| **Tailwind CSS** | Utility CSS classes (`px-4`, `text-sm`) | Fast, consistent styling with one colour palette defined in one place | `tailwind.config.ts` |
+| **Tailwind CSS** | Utility CSS classes (`px-4`, `text-sm`) | Fast, consistent styling. The palette, square corners and font live in one config, and shared pieces like `btn-primary`, `field` and `chip` live in one CSS file | `tailwind.config.ts`, `src/index.css` |
 | **TanStack Query** | Data fetching and caching | Loads jobs, matches and filters, caches them, and refreshes after changes (e.g. after uploading a resume) | `frontend/src/api/*.ts` |
 | **TanStack Table** | Headless table logic | The sortable table view of jobs | `components/PostingsTable.tsx` |
 | **React Router** | Pages and URLs in a single-page app | `/`, `/resume`, `/postings/:id`, `/saved`...; all job filters live in the URL so searches are shareable | `App.tsx`, `pages/PostingsListPage.tsx` |
 | **dnd-kit** | Drag and drop | Dragging jobs between columns on the tracker board | `components/TrackerBoard.tsx` |
 | **openapi-typescript** | Generates TypeScript types from the API's OpenAPI schema | One source of truth for data shapes; CI fails if they're out of date | `src/api/types.gen.ts` |
+
+### The look
+
+The design borrows from a Canadian post office instead of the usual blue and grey job board. A postal red top bar,
+airmail blue for links and anything picked, white rows split by thin ink lines instead of rounded cards, and
+narrow capital labels like the ones on a customs form. The font is Archivo, which has a condensed width for
+headings and labels and a normal width for reading.
+
+The one signature piece is the **postmark**: a round, slightly tilted stamp on every job showing the city and the
+day it was posted, the way a real postmark shows the town and day a letter was mailed. When you pick a job its
+postmark turns red and lands like a stamp (switched off for people who ask for reduced motion). Match scores use
+the same round stamp. The details panel draws the time left to apply as a bar to scale.
+
+It was designed with the Impeccable design skill (`.claude/skills/impeccable/`). The product facts it worked from
+are in `PRODUCT.md` and the finished design system is written down in `DESIGN.md`.
+
+| Piece | Where |
+|---|---|
+| Colours, corners, shadows, font | `frontend/tailwind.config.ts` |
+| Shared buttons, fields, chips, labels, focus ring, text selection | `frontend/src/index.css` |
+| The postmark | `frontend/src/components/Postmark.tsx`, `postal.ts` |
 
 ### Backend (the server)
 
@@ -217,8 +238,9 @@ About 2,800 open jobs take roughly 50 MB, so the free 0.5 GB database has plenty
 ## 6. How it's tested
 
 - **Backend: about 290 pytest tests.** Every API endpoint, the importers (with recorded API responses, never the
-  real internet), education reading, matching and scoring, and a speed test: p95 under 300 ms on 10,000 jobs.
-- **Frontend: 42 Vitest tests** for the filters, job cards and resume page.
+  real internet), education reading, matching and scoring, a check that `vercel.json` forwards `/api` with its
+  path, and a speed test: p95 under 300 ms on 10,000 jobs.
+- **Frontend: 45 Vitest tests** for the filters, job list, resume page and date handling.
 - **End-to-end: 7 Playwright tests** that open the real site in a browser: search, quick filters, the All filters
   panel, the details panel, uploading a resume and seeing "We read your resume: Computer Science...", and the phone
   layout.
@@ -240,6 +262,10 @@ About 2,800 open jobs take roughly 50 MB, so the free 0.5 GB database has plenty
 Why not Vercel alone? Vercel runs code only for a moment per request, but CoopRadar needs a server that keeps
 running to import jobs on a schedule, and a database. Step-by-step setup is in the
 [README](../../README.md#host-it-for-free).
+
+One thing to get right: the `/api` line in `vercel.json` has to end with `/api/:path*`, for example
+`https://your-site.onrender.com/api/:path*`. Without that ending every request lands on the Render home page,
+gets a web page back instead of job data, and the site says the jobs didn't load. A backend test checks this.
 
 ---
 
@@ -310,9 +336,11 @@ running to import jobs on a schedule, and a database. Step-by-step setup is in t
 | Job types and their title patterns | `backend/app/services/categories.py` |
 | Match scoring weights and "why it fits" | `backend/app/services/resume.py` (`_W_*`, `fit_notes`) |
 | The jobs page layout | `frontend/src/pages/PostingsListPage.tsx`, `components/PostingCard.tsx`, `PostingDetailView.tsx` |
+| The postmark stamp | `frontend/src/components/Postmark.tsx` |
 | Filters | `frontend/src/components/FilterBar.tsx`, `filters.ts` |
 | The resume page | `frontend/src/pages/ResumePage.tsx` |
-| Colours and font | `frontend/tailwind.config.ts` |
+| Colours and font | `frontend/tailwind.config.ts` (and `DESIGN.md` for the reasons) |
+| Buttons, fields and chips everywhere | `frontend/src/index.css` |
 | AI prompts | `backend/app/agent/resume_qa.py`, `backend/app/services/insights.py` |
 | A database table | `backend/app/models/` plus a migration (`/db-migration` skill) |
 | Hosting | `render.yaml`, `vercel.json`, `.github/workflows/refresh-jobs.yml` |

@@ -1,16 +1,15 @@
 /**
- * PostingsListPage: the jobs page, laid out like a job board.
+ * The jobs page.
  *
- *   ┌ search band ─ What [job, company, skill]  Where [province/state]  [Find jobs] ┐
- *   │ quick filters: level · work mode · country · All filters (n)                  │
- *   ├ results list (cards) ─────────┬ details of the selected job ──────────────────┤
+ * A tinted search strip on top with What, Where and Find jobs, and the quick filters under it.
+ * Below that the results list on the left and the picked job's details on the right.
  *
- * All state lives in the URL query string (useSearchParams), so views are shareable, Back from
- * a job restores the exact list, and refreshing keeps everything. Each change replaces the
- * current history entry so Back leaves the page instead of undoing filters one by one.
+ * Everything lives in the URL query string (useSearchParams) so views can be shared, Back from
+ * a job brings back the exact list, and a refresh keeps it all. Each change replaces the
+ * current history entry so Back leaves the page instead of undoing filters one at a time.
  *
- * Defaults are for students: co-op & internships, in Canada. ?level=entry adds entry-level
- * jobs, ?level=all everything; ?country=US or ?country=all adds US student roles.
+ * The defaults are for students, co-op and internships in Canada. ?level=entry adds entry level
+ * jobs and ?level=all shows everything. ?country=US or ?country=all adds US student roles.
  */
 
 import { useCallback, useEffect, useState } from 'react'
@@ -29,13 +28,13 @@ import {
   COUNTRY_CHOICES, LEVELS, WORK_MODES, countActive, countriesFor,
   type CountryChoice, type Filters, type Level,
 } from '../components/filters'
-import { ArrowRightIcon, FilterIcon, GridIcon, ListIcon, PinIcon, SearchIcon } from '../components/Icons'
+import { ArrowRightIcon, FilterIcon, ListIcon, PinIcon, SearchIcon, TableIcon } from '../components/Icons'
 import { PostingDetailPane } from '../components/PostingDetailView'
 import PostingsTable from '../components/PostingsTable'
 import { SearchModeToggle } from '../components/SearchModeToggle'
 import { isProvince, provinceName, workModeLabel } from '../utils/format'
 
-// URL param names: keep in one place so there's no typo drift
+// URL param names live in one place so nobody makes a typo
 const P = {
   q: 'q', city: 'city', province: 'province', term: 'term',
   work_mode: 'work_mode', duration: 'duration', skills: 'skills',
@@ -52,7 +51,7 @@ const CATEGORY_KEYS: CategoryKey[] = [
   'sales_marketing', 'customer',
 ]
 
-// One dropdown for sort field + direction, like most job boards
+// One menu for the sort field and direction like most job boards
 const SORTS: { value: string; label: string; sort: SortField; order: SortOrder }[] = [
   { value: 'posted_at:desc', label: 'Most recent', sort: 'posted_at', order: 'desc' },
   { value: 'deadline:asc', label: 'Deadline soonest', sort: 'deadline', order: 'asc' },
@@ -63,7 +62,7 @@ const SORTS: { value: string; label: string; sort: SortField; order: SortOrder }
 function readLevel(sp: URLSearchParams): Level {
   const raw = sp.get(P.level)
   if (raw === 'entry' || raw === 'all') return raw
-  return ''  // co-op & internships (older links used level=students for this)
+  return ''  // co-op and internships. Older links used level=students for this
 }
 
 function readCountry(sp: URLSearchParams): CountryChoice {
@@ -79,7 +78,7 @@ export default function PostingsListPage() {
   const hasResume = Boolean(matches?.resume)
   const [drawerOpen, setDrawerOpen] = useState(false)
 
-  // --- Read params from URL (with sensible defaults) -------------------------
+  // Read everything from the URL with sensible defaults
   const q            = sp.get(P.q) ?? ''
   const city         = sp.get(P.city) ?? ''
   const province     = sp.get(P.province) ?? ''
@@ -110,7 +109,7 @@ export default function PostingsListPage() {
     term, duration, company, skills, show_expired,
   }
 
-  // --- Fetch data ------------------------------------------------------------
+  // Get the jobs
   const { data, isLoading, isError, refetch } = usePostings({
     q: q || undefined,
     city: city || undefined,
@@ -137,11 +136,11 @@ export default function PostingsListPage() {
 
   const { data: meta, isLoading: metaLoading } = useFilterMeta()
 
-  // --- URL update helpers ---------------------------------------------------
+  // Helpers that write to the URL
   const update = useCallback((patches: Record<string, string | string[] | null>) => {
     setSp((prev) => {
       const next = new URLSearchParams(prev)
-      // A new filter or sort starts at page 1 with the first result selected
+      // A new filter or sort goes back to page 1 with the first job picked
       next.set(P.page, '1')
       next.delete(P.job)
       for (const [key, val] of Object.entries(patches)) {
@@ -186,7 +185,7 @@ export default function PostingsListPage() {
   }
 
   const clearAll = useCallback(() => {
-    // Keep the search text and layout; drop every filter
+    // Keep the search words and the layout and drop every filter
     const next = new URLSearchParams()
     if (q) next.set(P.q, q)
     if (view === 'table') next.set(P.view, 'table')
@@ -198,12 +197,14 @@ export default function PostingsListPage() {
   const totalPages = data ? Math.max(1, Math.ceil(data.total / page_size)) : 1
   const sortValue = `${sort}:${order}`
   const active = countActive(filters)
+  const first = data && data.total > 0 ? (page - 1) * page_size + 1 : 0
+  const last = data ? Math.min(data.total, page * page_size) : 0
 
   return (
     <div>
-      {/* ── Search band ─────────────────────────────────────────────────── */}
-      <div className="border-b border-gray-200 bg-white">
-        <div className="mx-auto max-w-7xl px-4 py-5">
+      {/* The search strip */}
+      <div className="border-b-[1.5px] border-gray-900 bg-gray-100">
+        <div className="mx-auto max-w-7xl px-4 pb-3 pt-3 md:pb-4 md:pt-5">
           <JobSearchForm
             q={q}
             province={province}
@@ -212,13 +213,21 @@ export default function PostingsListPage() {
             onSearch={(what, where) => update({ [P.q]: what || null, [P.province]: where || null, [P.city]: null })}
           />
 
-          {/* Quick filters: the ones people change most, one tap each */}
-          <div className="-mx-4 mt-4 flex items-center gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Quick filters">
+          {/* The filters people change most, one tap each */}
+          <div className="-mx-4 mt-3 flex items-center gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Quick filters">
+            <button type="button" onClick={() => setDrawerOpen(true)} className="chip shrink-0">
+              <FilterIcon className="h-4 w-4" />
+              All filters
+              {active > 0 && (
+                <span className="bg-post-600 px-1.5 text-xs font-bold text-white">{active}</span>
+              )}
+            </button>
+            <span className="mx-1 h-5 w-px shrink-0 bg-gray-400" aria-hidden="true" />
             <select
               aria-label="Experience level"
               value={level}
               onChange={(e) => changeFilters({ level: e.target.value as Level })}
-              className="shrink-0 rounded-full border border-gray-400 bg-white py-1 pl-3 pr-8 text-sm font-medium text-gray-800 hover:border-gray-600 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              className="chip shrink-0 py-1 pl-3 pr-8 focus:border-air-700 focus:outline-none focus:ring-0"
             >
               {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
             </select>
@@ -226,11 +235,11 @@ export default function PostingsListPage() {
               aria-label="Country"
               value={country}
               onChange={(e) => changeFilters({ country: e.target.value as CountryChoice, province: '', city: '' })}
-              className="shrink-0 rounded-full border border-gray-400 bg-white py-1 pl-3 pr-8 text-sm font-medium text-gray-800 hover:border-gray-600 focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              className="chip shrink-0 py-1 pl-3 pr-8 focus:border-air-700 focus:outline-none focus:ring-0"
             >
               {COUNTRY_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
             </select>
-            <span className="mx-1 h-5 w-px shrink-0 bg-gray-300" aria-hidden="true" />
+            <span className="mx-1 h-5 w-px shrink-0 bg-gray-400" aria-hidden="true" />
             {WORK_MODES.map((m) => (
               <span key={m} className="shrink-0">
                 <Pill
@@ -241,18 +250,6 @@ export default function PostingsListPage() {
                 </Pill>
               </span>
             ))}
-            <span className="mx-1 h-5 w-px shrink-0 bg-gray-300" aria-hidden="true" />
-            <button
-              type="button"
-              onClick={() => setDrawerOpen(true)}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-gray-400 bg-white px-3 py-1 text-sm font-medium text-gray-800 hover:border-gray-600 hover:bg-gray-50"
-            >
-              <FilterIcon className="h-4 w-4" />
-              All filters
-              {active > 0 && (
-                <span className="rounded-full bg-blue-600 px-1.5 text-xs font-semibold text-white">{active}</span>
-              )}
-            </button>
             {config?.semantic_search_enabled && (
               <span className="ml-auto shrink-0">
                 <SearchModeToggle
@@ -276,35 +273,41 @@ export default function PostingsListPage() {
         onClearAll={clearAll}
       />
 
-      <div className="mx-auto max-w-7xl space-y-4 px-4 py-5">
-        {/* Resume shortcut: match first, or jump back to the matches */}
-        {!meLoading && !hasResume && <ResumePrompt jobs={meta?.open_jobs} employers={meta?.companies?.length} />}
-        {hasResume && (
-          <Link
-            to="/resume"
-            className="flex items-center justify-between gap-3 rounded-md border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm text-blue-900 hover:bg-blue-100"
-          >
+      {/* Resume shortcut. Match first, or jump back to the matches */}
+      {!meLoading && !hasResume && <ResumePrompt jobs={meta?.open_jobs} employers={meta?.companies?.length} />}
+      {hasResume && (
+        <Link to="/resume" className="block border-b border-gray-200 bg-air-700 text-white hover:bg-air-800">
+          <span className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 text-sm">
             <span>
-              <span className="font-semibold">{matches?.items.length ?? 0} jobs fit your resume.</span>{' '}
+              <span className="font-bold">{matches?.items.length ?? 0} jobs fit your resume.</span>{' '}
               See them ranked, with why each one fits.
             </span>
             <ArrowRightIcon className="h-4 w-4 shrink-0" />
-          </Link>
-        )}
+          </span>
+        </Link>
+      )}
 
-        {/* Result count, sort, layout */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h1 className="text-base text-gray-800" aria-live="polite" aria-atomic="true">
-            {data ? (
-              <>
-                <span className="font-semibold text-gray-900">{data.total.toLocaleString()}</span>{' '}
-                {level === '' ? 'co-op and internship jobs' : 'jobs'}
-                {country === '' ? ' in Canada' : country === 'US' ? ' in the US' : ' in Canada and the US'}
-              </>
-            ) : 'Loading jobs...'}
-          </h1>
+      <div className="mx-auto max-w-7xl px-4 pb-8">
+        {/* How many, sort and layout */}
+        <div className="flex flex-wrap items-end justify-between gap-3 pb-3 pt-4">
+          <div>
+            <h1 className="display text-[22px] leading-tight text-gray-900 sm:text-[26px]" aria-live="polite" aria-atomic="true">
+              {data ? (
+                <>
+                  {data.total.toLocaleString()}{' '}
+                  {level === '' ? 'co-op and internship jobs' : 'jobs'}
+                  {country === '' ? ' in Canada' : country === 'US' ? ' in the US' : ' in Canada and the US'}
+                </>
+              ) : 'Loading jobs...'}
+            </h1>
+            {data && data.total > 0 && (
+              <p className="label-form mt-1">
+                Showing {first.toLocaleString()} to {last.toLocaleString()} of {data.total.toLocaleString()}
+              </p>
+            )}
+          </div>
           <div className="flex items-center gap-2">
-            <label htmlFor="sort-select" className="text-sm text-gray-600">Sort by</label>
+            <label htmlFor="sort-select" className="label-form">Sort by</label>
             <select
               id="sort-select"
               value={SORTS.some((s) => s.value === sortValue) ? sortValue : 'posted_at:desc'}
@@ -312,25 +315,27 @@ export default function PostingsListPage() {
                 const s = SORTS.find((x) => x.value === e.target.value)
                 if (s) update({ [P.sort]: s.sort, [P.order]: s.order })
               }}
-              className="rounded-md border border-gray-400 bg-white px-2.5 py-1.5 text-sm focus:border-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-600"
+              className="field w-auto py-1.5"
             >
               {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
-            <div className="hidden overflow-hidden rounded-md border border-gray-400 bg-white md:inline-flex" role="group" aria-label="Layout">
+            <div className="hidden overflow-hidden rounded-sm border-[1.5px] border-gray-400 bg-white md:inline-flex" role="group" aria-label="Layout">
               <ViewButton active={view === 'cards'} label="List" onClick={() => update({ [P.view]: null })}>
-                <GridIcon className="h-4 w-4" />
+                <ListIcon className="h-4 w-4" />
               </ViewButton>
               <ViewButton active={view === 'table'} label="Table" onClick={() => update({ [P.view]: 'table' })}>
-                <ListIcon className="h-4 w-4" />
+                <TableIcon className="h-4 w-4" />
               </ViewButton>
             </div>
           </div>
         </div>
 
-        <ActiveFilterChips filters={filters} meta={meta} onChange={changeFilters} onClearAll={clearAll} />
+        <div className="pb-3 empty:hidden">
+          <ActiveFilterChips filters={filters} meta={meta} onChange={changeFilters} onClearAll={clearAll} />
+        </div>
 
-        <div className={view === 'cards' ? 'grid gap-4 lg:grid-cols-[minmax(0,25rem)_minmax(0,1fr)]' : ''}>
-          <div className="min-w-0 space-y-4">
+        <div className={view === 'cards' ? 'grid lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,36rem)_minmax(0,1fr)]' : ''}>
+          <div className="-mx-4 min-w-0 sm:mx-0 lg:border-r lg:border-gray-200">
             <PostingsTable
               data={items}
               isLoading={isLoading}
@@ -346,69 +351,71 @@ export default function PostingsListPage() {
               onSelect={selectJob}
             />
 
-            {data && level === '' && data.total < 15 && (
-              <p className="text-sm text-gray-600">
-                Co-op and intern roles are posted in waves before each term.{' '}
-                <button type="button" className="font-medium text-blue-700 hover:underline" onClick={() => changeFilters({ level: 'entry' })}>
-                  Show entry-level jobs too
-                </button>
-                {country === '' && (
-                  <>
-                    {' '}or{' '}
-                    <button type="button" className="font-medium text-blue-700 hover:underline" onClick={() => changeFilters({ country: 'all' })}>
-                      add US internships
-                    </button>
-                  </>
-                )}
-                .
-              </p>
-            )}
+            <div className="space-y-4 px-4 pt-4 sm:px-0 lg:pr-5">
+              {data && level === '' && data.total < 15 && (
+                <p className="text-sm text-gray-700">
+                  Co-op and intern roles are posted in waves before each term.{' '}
+                  <button type="button" className="link" onClick={() => changeFilters({ level: 'entry' })}>
+                    Show entry level jobs too
+                  </button>
+                  {country === '' && (
+                    <>
+                      {' '}or{' '}
+                      <button type="button" className="link" onClick={() => changeFilters({ country: 'all' })}>
+                        add US internships
+                      </button>
+                    </>
+                  )}
+                  .
+                </p>
+              )}
 
-            {/* Pagination */}
-            {data && data.total > 0 && (
-              <nav className="flex flex-col items-center justify-between gap-3 sm:flex-row" aria-label="Pages">
-                <div className="flex items-center gap-2 text-sm text-gray-600">
-                  <label htmlFor="page-size-select">Per page</label>
-                  <select
-                    id="page-size-select"
-                    value={page_size}
-                    onChange={(e) => update({ [P.page_size]: e.target.value, [P.page]: '1' })}
-                    className="rounded-md border border-gray-400 bg-white px-2 py-1 text-sm focus:outline-none focus:ring-1 focus:ring-blue-600"
-                  >
-                    {PAGE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
-                  </select>
-                </div>
-                <div className="flex items-center gap-2 text-sm">
-                  <button
-                    disabled={page <= 1}
-                    onClick={() => update({ [P.page]: String(page - 1) })}
-                    className="rounded-md border border-gray-400 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    aria-label="Previous page"
-                  >
-                    Previous
-                  </button>
-                  <span className="px-2 text-gray-600">Page {page} of {totalPages}</span>
-                  <button
-                    disabled={page >= totalPages}
-                    onClick={() => update({ [P.page]: String(page + 1) })}
-                    className="rounded-md border border-gray-400 bg-white px-3 py-1.5 hover:bg-gray-50 disabled:opacity-40 focus:outline-none focus:ring-2 focus:ring-blue-600"
-                    aria-label="Next page"
-                  >
-                    Next
-                  </button>
-                </div>
-              </nav>
-            )}
-            <p className="text-xs text-gray-500">
-              Know a job that's missing? Signed-in users can <Link to="/add" className="underline">add it</Link>.
-            </p>
+              {/* Pages */}
+              {data && data.total > 0 && (
+                <nav className="flex flex-col items-center justify-between gap-3 sm:flex-row" aria-label="Pages">
+                  <div className="flex items-center gap-2 text-sm text-gray-700">
+                    <label htmlFor="page-size-select" className="label-form">Per page</label>
+                    <select
+                      id="page-size-select"
+                      value={page_size}
+                      onChange={(e) => update({ [P.page_size]: e.target.value, [P.page]: '1' })}
+                      className="field w-auto py-1"
+                    >
+                      {PAGE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
+                    </select>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm">
+                    <button
+                      disabled={page <= 1}
+                      onClick={() => update({ [P.page]: String(page - 1) })}
+                      className="btn-secondary px-3 py-1.5"
+                      aria-label="Previous page"
+                    >
+                      Previous
+                    </button>
+                    <span className="px-2 text-gray-700">Page {page} of {totalPages}</span>
+                    <button
+                      disabled={page >= totalPages}
+                      onClick={() => update({ [P.page]: String(page + 1) })}
+                      className="btn-secondary px-3 py-1.5"
+                      aria-label="Next page"
+                    >
+                      Next
+                    </button>
+                  </div>
+                </nav>
+              )}
+              <p className="text-xs text-gray-600">
+                Know a job that's missing? Signed in users can <Link to="/add" className="underline">add it</Link>.
+              </p>
+            </div>
           </div>
 
-          {/* Details of the selected job, next to the list on wide screens */}
+          {/* The picked job's details, next to the list on wide screens */}
           {view === 'cards' && items.length > 0 && (
             <aside
               aria-label="Job details"
-              className="hidden lg:sticky lg:top-20 lg:block lg:max-h-[calc(100vh-6rem)] lg:overflow-y-auto rounded-md border border-gray-200 bg-white"
+              className="hidden border-t-[1.5px] border-gray-900 bg-white lg:sticky lg:top-14 lg:block lg:max-h-[calc(100vh-3.5rem)] lg:overflow-y-auto"
             >
               <PostingDetailPane id={selectedId} />
             </aside>
@@ -419,7 +426,7 @@ export default function PostingsListPage() {
   )
 }
 
-/** What / Where / Find jobs, like a job board's search bar. */
+/** What, Where and Find jobs, like a job board's search bar. */
 function JobSearchForm({
   q, province, country, provinces, onSearch,
 }: {
@@ -431,7 +438,7 @@ function JobSearchForm({
 }) {
   const [what, setWhat] = useState(q)
   const [where, setWhere] = useState(province)
-  // Follow the URL when it changes elsewhere (Clear all, a chip, Back)
+  // Follow the URL when it changes somewhere else, like Clear all, a chip or Back
   useEffect(() => setWhat(q), [q])
   useEffect(() => setWhere(province), [province])
 
@@ -445,10 +452,10 @@ function JobSearchForm({
         e.preventDefault()
         onSearch(what.trim(), where)
       }}
-      className="flex flex-col gap-2 md:flex-row md:items-stretch md:gap-0 md:rounded-lg md:border md:border-gray-400 md:bg-white md:shadow-sm md:focus-within:border-blue-600"
+      className="flex flex-col gap-2 md:flex-row md:items-stretch md:gap-0 md:border-2 md:border-gray-900 md:bg-white md:focus-within:border-air-700"
     >
-      <label className="flex flex-1 items-center gap-2.5 rounded-lg border border-gray-400 bg-white px-3.5 md:rounded-none md:border-0">
-        <SearchIcon className="h-5 w-5 shrink-0 text-gray-500" />
+      <label className="flex flex-1 items-center gap-3 border-2 border-gray-900 bg-white px-3 md:border-0 md:px-4">
+        <SearchIcon className="h-5 w-5 shrink-0 text-gray-700" />
         <span className="sr-only">What</span>
         <input
           type="search"
@@ -456,12 +463,13 @@ function JobSearchForm({
           onChange={(e) => setWhat(e.target.value)}
           placeholder="Job title, keyword or company"
           aria-label="Search jobs by title, keyword or company"
-          className="w-full border-0 bg-transparent py-3 text-base text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0"
+          className="w-full border-0 bg-transparent py-2.5 text-base text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 md:py-3.5 md:text-[17px]"
         />
       </label>
-      <span className="hidden w-px self-stretch bg-gray-300 md:my-2 md:block" aria-hidden="true" />
-      <label className="flex items-center gap-2.5 rounded-lg border border-gray-400 bg-white px-3.5 md:w-72 md:rounded-none md:border-0">
-        <PinIcon className="h-5 w-5 shrink-0 text-gray-500" />
+      <span className="hidden w-[1.5px] self-stretch bg-gray-300 md:my-2.5 md:block" aria-hidden="true" />
+      <div className="flex gap-2 md:contents">
+      <label className="flex min-w-0 flex-1 items-center gap-3 border-2 border-gray-900 bg-white px-3 md:w-72 md:flex-none md:border-0 md:px-4">
+        <PinIcon className="h-5 w-5 shrink-0 text-gray-700" />
         <span className="sr-only">Where</span>
         <select
           value={where}
@@ -470,7 +478,7 @@ function JobSearchForm({
             onSearch(what.trim(), e.target.value)
           }}
           aria-label="Where"
-          className="w-full border-0 bg-transparent py-3 pl-0 text-base text-gray-900 focus:outline-none focus:ring-0"
+          className="w-full border-0 bg-transparent py-2.5 pl-0 text-base text-gray-900 focus:outline-none focus:ring-0 md:py-3.5 md:text-[17px]"
         >
           <option value="">{country === 'US' ? 'Anywhere in the US' : country === 'all' ? 'Anywhere' : 'Anywhere in Canada'}</option>
           {country !== 'US' && canadian.length > 0 && (
@@ -485,38 +493,30 @@ function JobSearchForm({
           )}
         </select>
       </label>
-      <button
-        type="submit"
-        className="rounded-lg bg-blue-600 px-6 py-3 text-base font-semibold text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-600 focus:ring-offset-2 md:m-1.5 md:py-2"
-      >
+      <button type="submit" className="btn-primary shrink-0 px-4 py-2.5 text-base md:border-0 md:px-8 md:py-3.5">
         Find jobs
       </button>
+      </div>
     </form>
   )
 }
 
-/** For visitors without a resume: one line pointing at the main feature. */
+/** For visitors with no resume yet. One line pointing at the main feature */
 function ResumePrompt({ jobs, employers }: { jobs?: number; employers?: number }) {
   return (
-    <section
-      aria-label="Match your resume"
-      className="flex flex-col gap-3 rounded-md border border-gray-200 bg-white px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div>
-        <p className="font-semibold text-gray-900">See which of these jobs fit you</p>
-        <p className="text-sm text-gray-600">
-          Upload your resume and we'll rank jobs by your program, graduation year and skills.
-          {jobs ? ` ${jobs.toLocaleString()} open jobs from ${employers ?? 'real'} employers.` : ''}
+    <section aria-label="Match your resume" className="border-b border-gray-200 bg-white">
+      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2">
+        <p className="min-w-0 text-sm text-gray-800">
+          <span className="font-bold text-gray-900">See which of these jobs fit you.</span>{' '}
+          <span className="hidden md:inline">
+            Upload your resume and we'll rank jobs by your program, graduation year and skills.
+            {jobs ? ` ${jobs.toLocaleString()} open jobs from ${employers ?? 'real'} employers.` : ''}
+          </span>
         </p>
-      </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
-        <Link
-          to="/resume"
-          className="inline-flex items-center gap-1.5 rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700"
-        >
-          Upload resume
-        </Link>
-        <DemoButton variant="header" label="Try a sample" />
+        <div className="flex shrink-0 items-center gap-2">
+          <Link to="/resume" className="btn-primary px-3 py-1">Upload resume</Link>
+          <span className="hidden sm:inline-flex"><DemoButton variant="secondary" label="Try a sample" /></span>
+        </div>
       </div>
     </section>
   )
@@ -531,7 +531,7 @@ function ViewButton({
       onClick={onClick}
       aria-pressed={active}
       title={label}
-      className={`flex items-center gap-1.5 px-2.5 py-1.5 text-sm ${active ? 'bg-gray-100 text-gray-900' : 'text-gray-500 hover:text-gray-800'}`}
+      className={`flex items-center gap-1.5 px-2.5 py-1.5 text-sm font-semibold ${active ? 'bg-gray-900 text-white' : 'text-gray-700 hover:text-gray-900'}`}
     >
       {children}
       <span className="sr-only lg:not-sr-only">{label}</span>

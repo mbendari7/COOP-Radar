@@ -1,22 +1,20 @@
 """
-Bring-your-own-key AI: one interface over Claude (Anthropic), ChatGPT (OpenAI), and Gemini (Google).
+AI with the visitor's own key. One way to talk to Claude, ChatGPT and Gemini.
 
-How keys flow
--------------
-The browser stores the visitor's key and sends it with each AI request in headers:
-    X-AI-Provider: anthropic | openai | gemini
-    X-AI-Key:      the visitor's API key
-    X-AI-Model:    model id chosen in the UI (optional for anthropic/gemini)
-The server forwards it to that provider for this one request. It is never stored, logged,
-or put in error messages. If a request has no key and the site owner configured their own
-ANTHROPIC_API_KEY, the owner's key is used instead (with the daily AI limit).
+How keys move
+The browser keeps the visitor's key and sends it with each AI request in these headers
+    X-AI-Provider  anthropic or openai or gemini
+    X-AI-Key       the visitor's API key
+    X-AI-Model     the model picked on the AI key page
+We pass it to that provider for this one request and that is it. It is never saved,
+logged or shown in an error. If there is no key and the site owner set ANTHROPIC_API_KEY
+we use the owner's key instead and the daily AI limit applies.
 
-Public surface
---------------
-credentials_from_headers()  -> AICredentials (user key, or server fallback, or 400)
-complete(creds, system, user)          -> full text reply
-stream(creds, system, user)            -> async iterator of text chunks
-list_models(provider, api_key)         -> chat models the key can use (for "Check key")
+What lives here
+credentials_from_headers  picks the key to use or answers 400
+complete                  gets the whole reply at once
+stream                    gets the reply piece by piece
+list_models               lists the chat models a key can use for Check key
 """
 
 from collections.abc import AsyncIterator
@@ -30,8 +28,8 @@ from app.config import get_settings
 Provider = Literal["anthropic", "openai", "gemini"]
 PROVIDERS: tuple[Provider, ...] = ("anthropic", "openai", "gemini")
 
-# Used when the browser doesn't send a model. OpenAI has no default: the UI always sends one
-# chosen from the key's own model list, so it never goes stale.
+# Used when the browser sends no model. OpenAI has none on purpose because the page always
+# sends one from the key's own model list so it never goes out of date
 DEFAULT_MODELS: dict[Provider, str | None] = {
     "anthropic": "claude-opus-5-5",
     "gemini": "gemini-flash-latest",
@@ -44,14 +42,14 @@ _MAX_KEY_LENGTH = 512
 @dataclass(frozen=True)
 class AICredentials:
     provider: Provider
-    api_key: str = field(repr=False)  # never printed in logs or tracebacks
+    api_key: str = field(repr=False)  # never shows up in logs or tracebacks
     model: str
-    # "user" = the visitor's own key (no limits); "server" = the site owner's key (daily limit)
+    # user is the visitor's own key with no limit and server is the owner's key with a daily cap
     source: Literal["user", "server"]
 
 
 class AIProviderError(Exception):
-    """A provider call failed in a way the user should hear about (bad key, rate limit)."""
+    """A provider call failed in a way the visitor should hear about, like a bad key."""
 
     def __init__(self, status_code: int, code: str, message: str) -> None:
         super().__init__(message)
@@ -78,8 +76,8 @@ def credentials_from_headers(
     task: Literal["rank", "chat"],
 ) -> AICredentials:
     """
-    Resolve which AI account to use for this request.
-    Raises 400 AI_KEY_REQUIRED when the visitor sent no key and the site has none either.
+    Work out which AI account to use for this request.
+    Answers 400 AI_KEY_REQUIRED when the visitor sent no key and the site has none either.
     """
     if api_key:
         if provider not in PROVIDERS:
@@ -101,16 +99,16 @@ def credentials_from_headers(
     )
 
 
-# ── Error translation ─────────────────────────────────────────────────────────
+# Turning provider errors into plain ones
 
 _PROVIDER_NAMES = {"anthropic": "Claude (Anthropic)", "openai": "OpenAI", "gemini": "Gemini"}
 
 
 def _translate(provider: Provider, exc: Exception) -> AIProviderError:
-    """Map each SDK's errors to one of three user-facing outcomes. Never echoes the key."""
+    """Turn each SDK's errors into one of three plain outcomes. Never repeats the key."""
     name = _PROVIDER_NAMES[provider]
     status_code = getattr(exc, "status_code", None) or getattr(exc, "code", None)
-    # Google answers a bad key with 400 INVALID_ARGUMENT + reason API_KEY_INVALID, not 401
+    # Google answers a bad key with 400 INVALID_ARGUMENT and reason API_KEY_INVALID instead of 401
     bad_google_key = "API_KEY_INVALID" in str(getattr(exc, "details", "") or "")
     if status_code in (401, 403) or bad_google_key:
         return AIProviderError(
@@ -130,11 +128,11 @@ def _translate(provider: Provider, exc: Exception) -> AIProviderError:
     )
 
 
-# ── Calls ─────────────────────────────────────────────────────────────────────
+# Calling the models
 
 
 async def complete(creds: AICredentials, system: str, user: str, max_tokens: int = 8000) -> str:
-    """One request, full text reply."""
+    """One request and the whole reply."""
     try:
         if creds.provider == "anthropic":
             from app.llm import get_client, response_text
@@ -174,14 +172,14 @@ async def complete(creds: AICredentials, system: str, user: str, max_tokens: int
         return gresponse.text or ""
     except AIProviderError:
         raise
-    except Exception as exc:  # noqa: BLE001 — every SDK has its own error classes
+    except Exception as exc:  # noqa: BLE001 every SDK has its own error classes
         raise _translate(creds.provider, exc) from exc
 
 
 async def stream(
     creds: AICredentials, system: str, user: str, max_tokens: int = 4000
 ) -> AsyncIterator[str]:
-    """Yield the reply as it is generated."""
+    """Hand back the reply bit by bit as it is written."""
     try:
         if creds.provider == "anthropic":
             from app.llm import get_client
@@ -234,12 +232,12 @@ async def stream(
         raise _translate(creds.provider, exc) from exc
 
 
-# ── Key check: which models can this key use? ───────────────────────────────
+# Checking a key and which models it can use
 
 _OPENAI_CHAT_PREFIXES = ("gpt-", "o1", "o3", "o4", "chatgpt")
 _OPENAI_EXCLUDE = ("audio", "realtime", "tts", "transcribe", "search", "image", "embedding",
                    "instruct", "moderation", "codex")
-# Preferred defaults, best first: the first model id starting with one of these is pre-selected
+# Our favourite defaults best first. The first model id that starts with one of these gets picked
 _PREFERRED: dict[Provider, tuple[str, ...]] = {
     "anthropic": ("claude-opus-5-5", "claude-sonnet-5-5", "claude-haiku-5-5", "claude-"),
     "openai": ("gpt-5", "gpt-4.1", "gpt-4o", "gpt-"),
@@ -249,7 +247,7 @@ _PREFERRED: dict[Provider, tuple[str, ...]] = {
 
 def recommended_model(provider: Provider, model_ids: list[str]) -> str | None:
     for prefix in _PREFERRED[provider]:
-        # Shortest id with the prefix = the base model rather than a dated/variant snapshot
+        # The shortest id with the prefix is the main model and not a dated snapshot
         matches = sorted((m for m in model_ids if m.startswith(prefix)), key=len)
         if matches:
             return matches[0]
@@ -257,7 +255,7 @@ def recommended_model(provider: Provider, model_ids: list[str]) -> str | None:
 
 
 async def list_models(provider: Provider, api_key: str) -> list[dict[str, str]]:
-    """Chat-capable models for this key as [{"id", "label"}]; AIProviderError on a bad key."""
+    """Chat models this key can use as id and label pairs. Raises AIProviderError on a bad key."""
     try:
         models: list[dict[str, str]] = []
         if provider == "anthropic":
@@ -287,14 +285,14 @@ async def list_models(provider: Provider, api_key: str) -> list[dict[str, str]]:
         raise _translate(provider, exc) from exc
 
 
-# ── FastAPI dependency ────────────────────────────────────────────────────────
+# FastAPI dependency
 
 
 def ai_credentials(task: Literal["rank", "chat"], optional: bool = False) -> Any:
     """
-    Dependency factory: `creds: AICredentials = Depends(ai_credentials("chat"))`.
-    With optional=True the dependency yields None (instead of 400 AI_KEY_REQUIRED) when
-    neither the visitor nor the site has a key, so the endpoint can use its free path.
+    Use it like this  creds: AICredentials = Depends(ai_credentials("chat"))
+    With optional=True you get None instead of a 400 when nobody has a key
+    so the endpoint can fall back to its free path.
     """
 
     def dependency(

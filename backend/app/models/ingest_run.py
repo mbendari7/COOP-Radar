@@ -1,4 +1,4 @@
-"""IngestRun ORM model — one row per ingestion attempt for one source."""
+"""One row for every import attempt from one source."""
 
 from datetime import datetime
 from typing import TYPE_CHECKING

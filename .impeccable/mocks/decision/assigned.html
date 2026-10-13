@@ -1,0 +1,68 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&display=swap" rel="stylesheet">
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{width:1440px;height:900px;overflow:hidden;font-family:Archivo,sans-serif;color:#16181D;background:#fff}
+.bar{background:#C8281E;color:#fff;height:64px;display:flex;align-items:center;padding:0 40px;gap:40px}
+.logo{font-stretch:75%;font-weight:800;font-size:26px;letter-spacing:.02em;text-transform:uppercase}
+.nav{display:flex;gap:28px;font-size:15px;font-weight:600}
+.nav a{opacity:.8}.nav .on{opacity:1;border-bottom:3px solid #fff;padding-bottom:18px;margin-bottom:-21px}
+.right{margin-left:auto;display:flex;gap:12px}
+.btn{border:2px solid #fff;padding:7px 16px;font-weight:700;font-size:14px}
+.btn.solid{background:#fff;color:#C8281E}
+.filters{background:#EEF1F6;padding:18px 40px;display:flex;gap:12px;align-items:center;border-bottom:1px solid #D5DBE6}
+.search{flex:1;max-width:520px;background:#fff;border:1.5px solid #16181D;padding:11px 14px;font-size:15px;color:#5B6170}
+.chip{background:#fff;border:1.5px solid #9AA3B5;padding:9px 14px;font-size:14px;font-weight:600}
+.chip.on{background:#1E3A8A;color:#fff;border-color:#1E3A8A}
+.wrap{display:grid;grid-template-columns:600px 1fr;height:calc(900px - 64px - 74px)}
+.list{border-right:1px solid #D5DBE6;overflow:hidden}
+.range{padding:14px 40px;font-stretch:80%;text-transform:uppercase;letter-spacing:.08em;font-size:12px;font-weight:700;color:#5B6170;border-bottom:2px solid #16181D;display:flex;justify-content:space-between}
+.row{display:grid;grid-template-columns:1fr 84px;gap:16px;padding:18px 40px;border-bottom:1px solid #E3E7EE}
+.row.sel{background:#EEF1F6;box-shadow:inset 4px 0 #C8281E}
+.t{font-size:18px;font-weight:700;line-height:1.25}
+.c{font-size:15px;margin-top:4px}
+.m{font-size:13px;color:#5B6170;margin-top:6px}
+.fit{font-size:13px;color:#1E3A8A;font-weight:600;margin-top:6px}
+.pm{width:78px;height:78px;border:2px solid #1E3A8A;border-radius:50%;color:#1E3A8A;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;font-stretch:70%;text-transform:uppercase;font-weight:700;line-height:1.1;transform:rotate(-8deg);position:relative}
+.pm:before{content:"";position:absolute;inset:5px;border:1px solid #1E3A8A;border-radius:50%}
+.pm b{font-size:18px}.pm span{font-size:10px;letter-spacing:.06em}
+.pm.red{border-color:#C8281E;color:#C8281E}.pm.red:before{border-color:#C8281E}
+.det{padding:36px 56px}
+.k{font-stretch:80%;text-transform:uppercase;letter-spacing:.1em;font-size:12px;font-weight:700;color:#C8281E}
+h1{font-size:40px;line-height:1.05;font-weight:800;font-stretch:88%;margin-top:10px;max-width:640px}
+.co{font-size:18px;margin-top:10px}
+.facts{display:flex;gap:40px;margin-top:26px;padding:18px 0;border-top:2px solid #16181D;border-bottom:1px solid #D5DBE6}
+.f small{display:block;font-stretch:80%;text-transform:uppercase;letter-spacing:.08em;font-size:11px;color:#5B6170;font-weight:700}
+.f strong{font-size:17px}
+.dl{margin-top:22px}.track{height:8px;background:#E3E7EE;margin-top:8px;width:520px}.track i{display:block;height:8px;width:31%;background:#C8281E}
+.why{margin-top:26px}.why li{list-style:none;font-size:16px;padding:8px 0 8px 22px;position:relative}
+.why li:before{content:"";position:absolute;left:0;top:15px;width:10px;height:10px;border-radius:50%;border:2px solid #1E3A8A}
+.apply{display:inline-block;margin-top:24px;background:#C8281E;color:#fff;font-weight:700;padding:14px 26px;font-size:16px}
+.save{display:inline-block;margin-left:10px;border:2px solid #16181D;font-weight:700;padding:12px 22px;font-size:16px}
+</style></head><body>
+<div class="bar"><div class="logo">CoopRadar</div>
+<div class="nav"><a class="on">Find jobs</a><a>Match my resume</a><a>Tracker</a><a>AI key</a></div>
+<div class="right"><span class="btn">Try the demo</span><span class="btn solid">Sign in</span></div></div>
+<div class="filters"><div class="search">Search titles, companies, skills</div>
+<span class="chip on">Co-op and intern</span><span class="chip">Winter 2027</span><span class="chip">Ontario</span><span class="chip">Remote ok</span><span class="chip">Software</span></div>
+<div class="wrap"><div class="list">
+<div class="range"><span>1 to 25 of 2,903 jobs</span><span>Newest first</span></div>
+<div class="row sel"><div><div class="t">Data Intern, Product Analytics, Winter 2027</div><div class="c">1Password</div><div class="m">Remote in Canada · Winter 2027 · 4 months</div><div class="fit">Fits: Computer Science, grad 2028</div></div>
+<div class="pm red"><span>Closes</span><b>27 NOV</b><span>Remote</span></div></div>
+<div class="row"><div><div class="t">Analog Mixed Signal Engineer Intern</div><div class="c">Astera Labs</div><div class="m">Toronto ON · Summer 2027 · On site</div><div class="fit">Fits: Electrical Engineering</div></div>
+<div class="pm"><span>Toronto</span><b>27 NOV</b><span>Ont</span></div></div>
+<div class="row"><div><div class="t">AI Software Engineer</div><div class="c">Snowflake</div><div class="m">Toronto ON · Remote</div></div>
+<div class="pm"><span>Toronto</span><b>27 NOV</b><span>Ont</span></div></div>
+<div class="row"><div><div class="t">DashMart Team Member</div><div class="c">DoorDash Canada</div><div class="m">Montréal QC · On site</div></div>
+<div class="pm"><span>Montréal</span><b>27 NOV</b><span>Qc</span></div></div>
+<div class="row"><div><div class="t">CyberSecurity Engineer Intern</div><div class="c">Astera Labs</div><div class="m">San Jose CA · Summer 2027</div></div>
+<div class="pm"><span>San Jose</span><b>27 NOV</b><span>US</span></div></div>
+</div>
+<div class="det"><div class="k">Co-op · Winter 2027</div>
+<h1>Data Intern, Product Analytics</h1><div class="co">1Password · Remote in Canada</div>
+<div class="facts"><div class="f"><small>Term</small><strong>Jan to Apr 2027</strong></div><div class="f"><small>Length</small><strong>4 months</strong></div><div class="f"><small>Programs</small><strong>CS, Stats, Math</strong></div><div class="f"><small>Grad year</small><strong>2027 or 2028</strong></div></div>
+<div class="dl"><div class="k">45 days left to apply</div><div class="track"><i></i></div></div>
+<ul class="why"><li>Asks for SQL and Python, both on your resume</li><li>Open to Computer Science students graduating in 2028</li><li>Winter term matches what you picked</li></ul>
+<span class="apply">Apply on 1Password</span><span class="save">Save to tracker</span></div></div>
+</body></html>

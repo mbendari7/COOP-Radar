@@ -1,13 +1,13 @@
 """
-Eval suite for the AI Resume Matcher (25 fixture-based cases).
+Checks for the AI resume matcher with 25 set cases.
 
-Gates (from spec SC3/SC4 and constitution IV):
-  - Citation rate >= 80% across Q&A cases (citations present in response)
-  - Zero factual errors (all "don't know" cases return the exact expected phrase)
-  - Score range cases: strong/mid/weak resumes land in correct buckets
+What has to pass
+  At least 80% of the Q and A cases cite a source in the answer
+  No made up facts. Every do not know case gives the exact expected sentence
+  Score cases put strong, middle and weak resumes in the right buckets
 
-All Anthropic and OpenAI calls are mocked, so this suite checks the pipeline's
-handling of model output (parsing, citations, score bounds) — not live model quality.
+Every Anthropic and OpenAI call is faked, so this checks how we handle what the
+model sends back, like parsing, citations and score limits, and not how good a live model is.
 """
 
 import json
@@ -22,9 +22,7 @@ from app.ai import AICredentials
 
 TEST_CREDS = AICredentials("anthropic", "sk-test-key", "claude-test", "user")
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 CITATION_RE = re.compile(r"\b(?:Resume|Posting):\s")
 DONT_KNOW_PHRASE = "I don't have enough information to answer that."
@@ -39,7 +37,7 @@ def _is_dont_know(text: str) -> bool:
 
 
 async def _collect(question: str, posting_text: str, resume_text: str) -> str:
-    """Run stream_answer and join the streamed deltas."""
+    """Run stream_answer and join the streamed pieces."""
     from app.agent.resume_qa import stream_answer
 
     chunks: list[str] = []
@@ -51,9 +49,7 @@ async def _collect(question: str, posting_text: str, resume_text: str) -> str:
     return "".join(chunks)
 
 
-# ---------------------------------------------------------------------------
-# Cases 1–10: Q&A produces Resume: citation
-# ---------------------------------------------------------------------------
+# Cases 1 to 10. Q and A cites the resume
 
 RESUME_CITATION_CASES = [
     ("What Python experience do I have?", "Resume: Python projects listed in experience section."),
@@ -76,7 +72,7 @@ async def test_qa_resume_citation(
     expected_response: str,
     mock_claude_stream: Callable[..., MagicMock],
 ) -> None:
-    """Q&A response cites resume when relevant resume content exists."""
+    """The answer cites the resume when the resume has something relevant."""
     mock_claude_stream(expected_response)
     full_response = await _collect(
         question,
@@ -88,9 +84,7 @@ async def test_qa_resume_citation(
     )
 
 
-# ---------------------------------------------------------------------------
-# Cases 11–15: Q&A produces Posting: citation
-# ---------------------------------------------------------------------------
+# Cases 11 to 15. Q and A cites the posting
 
 POSTING_CITATION_CASES = [
     ("What does this role require?", "Posting: requires Python, Django, and PostgreSQL."),
@@ -108,7 +102,7 @@ async def test_qa_posting_citation(
     expected_response: str,
     mock_claude_stream: Callable[..., MagicMock],
 ) -> None:
-    """Q&A response cites posting when relevant posting content exists."""
+    """The answer cites the posting when the posting has something relevant."""
     mock_claude_stream(expected_response)
     full_response = await _collect(
         question,
@@ -120,9 +114,7 @@ async def test_qa_posting_citation(
     )
 
 
-# ---------------------------------------------------------------------------
-# Cases 16–20: AI correctly says "don't know"
-# ---------------------------------------------------------------------------
+# Cases 16 to 20. The AI rightly says it does not know
 
 DONT_KNOW_CASES = [
     "What is the company's GPA requirement?",
@@ -139,7 +131,7 @@ async def test_qa_dont_know(
     question: str,
     mock_claude_stream: Callable[..., MagicMock],
 ) -> None:
-    """AI says 'don't know' for questions not answerable from context."""
+    """The AI says it does not know when the answer is not in the text."""
     mock_claude_stream(DONT_KNOW_PHRASE)
     full_response = await _collect(
         question,
@@ -151,9 +143,7 @@ async def test_qa_dont_know(
     )
 
 
-# ---------------------------------------------------------------------------
-# Cases 21–25: Match score range validation
-# ---------------------------------------------------------------------------
+# Cases 21 to 25. Match scores land in the right range
 
 _STRONG_RESUME = "Skills: Python, Django, PostgreSQL, Docker, AWS, REST APIs, FastAPI"
 _MID_RESUME = "Skills: Python, SQL, some web development experience"
@@ -163,7 +153,7 @@ _IRRELEVANT_RESUME = "Skills: carpentry, plumbing, electrical wiring"
 
 @pytest.mark.asyncio
 async def test_score_strong_resume(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Strong match resume → score >= 70."""
+    """A strong resume scores 70 or more."""
     import json
 
     from app.services.resume import embed_and_rank
@@ -196,7 +186,7 @@ async def test_score_strong_resume(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_score_mid_resume(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Mid-level resume → score 40–69."""
+    """A middle resume scores 40 to 69."""
     import json
 
     from app.services.resume import embed_and_rank
@@ -229,7 +219,7 @@ async def test_score_mid_resume(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_score_weak_resume(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Weak resume → score < 40."""
+    """A weak resume scores under 40."""
     import json
 
     from app.services.resume import embed_and_rank
@@ -262,7 +252,7 @@ async def test_score_weak_resume(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_score_irrelevant_resume(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Irrelevant resume → score < 20."""
+    """An unrelated resume scores under 20."""
     import json
 
     from app.services.resume import embed_and_rank
@@ -295,7 +285,7 @@ async def test_score_irrelevant_resume(monkeypatch: pytest.MonkeyPatch) -> None:
 
 @pytest.mark.asyncio
 async def test_score_empty_db_returns_empty(monkeypatch: pytest.MonkeyPatch) -> None:
-    """No postings in DB → empty match list."""
+    """No jobs in the database gives an empty match list."""
     from app.services.resume import embed_and_rank
 
     monkeypatch.setattr("app.ingest.embed.generate_embedding", AsyncMock(return_value=[0.5] * 1536))
@@ -310,14 +300,12 @@ async def test_score_empty_db_returns_empty(monkeypatch: pytest.MonkeyPatch) -> 
     assert results == []
 
 
-# ---------------------------------------------------------------------------
-# Aggregate gate: citation rate >= 80%
-# ---------------------------------------------------------------------------
+# The overall bar of 80% or more citations
 
 def test_citation_rate_gate() -> None:
     """
-    Verify that the 15 citation cases above would yield >= 80% citation rate.
-    This is a compile-time check on the fixture design itself.
+    Check that the 15 citation cases above would give 80% or more citations.
+    This checks how the cases themselves are set up.
     """
     all_citation_responses = (
         [resp for _, resp in RESUME_CITATION_CASES]
@@ -333,7 +321,7 @@ def test_citation_rate_gate() -> None:
 
 
 def test_dont_know_exact_phrase_gate() -> None:
-    """All don't-know fixtures must contain the exact expected phrase."""
+    """Every do not know case has to have the exact expected sentence."""
     for question in DONT_KNOW_CASES:
         assert _is_dont_know(DONT_KNOW_PHRASE), (
             f"Don't-know fixture for '{question}' does not contain expected phrase."

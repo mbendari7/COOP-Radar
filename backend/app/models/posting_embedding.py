@@ -1,4 +1,4 @@
-"""PostingEmbedding ORM model — pgvector embedding for each posting (1:1)."""
+"""The pgvector embedding for each job, one per job."""
 
 from datetime import datetime
 from uuid import UUID
@@ -26,7 +26,7 @@ class PostingEmbedding(Base):
     )
 
     __table_args__ = (
-        # HNSW index for fast approximate cosine-distance (<=>) queries
+        # HNSW index so closest match lookups stay fast
         Index(
             "idx_posting_embeddings_hnsw",
             "embedding",

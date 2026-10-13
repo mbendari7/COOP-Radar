@@ -1,0 +1,100 @@
+{
+  "title": "Choose the visual world for CoopRadar",
+  "question": "The roll assigned Registered Mail. Keep it, take an alternate, or re-roll.",
+  "options": [
+    {
+      "id": "assigned",
+      "label": "Registered Mail",
+      "kicker": "THE ROLL",
+      "lineage": "Canadian post office counters, envelopes, postmarks and tracking slips",
+      "thesis": "Every application is a letter you send, and every job wears a postmark.",
+      "palette": ["#C8281E", "#1E3A8A", "#FFFFFF", "#EEF1F6", "#16181D"],
+      "materials": ["postmark ink rings", "envelope security tint", "condensed form lettering"],
+      "viewport": "A solid postal red top bar, a white job list with no card boxes, each row stamped with a round postmark showing its city and closing date, details panel on the right like the front of an envelope.",
+      "risk": "If the postmark gets overused it turns into a costume instead of a date badge.",
+      "raised": [
+        {"from": "challenger-specimen", "raise": "No card boxes: rows and panels are split by type size and thin rules only."},
+        {"from": "challenger-zoo-map", "raise": "Colour owns whole regions: the red bar and the tinted filter strip run full width."},
+        {"from": "challenger-labanotation", "raise": "Time is drawn to scale: a deadline bar shows the real days left."},
+        {"from": "challenger-lexicon", "raise": "The list header names the range you are looking at, like 1 to 25 of 2,903."}
+      ],
+      "html": ".impeccable/mocks/decision/assigned.html"
+    },
+    {
+      "id": "model-pick",
+      "label": "Transit Line",
+      "kicker": "IMPECCABLE’S PICK",
+      "lineage": "Canadian subway and LRT wayfinding maps",
+      "thesis": "Your co-op search drawn as a subway line, with each stage as a stop.",
+      "palette": ["#FFFFFF", "#141414", "#F2B705", "#00843D", "#D7282F"],
+      "materials": ["line diagrams", "station dots", "wayfinding signage type"],
+      "viewport": "Black top bar with yellow active line, job list with coloured line markers per term, tracker drawn as stations from Saved to Offer.",
+      "risk": "Transit maps are a common metaphor, so it can feel familiar.",
+      "html": ".impeccable/mocks/decision/model-pick.html"
+    },
+    {
+      "id": "challenger-specimen",
+      "label": "Type Specimen",
+      "verdict": "declined",
+      "lineage": "variable font specimen sheets",
+      "thesis": "Hierarchy by size alone on bare paper.",
+      "palette": ["#FAFAFA", "#111111", "#FF4F00"],
+      "materials": ["huge display type", "tiny mono labels"],
+      "viewport": "Giant job title, tiny labels.",
+      "risk": "Students do not see themselves in a type foundry.",
+      "case": "Loses on both: no link to students or co-op.",
+      "kept": "No card boxes, hierarchy by type scale and rules."
+    },
+    {
+      "id": "challenger-labanotation",
+      "label": "Dance Score",
+      "verdict": "declined",
+      "lineage": "Labanotation scores",
+      "thesis": "Length is exact duration.",
+      "palette": ["#FFFFFF", "#000000", "#D9D9D9"],
+      "materials": ["shaded blocks", "centre staff"],
+      "viewport": "Vertical staff of jobs.",
+      "risk": "Unreadable for a job search.",
+      "case": "Loses on both: foreign to the audience and the task.",
+      "kept": "Deadline bars drawn to real length."
+    },
+    {
+      "id": "challenger-zoo-map",
+      "label": "Guide Map",
+      "verdict": "declined",
+      "lineage": "zoo and gardens guide maps",
+      "thesis": "Flat colour lobes own each area.",
+      "palette": ["#8ED462", "#F5F1E4", "#2C2E2A", "#F5E211"],
+      "materials": ["flat fills", "capsule controls"],
+      "viewport": "One colour lobe per screen.",
+      "risk": "Playful shapes fight dense lists.",
+      "case": "Loses on both: hurts scanning hundreds of jobs.",
+      "kept": "Colour owns whole regions, not small accents."
+    },
+    {
+      "id": "challenger-lexicon",
+      "label": "Lexicon Page",
+      "verdict": "declined",
+      "lineage": "19th century reference lexicons",
+      "thesis": "Guide words name the span in view.",
+      "palette": ["#F4EEDF", "#141414", "#C4361C"],
+      "materials": ["engraving black", "bordered plates"],
+      "viewport": "Dense columns with guide words.",
+      "risk": "Old book look reads as dusty.",
+      "case": "Loses on both: wrong era for students.",
+      "kept": "The list header names the range in view."
+    }
+  ],
+  "reroll": {"registers": ["safer", "bolder"]},
+  "canon": true,
+  "canonCard": {
+    "label": "The category standard",
+    "thesis": "A clean job board like LinkedIn or Indeed, done carefully.",
+    "palette": ["#FFFFFF", "#111827", "#2557A7"],
+    "materials": ["clean grid", "neutral greys"],
+    "viewport": "White header, search bar, job list and details panel.",
+    "risk": "Looks like every other job board, which is what you said you want to leave.",
+    "html": ".impeccable/mocks/decision/canon.html"
+  },
+  "steer": true
+}

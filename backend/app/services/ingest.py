@@ -1,4 +1,4 @@
-"""Service layer for admin ingest source management."""
+"""The admin side of managing import sources."""
 
 from datetime import UTC, datetime
 from uuid import UUID
@@ -19,8 +19,8 @@ def _source_not_found() -> HTTPException:
 
 
 async def list_sources(db: AsyncSession) -> list[IngestSourceOut]:
-    """List all ingest sources with their latest run stats."""
-    # Subquery: most recent run per source
+    """List every source with how its last run went."""
+    # Subquery for the newest run of each source
     latest_run_sq = (
         select(
             IngestRun.source_id,
@@ -72,7 +72,7 @@ async def list_runs(
     page: int = 1,
     page_size: int = 20,
 ) -> RunsPage:
-    """Return paginated run history for a source."""
+    """Run history for one source, a page at a time."""
     source = await db.get(IngestSource, source_id)
     if source is None:
         raise _source_not_found()
@@ -108,9 +108,9 @@ async def list_runs(
 
 async def trigger_run(db: AsyncSession, source_id: UUID) -> TriggerRunOut:
     """
-    Trigger an immediate ingestion run for the given source.
-    Returns 409 if a run is already in progress.
-    Returns 422 if the source is auto-paused.
+    Run an import for this source right now.
+    Answers 409 if a run is already going.
+    Answers 422 if the source was paused on its own after failing.
     """
     source = await db.get(IngestSource, source_id)
     if source is None:
@@ -125,7 +125,7 @@ async def trigger_run(db: AsyncSession, source_id: UUID) -> TriggerRunOut:
             },
         )
 
-    # Check if already running
+    # Is one already running
     running_stmt = select(IngestRun).where(
         IngestRun.source_id == source_id,
         IngestRun.status == "running",
@@ -137,15 +137,15 @@ async def trigger_run(db: AsyncSession, source_id: UUID) -> TriggerRunOut:
             detail={"detail": "A run is already in progress.", "code": "ALREADY_RUNNING"},
         )
 
-    # Create the run record now so the admin UI shows "running" immediately;
-    # the background job picks up this same run via run_id and fills in the results.
+    # Make the run row now so the admin page shows running right away.
+    # The background job picks up this same run by run_id and fills in the results
     run = IngestRun(
         source_id=source_id,
         started_at=datetime.now(UTC),
         status="running",
     )
     db.add(run)
-    # Commit before starting the job: it loads this run in its own session
+    # Commit before starting the job since it loads this run in its own session
     await db.commit()
 
     try:
@@ -153,8 +153,8 @@ async def trigger_run(db: AsyncSession, source_id: UUID) -> TriggerRunOut:
 
         jobs.enqueue("run_source", str(source_id), str(run.id))
     except Exception as exc:  # noqa: BLE001
-        # If the job can't start, the run could never finish — record it as failed instead
-        # of leaving a "running" row that would block every future trigger.
+        # If the job cannot start the run would never finish, so mark it failed instead
+        # of leaving a running row that blocks every future run
         run.status = "failed"
         run.finished_at = datetime.now(UTC)
         run.errors = 1
@@ -176,7 +176,7 @@ async def patch_source(
     source_id: UUID,
     data: SourcePatchIn,
 ) -> IngestSourceOut:
-    """Enable, disable, or un-pause a source."""
+    """Turn a source on or off, or unpause it."""
     source = await db.get(IngestSource, source_id)
     if source is None:
         raise _source_not_found()
@@ -186,7 +186,7 @@ async def patch_source(
     if data.auto_paused is not None:
         source.auto_paused = data.auto_paused
         if not data.auto_paused:
-            source.consecutive_failures = 0  # reset on re-enable
+            source.consecutive_failures = 0  # start fresh when turned back on
 
     await db.commit()
     await db.refresh(source)

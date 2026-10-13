@@ -1,21 +1,21 @@
 /**
- * TanStack Query hooks for authentication and account management.
+ * TanStack Query hooks for signing in and managing the account.
  *
- * Every call goes through apiFetch, which sends the HTTP-only session cookie
- * (credentials: 'include') and throws ApiError({ status, code }) on failure.
+ * Every call goes through apiFetch, which sends the HTTP only session cookie
+ * and throws an ApiError with the status and code when something fails.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ApiError, apiFetch } from './client'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// Types
 
 export interface UserOut {
   id: string
   email: string
   created_at: string
   is_admin: boolean
-  /** Temporary account (demo or guest) — deleted after 7 days unless saved with /api/me/claim */
+  /** A temporary demo or guest account. Deleted after 7 days unless kept with /api/me/claim */
   is_demo: boolean
 }
 
@@ -24,9 +24,9 @@ interface Credentials {
   password: string
 }
 
-// ── Fetchers ──────────────────────────────────────────────────────────────────
+// Calls to the server
 
-/** Current user, or null when not signed in (a 401 is an expected answer here). */
+/** The signed in user, or null when nobody is. A 401 is a normal answer here. */
 async function fetchMe(): Promise<UserOut | null> {
   try {
     return await apiFetch<UserOut>('/api/me')
@@ -47,9 +47,9 @@ export function deleteAccount(password: string): Promise<void> {
   return apiFetch<void>('/api/me', { method: 'DELETE', json: { password } })
 }
 
-// ── Hooks ─────────────────────────────────────────────────────────────────────
+// Hooks
 
-/** The signed-in user (null when signed out). retry: false so 401s aren't retried. */
+/** The signed in user, or null. retry is off so a 401 is not asked again. */
 export function useMe() {
   return useQuery({
     queryKey: ['me'],
@@ -59,7 +59,7 @@ export function useMe() {
   })
 }
 
-/** Register a new account. Refreshes 'me' on success. */
+/** Make a new account. Refreshes me when it works. */
 export function useRegister() {
   const qc = useQueryClient()
   return useMutation({
@@ -68,7 +68,7 @@ export function useRegister() {
   })
 }
 
-/** Log in. Refreshes 'me' and any per-user data (e.g. is_saved flags) on success. */
+/** Sign in. Refreshes me and anything personal like the saved marks when it works. */
 export function useLogin() {
   const qc = useQueryClient()
   return useMutation({
@@ -78,8 +78,8 @@ export function useLogin() {
 }
 
 /**
- * "Try the demo": the server creates a private, pre-filled demo account and logs into it.
- * Refreshes all cached data so every page reflects the new account.
+ * Try the demo. The server makes a private demo account with sample data and signs into it.
+ * Refreshes everything cached so every page shows the new account.
  */
 export function useDemoLogin() {
   const qc = useQueryClient()
@@ -90,14 +90,14 @@ export function useDemoLogin() {
 }
 
 /**
- * Start without signing up: the server creates an empty temporary account and logs into it.
- * Used when a signed-out visitor uploads their resume.
+ * Start without signing up. The server makes an empty temporary account and signs into it.
+ * Used when someone who is not signed in uploads their resume.
  */
 export function guestLogin(): Promise<UserOut> {
   return apiFetch<UserOut>('/api/auth/guest', { method: 'POST' })
 }
 
-/** Keep a temporary account: add an email + password. All saved jobs and the resume stay. */
+/** Keep a temporary account by adding an email and password. Saved jobs and the resume stay. */
 export function useClaimAccount() {
   const qc = useQueryClient()
   return useMutation({
@@ -106,12 +106,12 @@ export function useClaimAccount() {
   })
 }
 
-/** Log out. Clears every cached query so no stale user data is shown afterwards. */
+/** Sign out. Clears everything cached so no old personal data shows up after. */
 export function useLogout() {
   const qc = useQueryClient()
   return useMutation({
     mutationFn: () => apiFetch<void>('/api/auth/logout', { method: 'POST' }),
-    // Clear even if the server call failed (e.g. session already expired)
+    // Clear it even if the server call failed, like when the session already ran out
     onSettled: () => qc.clear(),
   })
 }

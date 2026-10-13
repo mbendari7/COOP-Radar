@@ -1,4 +1,4 @@
-"""IngestSource ORM model — one row per configured ingestion source."""
+"""One row for every place we import jobs from."""
 
 from datetime import datetime
 from typing import TYPE_CHECKING, Any

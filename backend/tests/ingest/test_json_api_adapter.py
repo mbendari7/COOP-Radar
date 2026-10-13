@@ -1,4 +1,4 @@
-"""Tests for JsonApiAdapter using respx fixture mocking — no live network calls."""
+"""Tests for JsonApiAdapter with respx faking the replies, so nothing goes over the network."""
 
 import json
 from pathlib import Path
@@ -14,7 +14,7 @@ FIXTURE_DIR = Path(__file__).parent.parent / "fixtures" / "ingest"
 
 
 def make_source(url: str, field_map: dict | None = None):
-    """Helper to create a minimal IngestSource-like object."""
+    """Makes a small object that looks enough like an IngestSource."""
 
     class FakeSource:
         config = {"url": url, "field_map": field_map or {}}
@@ -24,7 +24,7 @@ def make_source(url: str, field_map: dict | None = None):
 
 @pytest.mark.asyncio
 async def test_happy_path_returns_raw_postings():
-    """Happy path: 5 raw postings returned matching acme_jobs.json fixture."""
+    """The normal case. 5 raw jobs come back matching the acme_jobs.json file."""
     fixture_data = json.loads((FIXTURE_DIR / "acme_jobs.json").read_text())
 
     with respx.mock(assert_all_called=True) as mock:
@@ -45,7 +45,7 @@ async def test_happy_path_returns_raw_postings():
 
 @pytest.mark.asyncio
 async def test_http_500_raises_adapter_error():
-    """Non-200 HTTP response raises AdapterError."""
+    """A reply that is not 200 raises AdapterError."""
     with respx.mock() as mock:
         mock.get("https://broken.example.com/jobs").mock(
             return_value=Response(500)
@@ -59,7 +59,7 @@ async def test_http_500_raises_adapter_error():
 
 @pytest.mark.asyncio
 async def test_empty_array_returns_empty_list():
-    """Empty array response returns an empty list (no exception)."""
+    """An empty list reply gives an empty list and no error."""
     with respx.mock() as mock:
         mock.get("https://empty.example.com/jobs").mock(
             return_value=Response(200, json=[])
@@ -73,7 +73,7 @@ async def test_empty_array_returns_empty_list():
 
 @pytest.mark.asyncio
 async def test_field_map_remapping():
-    """Custom field_map correctly remaps response keys to RawPosting fields."""
+    """A custom field_map maps reply keys onto RawPosting fields."""
     data = [
         {
             "job_title": "QA Engineer Co-op",

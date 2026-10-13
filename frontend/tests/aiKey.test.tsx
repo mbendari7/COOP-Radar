@@ -1,6 +1,6 @@
 /**
- * Bring-your-own-key tests: the key stays in the browser, rides along only as AI headers,
- * and the AI key page checks a key, picks a model, and saves it.
+ * Tests for the visitor's own AI key. The key stays in the browser, only goes along as AI
+ * headers, and the AI key page checks a key, picks a model and saves it.
  */
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'

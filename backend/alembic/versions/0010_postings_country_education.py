@@ -1,5 +1,4 @@
-"""postings.country, grad_years and fields_of_study (US internships, co-op matching by program);
-SmartRecruiters career boards
+"""postings.country, grad_years and fields_of_study plus SmartRecruiters boards
 
 Revision ID: 0010
 Revises: 0009
@@ -20,7 +19,7 @@ _ADAPTERS_NEW = _ADAPTERS_OLD + ",'smartrecruiters'"
 
 
 def upgrade() -> None:
-    # Every posting so far was imported with the Canada filter
+    # Every job so far came in with the Canada filter
     op.add_column(
         "postings", sa.Column("country", sa.String(length=2), server_default="CA", nullable=False)
     )

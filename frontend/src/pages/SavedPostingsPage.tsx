@@ -1,12 +1,12 @@
 /**
- * SavedPostingsPage — /saved route.
+ * The tracker at /saved.
  *
- * Two views:
- *  - Table: filterable by status, with StatusBadge, events history, and pagination
- *  - Board: dnd-kit Kanban grouped by status, drag to change status
+ * Two views
+ *   List can be filtered by stage and has the stage menu, the history and pages
+ *   Board groups jobs into columns by stage and you drag to change the stage
  *
- * Also shows stats panel and deadlines-this-week panel.
- * Redirects to home if not authenticated.
+ * It also shows how things are going and the deadlines this week.
+ * People who are not signed in get a short note and a link back to the jobs.
  */
 
 import { useState } from 'react'
@@ -23,6 +23,7 @@ import {
 import ApplicationEventsHistory from '../components/ApplicationEventsHistory'
 import BookmarkButton from '../components/BookmarkButton'
 import DeadlinesPanel from '../components/DeadlinesPanel'
+import StageStamp from '../components/StageStamp'
 import StatsPanel from '../components/StatsPanel'
 import StatusBadge from '../components/StatusBadge'
 import TrackerBoard from '../components/TrackerBoard'
@@ -41,7 +42,7 @@ export default function SavedPostingsPage() {
   const [activeStatus, setActiveStatus] = useState<ApplicationStatus | undefined>(undefined)
   const [page, setPage] = useState(1)
 
-  // Board needs all items — skip pagination when in board view
+  // The board needs every job so it skips paging
   const { data, isLoading, isError, refetch } = useSavedPostings(
     me
       ? view === 'board'
@@ -53,19 +54,16 @@ export default function SavedPostingsPage() {
   const unsave = useUnsavePosting()
 
   if (meLoading) {
-    return <div className="flex justify-center items-center h-64 text-gray-500">Loading...</div>
+    return <div className="flex h-64 items-center justify-center text-gray-600">Loading...</div>
   }
 
   if (!me) {
     return (
-      <div className="max-w-lg mx-auto mt-20 text-center px-4">
-        <h1 className="text-2xl font-semibold text-gray-900 mb-3">Saved Postings</h1>
-        <p className="text-gray-500 mb-6">Sign in to see and manage your saved postings.</p>
-        <Link
-          to="/"
-          className="inline-block px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700"
-        >
-          Back to postings
+      <div className="mx-auto mt-20 max-w-lg px-4 text-center">
+        <h1 className="display mb-3 text-3xl text-gray-900">Tracker</h1>
+        <p className="mb-6 text-gray-700">Sign in to see and manage the jobs you saved.</p>
+        <Link to="/" className="btn-primary">
+          Back to jobs
         </Link>
       </div>
     )
@@ -74,42 +72,38 @@ export default function SavedPostingsPage() {
   const statusCounts = data?.status_counts ?? {}
 
   return (
-    <div className="max-w-6xl mx-auto px-4 py-8">
-      {/* Header row */}
-      <div className="flex items-center justify-between mb-4 gap-4 flex-wrap">
-        <h1 className="text-2xl font-semibold text-gray-900">Saved Postings</h1>
+    <div className="mx-auto max-w-6xl px-4 py-8">
+      {/* Title row */}
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
+        <h1 className="display text-4xl text-gray-900">Tracker</h1>
 
         <div className="flex items-center gap-2">
-          {/* View toggle */}
-          <div className="flex rounded-lg border border-gray-200 overflow-hidden text-sm" role="group" aria-label="View mode">
+          {/* List or board */}
+          <div className="flex overflow-hidden rounded-sm border-[1.5px] border-gray-900 text-sm font-bold" role="group" aria-label="View mode">
             <button
               onClick={() => setView('table')}
               aria-pressed={view === 'table'}
-              className={`px-3 py-1.5 ${view === 'table' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              className={`px-3 py-1.5 ${view === 'table' ? 'bg-gray-900 text-white' : 'bg-white text-gray-800 hover:bg-gray-100'}`}
             >
-              Table
+              List
             </button>
             <button
               onClick={() => setView('board')}
               aria-pressed={view === 'board'}
-              className={`px-3 py-1.5 border-l border-gray-200 ${view === 'board' ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+              className={`border-l-[1.5px] border-gray-900 px-3 py-1.5 ${view === 'board' ? 'bg-gray-900 text-white' : 'bg-white text-gray-800 hover:bg-gray-100'}`}
             >
               Board
             </button>
           </div>
 
-          {/* CSV export */}
-          <button
-            onClick={downloadCsv}
-            className="px-3 py-1.5 text-sm border border-gray-300 rounded-lg bg-white text-gray-600 hover:bg-gray-50 flex items-center gap-1"
-            aria-label="Export tracker as CSV"
-          >
+          {/* CSV download */}
+          <button onClick={downloadCsv} className="btn-secondary py-1.5" aria-label="Export tracker as CSV">
             Download CSV
           </button>
         </div>
       </div>
 
-      {/* Stats panel */}
+      {/* How it is going */}
       {data && (
         <StatsPanel
           totalApplied={data.total_applied}
@@ -118,19 +112,19 @@ export default function SavedPostingsPage() {
         />
       )}
 
-      {/* Deadlines panel */}
+      {/* Deadlines this week */}
       {data && data.deadlines_this_week.length > 0 && (
         <DeadlinesPanel deadlines={data.deadlines_this_week} />
       )}
 
-      {/* ── Board view ── */}
+      {/* Board view */}
       {view === 'board' && (
         <>
           {isLoading && (
-            <div className="h-48 flex items-center justify-center text-gray-500">Loading...</div>
+            <div className="flex h-48 items-center justify-center text-gray-600">Loading...</div>
           )}
           {isError && (
-            <p className="text-red-600 text-sm">Failed to load. <button onClick={() => refetch()} className="underline">Retry</button></p>
+            <p className="text-sm font-semibold text-post-700">Your tracker didn't load. <button onClick={() => refetch()} className="underline">Try again</button></p>
           )}
           {!isLoading && !isError && data && (
             <TrackerBoard items={data.items} />
@@ -138,38 +132,35 @@ export default function SavedPostingsPage() {
         </>
       )}
 
-      {/* ── Table view ── */}
+      {/* List view */}
       {view === 'table' && (
         <>
-          {/* Status filter tabs */}
-          <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto" role="tablist">
+          {/* Tabs for each stage */}
+          <div className="mb-2 flex gap-0 overflow-x-auto bg-gray-100" role="tablist">
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab.label}
                 role="tab"
                 aria-selected={activeStatus === tab.value}
                 onClick={() => { setActiveStatus(tab.value); setPage(1) }}
-                className={`px-3 py-2 text-sm font-medium border-b-2 -mb-px whitespace-nowrap ${
+                className={`whitespace-nowrap px-3.5 py-2.5 text-sm font-bold transition-colors ${
                   activeStatus === tab.value
-                    ? 'border-blue-600 text-blue-600'
-                    : 'border-transparent text-gray-500 hover:text-gray-700'
+                    ? 'bg-post-600 text-white'
+                    : 'text-gray-800 hover:bg-gray-200'
                 }`}
               >
                 {tab.label}
                 {tab.value && (statusCounts[tab.value] ?? 0) > 0 && (
-                  <span className="ml-1 text-xs text-gray-500">({statusCounts[tab.value]})</span>
+                  <span className="ml-1.5 text-xs tabular-nums opacity-80">{statusCounts[tab.value]}</span>
                 )}
               </button>
             ))}
           </div>
 
           {isError && (
-            <div className="rounded-lg border border-red-200 bg-red-50 p-6 text-center">
-              <p className="text-red-700">Failed to load saved postings.</p>
-              <button
-                onClick={() => refetch()}
-                className="mt-3 px-4 py-1.5 bg-red-600 text-white text-sm rounded hover:bg-red-700"
-              >
+            <div className="border-y-[1.5px] border-post-600 p-6 text-center">
+              <p className="font-semibold text-post-700">Your saved jobs didn't load.</p>
+              <button onClick={() => refetch()} className="btn-primary mt-3">
                 Try again
               </button>
             </div>
@@ -178,42 +169,42 @@ export default function SavedPostingsPage() {
           {isLoading && (
             <div className="space-y-3">
               {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="h-16 bg-gray-100 rounded-lg animate-pulse" />
+                <div key={i} className="h-16 animate-pulse bg-gray-100" />
               ))}
             </div>
           )}
 
           {!isLoading && !isError && data?.total === 0 && (
-            <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center">
-              <p className="text-gray-500">
-                You haven't saved any jobs yet.{' '}
-                <Link to="/" className="text-blue-600 hover:underline">Browse jobs</Link> or <Link to="/resume" className="text-blue-600 hover:underline">match your resume</Link> to get started.
+            <div className="border-y-[1.5px] border-gray-900 px-6 py-12 text-center">
+              <p className="display text-2xl text-gray-900">Nothing saved yet</p>
+              <p className="mt-1.5 text-gray-700">
+                <Link to="/" className="link">Browse jobs</Link> or <Link to="/resume" className="link">match your resume</Link> and save the ones you like.
               </p>
             </div>
           )}
 
           {!isLoading && !isError && data && data.items.length > 0 && (
             <>
-              <div className="space-y-3">
+              <div className="border-t-[1.5px] border-gray-900">
                 {data.items.map((saved) => (
-                  <div
-                    key={saved.id}
-                    className="bg-white rounded-lg border border-gray-200 p-4"
-                  >
-                    <div className="flex items-start justify-between gap-4">
+                  <div key={saved.id} className="border-b border-gray-300 py-4">
+                    <div className="flex items-start gap-4">
+                      <div className="hidden w-[60px] shrink-0 sm:block">
+                        {saved.status && <StageStamp status={saved.status} date={saved.last_status_at ?? saved.saved_at} />}
+                      </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-2 flex-wrap">
                           <Link
                             to={`/postings/${saved.posting.id}`}
-                            className="font-semibold text-gray-900 hover:text-blue-600 hover:underline"
+                            className="text-[17px] font-bold text-gray-900 hover:text-air-700 hover:underline"
                           >
                             {saved.posting.title}
                           </Link>
                         </div>
-                        <p className="text-sm text-gray-600 mt-0.5">
+                        <p className="mt-0.5 text-sm text-gray-700">
                           {saved.posting.company} · {formatLocation(saved.posting.city, saved.posting.province)} · {saved.posting.term}
                         </p>
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="mt-1 text-xs text-gray-600">
                           Saved {formatDate(saved.saved_at)} · Deadline {formatDate(saved.posting.deadline)}
                           {saved.last_status_at && (
                             <> · Updated {formatDate(saved.last_status_at)}</>
@@ -241,21 +232,21 @@ export default function SavedPostingsPage() {
               </div>
 
               {data.total > data.page_size && (
-                <div className="flex justify-center items-center gap-3 mt-6">
+                <div className="mt-6 flex items-center justify-center gap-3">
                   <button
                     onClick={() => setPage((p) => Math.max(1, p - 1))}
                     disabled={page === 1}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40"
+                    className="btn-secondary px-3 py-1.5"
                   >
                     Previous
                   </button>
-                  <span className="text-sm text-gray-500">
+                  <span className="text-sm text-gray-700">
                     Page {page} of {Math.ceil(data.total / data.page_size)}
                   </span>
                   <button
                     onClick={() => setPage((p) => p + 1)}
                     disabled={page >= Math.ceil(data.total / data.page_size)}
-                    className="px-3 py-1.5 text-sm border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-40"
+                    className="btn-secondary px-3 py-1.5"
                   >
                     Next
                   </button>

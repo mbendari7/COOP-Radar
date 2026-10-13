@@ -1,19 +1,17 @@
 """
-Temporary accounts — no sign-up needed.
+Temporary accounts, so nobody has to sign up.
 
-- Demo account ("Try the demo"): pre-filled with sample tracker history and matches.
-- Guest account ("Upload your resume" without an account): empty, ready for the visitor's own
-  resume. A guest can keep everything by adding an email + password (claim_account).
+Demo account from Try the demo comes filled with sample tracker history and matches.
+Guest account from uploading a resume without an account starts empty for the
+visitor's own resume. A guest can keep everything by adding an email and password.
 
-Original notes on demo accounts — one click, no sign-up, for people trying the hosted site.
+Every visitor gets their own throwaway account so nobody sees or messes with
+anyone else's changes. A demo account comes with
+  six saved jobs spread across tracker stages with notes and dates
+  a sample resume and up to 20 matches scored by skill overlap, so no AI cost
 
-Every visitor gets their *own* throwaway account (so visitors never see or overwrite each
-other's changes), pre-filled with:
-  - six saved postings spread across tracker statuses, with notes and dates
-  - a sample resume and up to 20 matches scored by skill overlap (no AI cost)
-
-Temporary accounts are deleted 7 days after creation unless claimed; cleanup runs whenever a
-new one is created. Creation is rate-limited per IP address.
+Temporary accounts get deleted 7 days after they are made unless someone keeps them.
+Cleanup runs each time a new one is made, and each IP can only make so many.
 """
 
 import secrets
@@ -34,7 +32,7 @@ from app.services.auth import _create_session, _ph
 from app.store import Store
 
 DEMO_EMAIL_DOMAIN = "demo.coopradar"
-DEMO_TTL = timedelta(days=7)  # temporary accounts are deleted after this
+DEMO_TTL = timedelta(days=7)  # temporary accounts get deleted after this
 _RATE_LIMIT = 10          # demo accounts per IP per hour
 _RATE_WINDOW = 60 * 60
 
@@ -51,19 +49,19 @@ Projects
 - Data pipeline that loads transit data into PostgreSQL and serves charts.
 """
 
-# (status, note, days until the event date or None) for the six demo saves, in order
+# Status, note and days until the event date or None for the six demo saves in order
 _TRACKER_PLAN: list[tuple[ApplicationStatus | None, str | None, int | None]] = [
-    (ApplicationStatus.offer, "Offer received — reply by Friday", 3),
+    (ApplicationStatus.offer, "Offer received. Reply by Friday", 3),
     (ApplicationStatus.interview, "Technical interview with the platform team", 5),
     (ApplicationStatus.applied, "Applied through the company site", None),
     (ApplicationStatus.applying, "Tailoring resume bullets", None),
     (ApplicationStatus.rejected, "Position filled internally", None),
-    (None, None, None),  # saved, no status yet
+    (None, None, None),  # saved with no status yet
 ]
 
 
 def _client_ip(forwarded_for: str | None, peer: str | None) -> str:
-    """First address in X-Forwarded-For (set by the hosting proxy), else the socket peer."""
+    """The first address in X-Forwarded-For from the host's proxy, or else the direct peer."""
     if forwarded_for:
         return forwarded_for.split(",")[0].strip()
     return peer or "unknown"
@@ -85,7 +83,7 @@ async def _check_rate_limit(store: Store, ip: str) -> None:
 
 
 async def cleanup_expired_demo_users(db: AsyncSession) -> int:
-    """Delete demo users older than DEMO_TTL (their data cascades). Returns rows deleted."""
+    """Delete demo users older than DEMO_TTL and their data with them. Gives back how many."""
     cutoff = datetime.now(UTC) - DEMO_TTL
     result = await db.execute(
         delete(User).where(User.is_demo.is_(True), User.created_at < cutoff)
@@ -94,13 +92,13 @@ async def cleanup_expired_demo_users(db: AsyncSession) -> int:
 
 
 def skill_overlap_match(posting_skills: list[str], resume_skills: list[str]) -> tuple[int, str]:
-    """Score = share of the posting's skills the resume covers. No AI call involved."""
+    """Score is the share of the job's skills the resume covers. No AI involved."""
     have = {s.lower() for s in resume_skills}
     matched = [s for s in posting_skills if s.lower() in have]
     missing = [s for s in posting_skills if s.lower() not in have]
     score = round(100 * len(matched) / len(posting_skills)) if posting_skills else 0
-    reason = f"Demo match: you have {', '.join(matched) or 'none of the listed skills'}"
-    reason += f"; missing {', '.join(missing)}." if missing else "; no missing skills."
+    reason = f"Demo match. You have {', '.join(matched) or 'none of the listed skills'}."
+    reason += f" Missing {', '.join(missing)}." if missing else " Nothing missing."
     return score, reason
 
 
@@ -113,7 +111,7 @@ async def _fill_demo_data(db: AsyncSession, user_id: UUID) -> None:
         )
     ).scalars().all()
 
-    # Tracker: six postings spread across statuses, with history
+    # Tracker with six jobs spread across stages and some history
     now = datetime.now(UTC)
     for posting, (app_status, note, days) in zip(open_postings[:6], _TRACKER_PLAN, strict=False):
         saved = SavedPosting(
@@ -134,7 +132,7 @@ async def _fill_demo_data(db: AsyncSession, user_id: UUID) -> None:
                 )
             )
 
-    # Resume + matches (skill overlap, so the demo costs nothing and works without API keys)
+    # Resume and matches by skill overlap so the demo costs nothing and needs no API keys
     resume = Resume(
         user_id=user_id,
         filename="alex-rivera-resume.pdf",
@@ -158,13 +156,13 @@ async def create_demo_user(
     peer: str | None,
     prefill: bool = True,
 ) -> tuple[User, str]:
-    """Create a fresh temporary account (pre-filled demo, or an empty guest) and log into it."""
+    """Make a fresh temporary account, a filled demo or an empty guest, and sign into it."""
     await _check_rate_limit(store, _client_ip(forwarded_for, peer))
     await cleanup_expired_demo_users(db)
 
     user = User(
         email=f"demo-{secrets.token_hex(4)}@{DEMO_EMAIL_DOMAIN}",
-        # Random password nobody knows — demo accounts are reachable only via this endpoint
+        # A random password nobody knows. Demo accounts can only be reached through here
         hashed_password=_ph.hash(secrets.token_urlsafe(32)),
         is_demo=True,
     )
@@ -180,7 +178,7 @@ async def create_demo_user(
 
 
 async def claim_account(db: AsyncSession, user: User, email: str, password: str) -> User:
-    """Turn a temporary (demo/guest) account into a normal one, keeping all its data."""
+    """Turn a temporary demo or guest account into a normal one and keep all its data."""
     if not user.is_demo:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,

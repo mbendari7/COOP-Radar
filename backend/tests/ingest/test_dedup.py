@@ -1,4 +1,4 @@
-"""Tests for duplicate_exists — same company + city and a near-identical title."""
+"""Tests for duplicate_exists. Same company and city and almost the same title."""
 
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -8,8 +8,8 @@ from app.ingest.dedup import duplicate_exists
 
 @pytest.mark.asyncio
 async def test_exact_match_is_duplicate(db_session: AsyncSession):
-    """An exact title/company/city match is detected as a duplicate."""
-    # Insert a posting
+    """An exact title, company and city match counts as a duplicate."""
+    # Add a job
     from sqlalchemy import text
     await db_session.execute(
         text(
@@ -28,7 +28,7 @@ async def test_exact_match_is_duplicate(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_near_duplicate_title_is_duplicate(db_session: AsyncSession):
-    """A title with >85% Levenshtein similarity to an existing one is a duplicate."""
+    """A title more than 85% alike an existing one is a duplicate."""
     from sqlalchemy import text
     await db_session.execute(
         text(
@@ -41,14 +41,14 @@ async def test_near_duplicate_title_is_duplicate(db_session: AsyncSession):
     )
     await db_session.flush()
 
-    # Slightly different title — should still be caught
+    # A slightly different title should still get caught
     result = await duplicate_exists(db_session, "TechCo", "Frontend React Develoer", "Toronto")
     assert result is True
 
 
 @pytest.mark.asyncio
 async def test_different_city_not_duplicate(db_session: AsyncSession):
-    """Same title and company but different city is NOT a duplicate."""
+    """Same title and company in a different city is NOT a duplicate."""
     from sqlalchemy import text
     await db_session.execute(
         text(
@@ -67,7 +67,7 @@ async def test_different_city_not_duplicate(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_different_company_not_duplicate(db_session: AsyncSession):
-    """Same title and city but different company is NOT a duplicate."""
+    """Same title and city at a different company is NOT a duplicate."""
     from sqlalchemy import text
     await db_session.execute(
         text(

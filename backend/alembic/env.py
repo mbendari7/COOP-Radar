@@ -1,8 +1,8 @@
 """
-Alembic environment — async-compatible.
+Alembic setup that works with async.
 
-We use run_async_migrations() so the same DATABASE_URL (postgresql+asyncpg://…)
-works for both the app and migrations without maintaining two connection strings.
+run_async_migrations() lets the app and the migrations share the same DATABASE_URL
+so there is only one connection string to keep track of.
 """
 
 import asyncio
@@ -12,11 +12,11 @@ from alembic import context
 from sqlalchemy.ext.asyncio import async_engine_from_config
 from sqlalchemy.pool import NullPool
 
-# Import all models so their metadata is registered on Base before autogenerate runs
+# Import every model so Base knows about them before autogenerate runs
 import app.models  # noqa: F401
 from app.config import get_settings
 
-# Import Base so Alembic can see all mapped tables for autogenerate
+# Import Base so Alembic can see every table for autogenerate
 from app.db import Base
 
 config = context.config
@@ -24,19 +24,19 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Tell Alembic which metadata to diff against the DB
+# Tell Alembic which models to compare with the database
 target_metadata = Base.metadata
 
 
 def get_url() -> str:
-    """Read the real URL from settings rather than alembic.ini."""
+    """Get the real URL from settings and not from alembic.ini."""
     return get_settings().database_url
 
 
 def run_migrations_offline() -> None:
     """
-    Offline mode: write SQL to a file instead of running against a live DB.
-    Useful for generating migration scripts for review before applying.
+    Offline mode writes SQL to a file instead of running it on a live database.
+    Handy for reading a migration before you apply it.
     """
     context.configure(
         url=get_url(),
@@ -56,8 +56,8 @@ def do_run_migrations(connection: object) -> None:
 
 async def run_migrations_online() -> None:
     """
-    Online mode: connect to the DB and apply migrations.
-    NullPool prevents connection pooling during migrations (one-shot operation).
+    Online mode connects to the database and runs the migrations.
+    NullPool skips connection pooling since migrations run once and exit.
     """
     cfg = config.get_section(config.config_ini_section, {})
     cfg["sqlalchemy.url"] = get_url()

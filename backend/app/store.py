@@ -1,18 +1,18 @@
 """
-Key-value store for login sessions and rate-limit counters.
+A small key value store for login sessions and rate limit counters.
 
-By default it lives in PostgreSQL (the `kv_store` table), so the site needs just one
-database and nothing else. Set REDIS_URL to use Redis instead — same commands, faster
-under heavy traffic.
+By default it lives in Postgres in the kv_store table, so the site needs one database
+and nothing else. Set REDIS_URL to use Redis instead. Same commands, just faster when
+traffic is heavy.
 
-Only the handful of Redis commands the app uses are needed:
-  hset / hget   session:<token> → {"user_id": ...}
-  incr          rate-limit and AI-quota counters
-  expire        rolling TTLs
-  delete        logout, cleanup
+We only need the few Redis commands the app uses
+  hset and hget   session:<token> holds the user_id
+  incr            rate limit and AI quota counters
+  expire          rolling expiry times
+  delete          sign out and cleanup
 
-The store is created once at startup (lifespan) and stored on app.state.store.
-Routes get it with: store: Store = Depends(get_store)
+It is made once at startup and kept on app.state.store.
+Routes get it with  store: Store = Depends(get_store)
 """
 
 from collections.abc import AsyncGenerator
@@ -38,20 +38,20 @@ class Store(Protocol):
 
 
 def _live(key: str) -> Any:
-    """WHERE clause: this key, and not expired."""
+    """WHERE clause for this key when it has not expired."""
     return (KVEntry.key == key) & or_(
         KVEntry.expires_at.is_(None), KVEntry.expires_at > func.now()
     )
 
 
 class PostgresStore:
-    """The Store commands on top of one small Postgres table. Each call is one transaction."""
+    """The Store commands on top of one small Postgres table. Each call is its own transaction."""
 
     def __init__(self, session_factory: async_sessionmaker[AsyncSession]) -> None:
         self._sessions = session_factory
 
     async def _drop_if_expired(self, db: AsyncSession, key: str) -> None:
-        # An expired key behaves as if it never existed (like Redis)
+        # An expired key acts like it was never there, same as Redis
         await db.execute(
             delete(KVEntry).where(KVEntry.key == key, KVEntry.expires_at <= func.now())
         )
@@ -102,7 +102,7 @@ class PostgresStore:
             await db.commit()
 
     async def purge_expired(self) -> int:
-        """Delete every expired key. Called by the background scheduler."""
+        """Delete every expired key. The background scheduler calls this."""
         async with self._sessions() as db:
             result = await db.execute(delete(KVEntry).where(KVEntry.expires_at <= func.now()))
             await db.commit()
@@ -113,7 +113,7 @@ class PostgresStore:
 
 
 def create_store() -> Store:
-    """Redis when REDIS_URL is set, otherwise the Postgres table."""
+    """Redis when REDIS_URL is set and the Postgres table otherwise."""
     settings = get_settings()
     if settings.redis_url:
         import redis.asyncio as aioredis
@@ -128,5 +128,5 @@ def create_store() -> Store:
 
 
 async def get_store(request: Request) -> AsyncGenerator[Store, None]:
-    """FastAPI dependency that yields the application-level store."""
+    """Gives routes the one shared store."""
     yield request.app.state.store

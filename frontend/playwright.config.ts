@@ -11,16 +11,16 @@ import { defineConfig, devices } from '@playwright/test'
 
 export default defineConfig({
   testDir: './e2e',
-  // *.e2e.ts, so Vitest (which runs *.test / *.spec files) never picks these up
+  // *.e2e.ts so Vitest, which runs *.test and *.spec files, never picks these up
   testMatch: '**/*.e2e.ts',
   timeout: 60_000,
-  // Matching runs over every open job, so give results a moment under parallel load
+  // Matching runs over every open job so give results a moment when tests run side by side
   expect: { timeout: 10_000 },
   retries: process.env.CI ? 1 : 0,
   reporter: process.env.CI ? 'github' : 'list',
   use: {
     baseURL: process.env.E2E_BASE_URL ?? 'http://localhost:8000',
-    // Locally you can reuse an installed browser: E2E_CHANNEL=msedge or chrome
+    // On your own computer you can use an installed browser with E2E_CHANNEL=msedge or chrome
     channel: process.env.E2E_CHANNEL || undefined,
     trace: 'retain-on-failure',
   },

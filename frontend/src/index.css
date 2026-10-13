@@ -6,8 +6,111 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    accent-color: #1e3a8a;
   }
   body {
-    @apply bg-[#f3f2f1] text-gray-900;
+    @apply bg-white text-gray-900;
+    font-variant-numeric: tabular-nums;
+  }
+  ::selection {
+    background: #c3d0ee;
+    color: #16181d;
+  }
+  input,
+  textarea {
+    caret-color: #c8281e;
+  }
+  a {
+    text-underline-offset: 3px;
+  }
+  /* One focus ring everywhere, in airmail blue */
+  :focus-visible {
+    outline: 2px solid #1e3a8a;
+    outline-offset: 2px;
+  }
+  * {
+    scrollbar-color: #c4cbd8 transparent;
+  }
+}
+
+@layer components {
+  /* Form lettering. Narrow capitals like the labels on a customs slip */
+  .label-form {
+    @apply text-[11px] font-bold uppercase text-gray-600;
+    font-stretch: 78%;
+    letter-spacing: 0.08em;
+  }
+  .display {
+    font-stretch: 82%;
+    @apply font-extrabold tracking-tight;
+  }
+
+  /* Buttons */
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm border-2 px-4 py-2 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn border-post-600 bg-post-600 text-white hover:border-post-700 hover:bg-post-700;
+  }
+  .btn-secondary {
+    @apply btn border-gray-900 bg-white text-gray-900 hover:bg-gray-100;
+  }
+  .btn-quiet {
+    @apply btn border-transparent bg-transparent text-air-700 hover:bg-air-50;
+  }
+
+  /* Inputs and selects */
+  .field {
+    @apply w-full rounded-sm border-[1.5px] border-gray-400 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-500 transition-colors hover:border-gray-600 focus:border-air-700 focus:outline-none focus:ring-0 disabled:opacity-50;
+  }
+
+  /* Filter chips. Picked ones turn airmail blue */
+  .chip {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border-[1.5px] border-gray-400 bg-white px-3 py-1 text-sm font-semibold text-gray-800 transition-colors hover:border-gray-700;
+  }
+  .chip-on {
+    @apply border-air-700 bg-air-700 text-white hover:border-air-800;
+  }
+
+  /* A plain text link */
+  .link {
+    @apply font-semibold text-air-700 underline-offset-2 hover:underline;
+  }
+
+  /* Thin rule under section headings */
+  .rule {
+    @apply border-t-[1.5px] border-gray-900;
+  }
+}
+
+@layer utilities {
+  .stretch-condensed {
+    font-stretch: 75%;
+  }
+  .stretch-semi {
+    font-stretch: 87%;
+  }
+}
+
+/* The postmark lands like a stamp when a job is picked */
+@keyframes stamp {
+  0% {
+    transform: rotate(var(--tilt, -8deg)) scale(1.18);
+    opacity: 0.4;
+  }
+  60% {
+    transform: rotate(var(--tilt, -8deg)) scale(0.97);
+    opacity: 1;
+  }
+  100% {
+    transform: rotate(var(--tilt, -8deg)) scale(1);
+  }
+}
+.postmark-stamp {
+  animation: stamp 260ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@media (prefers-reduced-motion: reduce) {
+  .postmark-stamp {
+    animation: none;
   }
 }

@@ -280,3 +280,27 @@ a real Render + Neon deploy, CI on GitHub.
 
 **What I reviewed / changed**: _(fill in after reviewing the diff)_
 
+
+---
+
+## 2026-10-13. Vercel fix, postal redesign, plain language comments
+
+**What the AI assistant did**:
+- Found why jobs would not load on Vercel. The `/api` rewrite in `vercel.json` had lost its `/api/:path*` ending, so
+  every API call got the Render home page back. Fixed it and added a backend test that checks the rewrite.
+- Redesigned the whole frontend with the Impeccable design skill. Wrote `PRODUCT.md`, rolled design directions, and
+  the developer picked "Registered Mail". Built it: postal red bar, airmail blue, square corners, Archivo, rows split
+  by rules instead of cards, a postmark on every job, stage stamps in the tracker, a days left bar, an envelope style
+  upload box. A separate finish reviewer subagent ran two rounds and the fixes it asked for were applied. A
+  documenter subagent wrote `DESIGN.md` and `.impeccable/design.json`.
+- Fixed bugs found along the way: deadlines showing a day early in Canada (plain dates read as UTC), Greenhouse board
+  labels showing as employer names, and the job page spilling sideways on phones. Each got a test.
+- Rewrote every code comment and docstring in the backend and frontend in short plain words with no dashes, and
+  updated README, both guides, DEPLOY, PROJECT_GUIDE, CLAUDE.md and `.env.example` to match.
+
+**Results (actual runs)**: ruff and mypy clean; backend 293 passed; `alembic upgrade head` and `alembic check` clean;
+frontend lint, tsc and build clean, 45 passed; Playwright jobs and phone tests 5 of 5 against a local dev site
+proxied to the live Render API. Not run: the resume upload e2e test (it creates accounts on the live site), a
+redeploy, and a fresh import, so live employer names update only after the next deploy and import.
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_

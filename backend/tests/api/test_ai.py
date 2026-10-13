@@ -1,6 +1,6 @@
 """
-Tests for bring-your-own-key AI (app/ai.py, /api/ai/check) across Claude, OpenAI, and Gemini.
-Every provider SDK is mocked — no network calls, no real keys.
+Tests for AI with the visitor's own key (app/ai.py and /api/ai/check) across Claude, OpenAI and Gemini.
+Every provider SDK is faked so there are no network calls and no real keys.
 """
 
 import json
@@ -24,7 +24,7 @@ OPENAI = AICredentials("openai", "sk-openai", "gpt-test", "user")
 GEMINI = AICredentials("gemini", "g-key", "gemini-flash-latest", "user")
 
 
-# ── Which key is used ─────────────────────────────────────────────────────────
+# Which key gets used
 
 def test_visitor_key_is_used_with_default_model() -> None:
     creds = credentials_from_headers("gemini", " g-key ", None, "chat")
@@ -90,7 +90,7 @@ async def _seed_two_postings(db_session: AsyncSession) -> None:
 async def test_upload_without_any_key_gives_free_skill_matches(
     client: AsyncClient, db_session: AsyncSession
 ) -> None:
-    """No AI key anywhere: the upload still works, ranked and explained by skill overlap."""
+    """No AI key anywhere. The upload still works, ranked and explained by skill overlap."""
     await _seed_two_postings(db_session)
     await client.post("/api/auth/register", json={"email": "nokey@test.com", "password": "Password1!"})
     res = await client.post(
@@ -101,7 +101,7 @@ async def test_upload_without_any_key_gives_free_skill_matches(
     assert res.status_code == 200
     top = res.json()["matches"][0]
     assert top["title"] == "Backend Co-op"
-    assert top["score"] == 58  # 2 of 3 skills (67% of 65) + 15 for a co-op title
+    assert top["score"] == 58  # 2 of 3 skills is 67% of 65, plus 15 for a co-op title
     assert top["reason"] == "You have Python, SQL; it also asks for Go."
 
 
@@ -123,7 +123,7 @@ async def test_rematch_needs_a_key_then_ranks_with_ai(
     mock_claude_create(json.dumps([
         {"posting_id": backend_id, "score": 91, "reason": "Python and SQL APIs fit well."}
     ]))
-    res = await client.post("/api/resume/rematch")  # client sends the test AI key headers
+    res = await client.post("/api/resume/rematch")  # the client sends the test AI key headers
     assert res.status_code == 200
     assert [(m["score"], m["reason"]) for m in res.json()["matches"]] == [
         (91, "Python and SQL APIs fit well.")
@@ -132,7 +132,7 @@ async def test_rematch_needs_a_key_then_ranks_with_ai(
     assert [m["score"] for m in stored] == [91]
 
 
-# ── Provider calls (mocked SDKs) ──────────────────────────────────────────────
+# Provider calls with faked SDKs
 
 async def test_complete_with_openai(monkeypatch: pytest.MonkeyPatch) -> None:
     reply = SimpleNamespace(choices=[SimpleNamespace(message=SimpleNamespace(content="hi from gpt"))])
@@ -198,7 +198,7 @@ async def test_provider_errors_become_clear_codes(
 
 
 async def test_gemini_bad_key_is_reported_as_invalid_key(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Google returns 400 + reason API_KEY_INVALID for a bad key (seen against the live API)."""
+    """Google answers a bad key with 400 and reason API_KEY_INVALID. We saw this on the live API."""
     error = Exception("API key not valid. Please pass a valid API key.")
     error.code = 400  # type: ignore[attr-defined]
     error.details = {"error": {"code": 400, "status": "INVALID_ARGUMENT", "details": [  # type: ignore[attr-defined]
@@ -218,7 +218,7 @@ async def test_qa_streams_through_the_visitors_openai_key(
     monkeypatch: pytest.MonkeyPatch,
     mock_claude_create: Callable[[str], AsyncMock],
 ) -> None:
-    """End to end: a ChatGPT key answers the resume Q&A."""
+    """All the way through. A ChatGPT key answers the resume Q and A."""
     posting = Posting(
         title="Data Co-op", company="Acme", city="Toronto", province="ON", work_mode=WorkMode.remote,
         term="Summer 2027", duration_months=4, deadline=date.today() + timedelta(days=20),
@@ -226,7 +226,7 @@ async def test_qa_streams_through_the_visitors_openai_key(
     )
     db_session.add(posting)
     await db_session.flush()
-    await client.post("/api/auth/demo")  # demo account already has resume + matches
+    await client.post("/api/auth/demo")  # the demo account already has a resume and matches
     matches = (await client.get("/api/resume/matches")).json()["items"]
     assert any(m["posting_id"] == str(posting.id) for m in matches)
 
@@ -248,7 +248,7 @@ async def test_qa_streams_through_the_visitors_openai_key(
     assert "".join(deltas) == "Resume: SQL listed."
 
 
-# ── "Check key" endpoint ──────────────────────────────────────────────────────
+# The Check key endpoint
 
 async def test_check_key_lists_models_and_recommends_one(
     client: AsyncClient, monkeypatch: pytest.MonkeyPatch
@@ -294,7 +294,7 @@ def test_recommended_model_prefers_known_good_defaults() -> None:
     assert recommended_model("gemini", []) is None
 
 
-# ── Shortlist without any AI key ──────────────────────────────────────────────
+# Shortlist with no AI key at all
 
 def test_skills_in_text_matches_whole_skills_only() -> None:
     text = "Built APIs in Python and C++; some CSS. Familiar with Node.js."
@@ -325,7 +325,7 @@ async def test_skill_shortlist_ranks_by_overlap(db_session: AsyncSession) -> Non
     # Skills are worth 65 of the 100 points
     assert sim["Full match"] == pytest.approx(0.65, abs=0.01)
     assert sim["Half match"] == pytest.approx(0.65 / 2, abs=0.01)
-    # Listing a single skill can't earn full marks from one match (counts as 1 of 3)
+    # Listing one skill cannot earn full marks off one match since it counts as 1 of 3
     assert sim["One-skill posting"] == pytest.approx(0.65 / 3, abs=0.01)
     assert sim["No match"] == 0.0
 

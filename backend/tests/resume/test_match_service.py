@@ -1,6 +1,6 @@
 """
-Unit tests for text extraction and match service functions.
-No database or live API calls required.
+Unit tests for reading text and the match service functions.
+No database or live API calls needed.
 """
 
 from unittest.mock import AsyncMock, MagicMock
@@ -13,15 +13,13 @@ from app.services.resume import extract_docx_text, extract_pdf_text, extract_tex
 
 TEST_CREDS = AICredentials("anthropic", "sk-test-key", "claude-test", "user")
 
-# ---------------------------------------------------------------------------
-# Text extraction
-# ---------------------------------------------------------------------------
+# Reading text
 
 
 def test_extract_pdf_text(sample_pdf_bytes: bytes) -> None:
     text = extract_pdf_text(sample_pdf_bytes)
     assert len(text) > 0
-    # Our fixture embeds these keywords
+    # Our fixture puts these words in
     assert any(kw in text for kw in ("Python", "Django", "PostgreSQL", "python", "django"))
 
 
@@ -51,9 +49,7 @@ def test_extract_text_no_extension_raises() -> None:
         extract_text("resumenoext", b"data")
 
 
-# ---------------------------------------------------------------------------
-# embed_and_rank (mocked)
-# ---------------------------------------------------------------------------
+# embed_and_rank with fakes
 
 
 @pytest.mark.asyncio
@@ -62,13 +58,13 @@ async def test_embed_and_rank_returns_top20(monkeypatch: pytest.MonkeyPatch) -> 
 
     from app.services.resume import embed_and_rank
 
-    # Mock generate_embedding
+    # Fake generate_embedding
     monkeypatch.setattr(
         "app.ingest.embed.generate_embedding",
         AsyncMock(return_value=[0.1] * 1536),
     )
 
-    # Mock DB execute to return 40 candidate rows
+    # Fake the database to give back 40 candidate rows
     fake_rows = [
         {
             "id": uuid4(),
@@ -89,7 +85,7 @@ async def test_embed_and_rank_returns_top20(monkeypatch: pytest.MonkeyPatch) -> 
     mock_db = AsyncMock()
     mock_db.execute = AsyncMock(return_value=mock_result)
 
-    # Mock Anthropic to return scores for all 40
+    # Fake Anthropic to give back scores for all 40
     haiku_items = [
         {"posting_id": str(r["id"]), "score": 90 - i, "reason": f"Reason {i}."}
         for i, r in enumerate(fake_rows)
@@ -107,10 +103,10 @@ async def test_embed_and_rank_returns_top20(monkeypatch: pytest.MonkeyPatch) -> 
     results = await embed_and_rank(mock_db, "Python Django PostgreSQL developer", TEST_CREDS)
 
     assert len(results) <= 20
-    # Results sorted by score descending
+    # Results sorted by score, highest first
     scores = [r.score for r in results]
     assert scores == sorted(scores, reverse=True)
-    # Each result has required fields
+    # Each result has the fields it needs
     for r in results:
         assert 0 <= r.score <= 100
         assert r.reason
@@ -190,7 +186,7 @@ async def test_rerank_accepts_fenced_json_and_drops_duplicates(
 
 @pytest.mark.asyncio
 async def test_rejected_key_is_reported_not_hidden(monkeypatch) -> None:
-    """A bad key must surface as 400 AI_KEY_INVALID, not silently fall back to non-AI results."""
+    """A bad key has to show up as 400 AI_KEY_INVALID and not quietly fall back to results without AI."""
     from fastapi import HTTPException
 
     from app import ai

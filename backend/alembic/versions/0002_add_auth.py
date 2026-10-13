@@ -16,9 +16,9 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # ── application_status enum ──────────────────────────────────────────────
-    # Four valid states for tracking an application's progress.
-    # NULL in saved_postings.status means "no status set" (different from any value).
+    # application_status enum
+    # The stages an application can be in.
+    # NULL in saved_postings.status means no status yet, which is not the same as any value
     status_enum = postgresql.ENUM(
         "saved", "applying", "applied", "interview", "offer", "rejected", "withdrawn",
         name="application_status_enum",
@@ -26,7 +26,7 @@ def upgrade() -> None:
     )
     status_enum.create(op.get_bind(), checkfirst=True)
 
-    # ── users table ──────────────────────────────────────────────────────────
+    # users table
     op.create_table(
         "users",
         sa.Column(
@@ -35,9 +35,9 @@ def upgrade() -> None:
             primary_key=True,
             server_default=sa.text("gen_random_uuid()"),
         ),
-        # Email stored lowercase — service layer normalises before every write/lookup
+        # Emails are saved lowercase and the service lowercases before every write and lookup
         sa.Column("email", sa.Text, nullable=False, unique=True),
-        # argon2id hash — plaintext never stored
+        # argon2id hash. The real password is never saved
         sa.Column("hashed_password", sa.Text, nullable=False),
         sa.Column(
             "created_at",
@@ -47,10 +47,10 @@ def upgrade() -> None:
         ),
     )
 
-    # Unique B-tree index on email — also the fast path for login lookups
+    # Unique index on email that also makes sign in lookups fast
     op.create_index("idx_users_email", "users", ["email"], unique=True)
 
-    # ── saved_postings table ─────────────────────────────────────────────────
+    # saved_postings table
     op.create_table(
         "saved_postings",
         sa.Column(
@@ -76,9 +76,9 @@ def upgrade() -> None:
             postgresql.ENUM(
                 "saved", "applying", "applied", "interview", "offer", "rejected", "withdrawn",
                 name="application_status_enum",
-                create_type=False,  # already created above
+                create_type=False,  # already made above
             ),
-            nullable=True,  # NULL = no status set
+            nullable=True,  # NULL means no status yet
         ),
         sa.Column(
             "saved_at",
@@ -86,16 +86,16 @@ def upgrade() -> None:
             nullable=False,
             server_default=sa.text("NOW()"),
         ),
-        # One save per (user, posting) pair — enables idempotent upsert via
-        # INSERT … ON CONFLICT (user_id, posting_id) DO NOTHING
+        # One save for each person and job, so saving twice can use
+        # INSERT ON CONFLICT (user_id, posting_id) DO NOTHING
         sa.UniqueConstraint("user_id", "posting_id", name="ux_saved_postings_user_posting"),
     )
 
-    # Index for listing a user's saved postings (most common read path)
+    # Index for listing someone's saved jobs, the most common read
     op.create_index("idx_saved_postings_user_id", "saved_postings", ["user_id"])
-    # Index for checking whether a posting is saved (is_saved on postings list)
+    # Index for checking if a job is saved, for is_saved on the job list
     op.create_index("idx_saved_postings_posting_id", "saved_postings", ["posting_id"])
-    # Unique index on (user_id, posting_id) — enforces the constraint above
+    # Unique index on user_id and posting_id that backs the rule above
     op.create_index(
         "ux_saved_postings_user_posting_idx",
         "saved_postings",
@@ -104,7 +104,7 @@ def upgrade() -> None:
     )
     # Index for filtering by status on the Saved page
     op.create_index("idx_saved_postings_status", "saved_postings", ["status"])
-    # Descending index for default sort (most recently saved first)
+    # Newest first index for the default sort
     op.create_index(
         "idx_saved_postings_saved_at",
         "saved_postings",
@@ -113,7 +113,7 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    # Drop in reverse order — saved_postings first (references users and postings)
+    # Drop in reverse order. saved_postings goes first since it points at users and postings
     for idx in [
         "idx_saved_postings_saved_at",
         "idx_saved_postings_status",

@@ -1,15 +1,15 @@
 """
-`python -m seed` — load starting data. Every step is idempotent (safe to re-run).
+`python -m seed` loads the starting data. Every step is safe to run again.
 
-What gets loaded is controlled by environment variables (true/false):
-  SEED_JOB_BOARDS        real employer career boards to import live jobs from (default true)
-  SEED_SAMPLE_POSTINGS   ~55 made-up sample postings — handy offline (default false, so
-                         visitors only see real jobs)
-  SEED_DEV_SOURCES       two fixture-file sources to try the Admin page with (default false)
-The skills taxonomy (used for skill detection) is always loaded.
+Environment variables decide what gets loaded, each true or false
+  SEED_JOB_BOARDS        real employer career boards to import live jobs from. On by default
+  SEED_SAMPLE_POSTINGS   about 55 made up jobs, handy offline. Off by default so
+                         visitors only see real jobs
+  SEED_DEV_SOURCES       two file based sources to try the Admin page with. Off by default
+The skills list always gets loaded since skill matching needs it.
 
-Jobs from the career boards arrive when the background scheduler runs them (app/jobs.py:
-on start, then every 6 hours).
+Jobs from the career boards show up when the background scheduler runs them
+(app/jobs.py), once on start and then every 6 hours.
 """
 
 import asyncio

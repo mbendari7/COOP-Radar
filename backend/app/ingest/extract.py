@@ -1,9 +1,9 @@
 """
-Skill and field extraction from raw posting text.
+Pulling skills and other fields out of raw job text.
 
-Two-stage process:
-  1. Regex/keyword match against the skills taxonomy (fast, no API call)
-  2. If confidence < 0.6: LLM fallback via Claude (FAST_MODEL) for structured fields
+Two steps
+  1. Match words against the skills list. Fast and no API call
+  2. If we are less than 0.6 sure, ask Claude (FAST_MODEL) for the fields
 """
 
 import re
@@ -28,25 +28,25 @@ class ExtractedFields:
 
 async def extract_fields(db: AsyncSession, text: str) -> ExtractedFields:
     """
-    Extract structured fields from raw posting text.
+    Pull structured fields out of raw job text.
 
-    Step 1: regex/keyword match against the skills taxonomy
-    Step 2: if confidence < 0.6, call Claude (FAST_MODEL) for a structured extraction
+    Step 1 matches words against the skills list
+    Step 2 asks Claude (FAST_MODEL) when we are less than 0.6 sure
     """
     from app.models.skill import Skill
 
-    # Load taxonomy from DB
+    # Load the skills list from the database
     stmt = select(Skill.name, Skill.aliases)
     rows = (await db.execute(stmt)).all()
     taxonomy: list[tuple[str, list[str]]] = [(row[0], row[1]) for row in rows]
 
-    # --- Stage 1: regex match ---
+    # Step 1 is plain matching
     matched_skills = match_skills(taxonomy, text)
     text_lower = text.lower()
 
-    # Simple heuristic confidence: ratio of fields we can extract via regex
+    # A simple sureness score from how many fields plain matching could find
     simple_fields_found = 0
-    total_simple_fields = 4  # work_mode, city, term, skills
+    total_simple_fields = 4  # work_mode, city, term and skills
 
     work_mode: str | None = None
     for mode, keywords in (
@@ -62,7 +62,7 @@ async def extract_fields(db: AsyncSession, text: str) -> ExtractedFields:
     if matched_skills:
         simple_fields_found += 1
 
-    # Very rough term detection
+    # Very rough term spotting
     term: str | None = None
     for season in ("summer", "fall", "winter", "spring"):
         m = re.search(rf"\b{season}\s+(\d{{4}})\b", text_lower)
@@ -75,7 +75,7 @@ async def extract_fields(db: AsyncSession, text: str) -> ExtractedFields:
     duration_months: int | None = None
 
     if confidence < 0.6 and taxonomy:
-        # --- Stage 2: LLM fallback ---
+        # Step 2 asks the model
         llm_result = await _llm_extract(text, [name for name, _ in taxonomy])
         if llm_result:
             if llm_result.get("work_mode"):
@@ -102,9 +102,9 @@ async def extract_fields(db: AsyncSession, text: str) -> ExtractedFields:
 
 async def _llm_extract(text: str, taxonomy: list[str]) -> dict[str, Any] | None:
     """
-    Ask Claude (FAST_MODEL) for structured fields when regex confidence is low.
-    Returns None when no API key is configured or the call/parse fails, so ingestion
-    keeps working (with lower-confidence fields) without an AI provider.
+    Ask Claude (FAST_MODEL) for the fields when plain matching is not sure enough.
+    Gives back None when there is no API key or the call or parsing fails, so imports
+    keep working without any AI, just with less sure fields.
     """
     from app.config import get_settings
     from app.llm import get_client, parse_json, response_text
@@ -136,7 +136,7 @@ async def _llm_extract(text: str, taxonomy: list[str]) -> dict[str, Any] | None:
 
     if not isinstance(result, dict):
         return None
-    # Never trust skills outside the taxonomy — the model must not invent skills
+    # Never trust skills that are not on our list. The model must not make up skills
     allowed = set(taxonomy)
     result["skills"] = [s for s in result.get("skills") or [] if s in allowed]
     return result

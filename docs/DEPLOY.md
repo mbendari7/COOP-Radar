@@ -38,7 +38,7 @@ expire (Render's free Postgres is deleted 30 days after it's created).
 2. **Render**: sign up at https://render.com with **GitHub**, then **New → Blueprint** and pick the repo.
 3. Paste the Neon string into `DATABASE_URL`. Leave `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` **blank**: visitors
    bring their own AI key. Click **Apply**.
-4. The first build takes about 5–10 minutes. Your site is at `https://coopradar-xxxx.onrender.com`. Add your own
+4. The first build takes about 5 to 10 minutes. Your site is at `https://coopradar-xxxx.onrender.com`. Add your own
    domain under **Settings → Custom Domains** if you like.
 5. Within a few minutes of going live, about 2,800 jobs are imported. Refresh **Find jobs** to see them.
 6. **Keep jobs fresh**: in GitHub, **Settings → Secrets and variables → Actions → Variables**, add `SITE_URL` with
@@ -70,10 +70,13 @@ running: it imports jobs every 6 hours and needs a Postgres database. So the spl
 
 Steps:
 1. Deploy Option A and note the Render address (for example `https://coopradar.onrender.com`).
-2. If it differs, edit the `destination` in `vercel.json` to your Render address.
+2. If it differs, edit the `destination` in `vercel.json` to your Render address. Keep `/api/:path*` on the end,
+   like `https://your-site.onrender.com/api/:path*`. Without it every request goes to the Render home page and the
+   jobs page says the jobs didn't load. `backend/tests/api/test_hosting.py` checks this.
 3. On https://vercel.com: **Add New, Project**, import the repo, keep the defaults (`vercel.json` sets the build
    command `npm run build --prefix frontend` and output `frontend/dist`), and deploy.
-4. Open `https://<project>.vercel.app/api/health`; it should say `{"status":"ok"}`.
+4. Open `https://<project>.vercel.app/api/health`. It should say `{"status":"ok"}`. Then open
+   `https://<project>.vercel.app/api/postings?page_size=10`. It should be JSON with `items`, not a web page.
 
 Notes: `vercel.json` turns off Vercel caching for `/api` because answers are per visitor. The Render free plan
 still sleeps after about 15 minutes, so the first request after a quiet spell waits for it to wake. Running the

@@ -9,12 +9,12 @@ export const ROLE_LABELS: Record<RoleType, string> = {
   job: 'Job',
 }
 
-/** Wide enough for the list + details layout (Tailwind's lg breakpoint). */
+/** Wide enough for the list and details side by side, which is Tailwind's lg breakpoint. */
 export function splitViewVisible(): boolean {
   return typeof window !== 'undefined' && window.matchMedia?.('(min-width: 1024px)').matches === true
 }
 
-/** Field-of-study tags stored on postings (app/services/education.py FIELD_LABELS). */
+/** Program tags saved on jobs. They match FIELD_LABELS in app/services/education.py. */
 export const FIELD_LABELS: Record<string, string> = {
   cs: 'Computer Science / Software',
   engineering: 'Engineering',

@@ -23,10 +23,10 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
 
-# Postgres only allows IMMUTABLE functions in generated columns, and the built-in
-# array_to_string() is merely STABLE. This one-line SQL wrapper is safe to declare
-# IMMUTABLE for text[] input. Migration 0001 creates it too; the listener below makes
-# Base.metadata.create_all() (used by the tests) create it before the postings table.
+# Postgres only allows IMMUTABLE functions in generated columns and the built in
+# array_to_string() is only STABLE. This tiny SQL wrapper is safe to call IMMUTABLE
+# for text[] input. Migration 0001 makes it too and the listener below makes sure
+# create_all() in the tests makes it before the postings table.
 SKILLS_TO_TEXT_DDL = (
     "CREATE OR REPLACE FUNCTION coopradar_skills_text(text[]) RETURNS text "
     "LANGUAGE sql IMMUTABLE PARALLEL SAFE AS $$ SELECT array_to_string($1, ' ') $$"
@@ -35,9 +35,9 @@ SKILLS_TO_TEXT_DDL = (
 
 class WorkMode(enum.StrEnum):
     """
-    Stored as a PostgreSQL ENUM type (work_mode_enum) so the DB enforces
-    valid values without needing an application-layer check.
-    str mixin means FastAPI can serialise it as a plain string.
+    Saved as a Postgres ENUM called work_mode_enum so the database
+    itself rejects bad values.
+    The str mixin lets FastAPI send it as a plain string.
     """
     onsite = "onsite"
     hybrid = "hybrid"
@@ -46,13 +46,12 @@ class WorkMode(enum.StrEnum):
 
 class Posting(Base):
     """
-    One row per co-op/internship posting.
+    One row for every co-op or internship job.
 
-    search_vector is a GENERATED ALWAYS AS STORED tsvector column — PostgreSQL
-    keeps it in sync automatically whenever title/company/skills/description
-    change. The expression below mirrors migration 0001 exactly, so
-    Base.metadata.create_all() (used by the test suite) builds the same column,
-    and SQLAlchemy never tries to INSERT/UPDATE it.
+    search_vector is a generated tsvector column that Postgres keeps up to date
+    on its own whenever the title, company, skills or description change.
+    The expression below matches migration 0001 exactly so create_all() in the
+    tests builds the same column, and SQLAlchemy never tries to write to it.
     """
 
     __tablename__ = "postings"
@@ -63,7 +62,7 @@ class Posting(Base):
     title: Mapped[str] = mapped_column(Text, nullable=False)
     company: Mapped[str] = mapped_column(Text, nullable=False)
     city: Mapped[str] = mapped_column(Text, nullable=False)
-    # Province (Canada) or state (United States) code
+    # Province code in Canada or state code in the US
     province: Mapped[str] = mapped_column(String(2), nullable=False)
     country: Mapped[str] = mapped_column(String(2), nullable=False, server_default="CA")
     work_mode: Mapped[WorkMode] = mapped_column(
@@ -71,25 +70,25 @@ class Posting(Base):
     )
     term: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # CHECK constraint enforces only the four valid co-op durations
+    # The check only allows the four normal co-op lengths
     duration_months: Mapped[int] = mapped_column(SmallInteger, nullable=False)
 
     deadline: Mapped[date] = mapped_column(Date, nullable=False)
     posted_at: Mapped[datetime] = mapped_column(
         TIMESTAMP(timezone=True),
-        # server_default lets the DB fill this in; we don't have to set it manually
+        # The database fills this in so we never have to
         server_default=text("NOW()"),
         nullable=False,
     )
     description: Mapped[str] = mapped_column(Text, nullable=False)
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    # TEXT[] — stored as a Postgres array; GIN index supports fast @> (contains) queries
+    # A Postgres text array with a GIN index so contains queries are fast
     skills: Mapped[list[str]] = mapped_column(
         ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
     )
 
-    # Weights: A = title, B = company + skills, C = description (title matches rank highest)
+    # Weights are A for title, B for company and skills, C for description. Title hits rank highest
     search_vector: Mapped[str | None] = mapped_column(
         TSVECTOR,
         Computed(
@@ -103,7 +102,7 @@ class Posting(Base):
         nullable=True,
     )
 
-    # Feature 003 — ingestion source tracking
+    # Where the job was imported from
     source_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("ingest_sources.id", ondelete="SET NULL"),
@@ -115,8 +114,8 @@ class Posting(Base):
         JSONB, nullable=False, server_default=text("'{}'::jsonb")
     )
 
-    # Read from the description at import time (app/services/education.py):
-    # graduation years the job asks for, and programs of study it names. Empty = not stated.
+    # Read from the description when we import it (app/services/education.py).
+    # The grad years the job asks for and the programs it names. Empty means it did not say
     grad_years: Mapped[list[int]] = mapped_column(
         ARRAY(SmallInteger), nullable=False, server_default=text("'{}'::smallint[]")
     )
@@ -128,10 +127,10 @@ class Posting(Base):
         CheckConstraint(
             "duration_months IN (4, 8, 12, 16)", name="ck_duration_months"
         ),
-        # GIN indexes for full-text and array containment queries
+        # GIN indexes for full text search and array lookups
         Index("idx_postings_search_vector", "search_vector", postgresql_using="gin"),
         Index("idx_postings_skills", "skills", postgresql_using="gin"),
-        # B-tree indexes for sorting and equality filters
+        # Normal indexes for sorting and exact filters
         Index("idx_postings_posted_at", "posted_at"),
         Index("idx_postings_deadline", "deadline"),
         Index("idx_postings_company", "company"),
@@ -142,7 +141,7 @@ class Posting(Base):
         Index("idx_postings_term", "term"),
         Index("idx_postings_work_mode", "work_mode"),
         Index("idx_postings_duration", "duration_months"),
-        # Feature 003 indexes
+        # Indexes for import tracking
         Index("idx_postings_closed_at", "closed_at"),
         Index(
             "idx_postings_source_ref",

@@ -1,17 +1,17 @@
-"""Schemas for resume insights."""
+"""Shapes for resume insights."""
 
 from pydantic import BaseModel
 
 
 class DemandSkill(BaseModel):
-    """A skill employers ask for, and how many open postings ask for it."""
+    """A skill employers ask for and how many open jobs ask for it."""
 
     skill: str
     postings: int
 
 
 class AIInsights(BaseModel):
-    """The AI's resume review (generated with the visitor's own key, cached on the resume)."""
+    """The AI resume review, made with the visitor's own key and saved on the resume."""
 
     summary: str = ""
     strengths: list[str] = []
@@ -22,7 +22,7 @@ class AIInsights(BaseModel):
 
 
 class ResumeInsights(BaseModel):
-    """Free insights (always present) plus the AI review (None until requested)."""
+    """Free insights that are always there plus the AI review, which is None until asked for."""
 
     skills_found: list[str]
     in_demand_missing: list[DemandSkill]

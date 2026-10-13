@@ -1,13 +1,13 @@
 """
-Seed script — inserts ~60 realistic co-op postings for development and testing.
+Sample data. About 60 realistic made up co-op jobs for building and testing.
 
-Run everything with:  python -m seed          (postings + skills + dev ingest sources)
-Postings only:        python -c "import asyncio, seed; asyncio.run(seed.seed())"
-(from the backend/ directory, or inside the api container)
+Load everything with   python -m seed          (jobs, skills and dev import sources)
+Jobs only              python -c "import asyncio, seed; asyncio.run(seed.seed())"
+Run both from the backend folder.
 
-The data covers 8 Canadian cities + remote, 3 co-op terms (Winter/Summer/Fall 2027),
-4 duration lengths, and a mix of future and past deadlines so the "Show expired"
-toggle has something to show.
+The jobs cover 8 Canadian cities plus remote, 3 co-op terms in Winter, Summer and Fall 2027,
+4 lengths, and a mix of future and past deadlines so the Show expired switch has
+something to show.
 """
 
 import asyncio
@@ -19,9 +19,9 @@ from sqlalchemy import select
 from app.db import AsyncSessionLocal
 from app.models.posting import Posting, WorkMode
 
-# --- Taxonomy ----------------------------------------------------------------
-# Fixed skill list used across all seed postings.
-# A real taxonomy would live in a skills table; for Feature 001 a constant is fine.
+# Skills
+# One fixed skill list for all the sample jobs.
+# A full list lives in the skills table but a constant is fine for sample data
 
 SKILLS_POOL = [
     "Python", "Java", "TypeScript", "JavaScript", "Go", "C++", "Rust", "Swift",
@@ -32,12 +32,12 @@ SKILLS_POOL = [
 ]
 
 
-# --- Posting definitions -----------------------------------------------------
-# Each tuple: (title, company, city, province, work_mode, term,
-#              duration, deadline, posted_at, skills[4-6], description, source_url?)
+# The sample jobs
+# Each one is title, company, city, province, work_mode, term,
+# duration, deadline, posted_at, 4 to 6 skills, description and an optional source_url
 
 RAW: list[tuple[Any, ...]] = [
-    # ── Toronto ──────────────────────────────────────────────────────────────
+    # Toronto
     ("Backend Developer", "Shopify", "Toronto", "ON", WorkMode.hybrid,
      "Summer 2027", 4, date(2027, 2, 28), datetime(2026, 9, 10, tzinfo=UTC),
      ["Python", "Django", "PostgreSQL", "Docker"],
@@ -74,7 +74,7 @@ RAW: list[tuple[Any, ...]] = [
      "Build and maintain features for our loyalty platform used by 50+ airline and hotel programs. TypeScript everywhere — no legacy JQuery.",
      "https://points.com/careers"),
 
-    # ── Waterloo ─────────────────────────────────────────────────────────────
+    # Waterloo
     ("Software Engineering Intern", "Google", "Waterloo", "ON", WorkMode.hybrid,
      "Summer 2027", 4, date(2027, 1, 15), datetime(2026, 9, 3, tzinfo=UTC),
      ["C++", "Python", "Go", "SQL"],
@@ -111,7 +111,7 @@ RAW: list[tuple[Any, ...]] = [
      "Work on the Kik messaging client. You'll write React components seen by millions of users daily.",
      None),
 
-    # ── Kitchener ─────────────────────────────────────────────────────────────
+    # Kitchener
     ("Embedded Systems Co-op", "Dejur Inc", "Kitchener", "ON", WorkMode.onsite,
      "Summer 2027", 4, date(2027, 1, 31), datetime(2026, 9, 28, tzinfo=UTC),
      ["C++", "Rust", "Linux"],
@@ -130,7 +130,7 @@ RAW: list[tuple[Any, ...]] = [
      "Build features for the eSentire Atlas portal mobile app. Both iOS and Android experience welcomed.",
      "https://esentire.com/careers"),
 
-    # ── Guelph ────────────────────────────────────────────────────────────────
+    # Guelph
     ("Full Stack Developer", "EcoVadis", "Guelph", "ON", WorkMode.hybrid,
      "Fall 2027", 8, date(2027, 5, 15), datetime(2026, 9, 30, tzinfo=UTC),
      ["Vue", "Node.js", "PostgreSQL", "Docker"],
@@ -149,7 +149,7 @@ RAW: list[tuple[Any, ...]] = [
      "Work on the listing search API serving 15M monthly visits. Performance matters here.",
      None),
 
-    # ── Hamilton ───────────────────────────────────────────────────────────────
+    # Hamilton
     ("Security Analyst Co-op", "FirstOntario Credit Union", "Hamilton", "ON", WorkMode.onsite,
      "Summer 2027", 4, date(2027, 2, 1), datetime(2026, 9, 11, tzinfo=UTC),
      ["Python", "Linux", "SQL"],
@@ -168,7 +168,7 @@ RAW: list[tuple[Any, ...]] = [
      "Automate deployment pipelines and maintain the on-premise Kubernetes cluster running medical waste tracking systems.",
      None),
 
-    # ── Ottawa ─────────────────────────────────────────────────────────────────
+    # Ottawa
     ("Software Developer Co-op", "Kinaxis", "Ottawa", "ON", WorkMode.hybrid,
      "Summer 2027", 4, date(2027, 2, 28), datetime(2026, 9, 23, tzinfo=UTC),
      ["Java", "Spring", "PostgreSQL", "React"],
@@ -193,7 +193,7 @@ RAW: list[tuple[Any, ...]] = [
      "Database-focused development role working alongside DBAs building managed services for enterprise clients.",
      None),
 
-    # ── Mississauga ───────────────────────────────────────────────────────────
+    # Mississauga
     ("Software Developer", "Huawei Canada R&D", "Mississauga", "ON", WorkMode.onsite,
      "Summer 2027", 4, date(2027, 2, 15), datetime(2026, 9, 17, tzinfo=UTC),
      ["C++", "Python", "Linux", "Go"],
@@ -212,7 +212,7 @@ RAW: list[tuple[Any, ...]] = [
      "Work on internal tooling and customer-facing account management applications.",
      None),
 
-    # ── Vancouver ──────────────────────────────────────────────────────────────
+    # Vancouver
     ("Software Engineer Co-op", "Hootsuite", "Vancouver", "BC", WorkMode.hybrid,
      "Summer 2027", 4, date(2027, 2, 1), datetime(2026, 9, 13, tzinfo=UTC),
      ["Scala", "React", "PostgreSQL", "AWS"],
@@ -243,8 +243,8 @@ RAW: list[tuple[Any, ...]] = [
      "Model energy demand forecasting and grid stability scenarios. Work directly with operations researchers.",
      None),
 
-    # ── Remote ────────────────────────────────────────────────────────────────
-    # Remote postings must always show in city-filtered results (FR-004a).
+    # Remote
+    # Remote jobs always have to show up when filtering by city
     ("Frontend Engineer Co-op", "1Password", "Remote", "ON", WorkMode.remote,
      "Summer 2027", 4, date(2027, 2, 28), datetime(2026, 9, 16, tzinfo=UTC),
      ["TypeScript", "React", "Node.js", "Figma"],
@@ -275,8 +275,8 @@ RAW: list[tuple[Any, ...]] = [
      "Build infrastructure for training and serving large language models. The most technically demanding co-op on this list.",
      "https://cohere.com/careers"),
 
-    # ── Expired postings (deadline in the past) ────────────────────────────────
-    # These are hidden by default and revealed by the "Show expired" toggle.
+    # Expired jobs with a deadline in the past
+    # These stay hidden unless you turn on Show expired
 
     ("Software Developer (Expired)", "BlackBerry QNX", "Waterloo", "ON", WorkMode.onsite,
      "Winter 2027", 4, date(2026, 9, 30), datetime(2026, 8, 1, tzinfo=UTC),
@@ -308,7 +308,7 @@ RAW: list[tuple[Any, ...]] = [
      "Previous intake — closed. Multiple DevOps roles opening in Summer 2027.",
      None),
 
-    # ── Extra Summer 2027 postings to hit ~60 rows ─────────────────────────────
+    # A few more Summer 2027 jobs to get to about 60
     ("Cloud Engineer", "Sun Life Financial", "Toronto", "ON", WorkMode.hybrid,
      "Summer 2027", 8, date(2027, 2, 10), datetime(2026, 9, 22, tzinfo=UTC),
      ["AWS", "Terraform", "Python", "Docker"],
@@ -385,8 +385,8 @@ RAW: list[tuple[Any, ...]] = [
 
 async def seed() -> None:
     """
-    Insert the sample postings. Idempotent: postings that already exist (same title,
-    company and city) are skipped, so re-running never deletes users' saved postings.
+    Add the sample jobs. Safe to rerun. Jobs that are already there with the same title,
+    company and city get skipped so running it again never deletes anyone's saved jobs.
     """
     async with AsyncSessionLocal() as session:
         existing = {

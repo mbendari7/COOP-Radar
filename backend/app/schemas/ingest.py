@@ -1,4 +1,4 @@
-"""Pydantic schemas for admin ingest source and run endpoints."""
+"""Shapes for the admin import source and run endpoints."""
 
 from datetime import datetime
 from uuid import UUID
@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 
 class IngestSourceOut(BaseModel):
-    """Public representation of an IngestSource."""
+    """An import source as we send it out."""
 
     id: UUID
     name: str
@@ -23,7 +23,7 @@ class IngestSourceOut(BaseModel):
 
 
 class IngestRunOut(BaseModel):
-    """Public representation of an IngestRun."""
+    """One import run as we send it out."""
 
     id: UUID
     started_at: datetime
@@ -37,7 +37,7 @@ class IngestRunOut(BaseModel):
 
 
 class RunsPage(BaseModel):
-    """Paginated list of IngestRun objects."""
+    """A page of import runs."""
 
     items: list[IngestRunOut]
     total: int
@@ -46,14 +46,14 @@ class RunsPage(BaseModel):
 
 
 class SourcePatchIn(BaseModel):
-    """Fields that can be patched on an IngestSource (all optional)."""
+    """What you can change on a source. Everything is optional."""
 
     enabled: bool | None = None
     auto_paused: bool | None = None
 
 
 class TriggerRunOut(BaseModel):
-    """Response from POST /api/admin/sources/{id}/run."""
+    """What POST /api/admin/sources/{id}/run sends back."""
 
     run_id: UUID
     message: str

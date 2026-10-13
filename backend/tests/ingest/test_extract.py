@@ -1,4 +1,4 @@
-"""Tests for extract_fields — skill extraction with regex and LLM fallback."""
+"""Tests for extract_fields. Skill matching with words and the model as backup."""
 
 from unittest.mock import AsyncMock, patch
 
@@ -9,7 +9,7 @@ from app.ingest.extract import extract_fields
 
 
 async def _seed_skills(db: AsyncSession) -> None:
-    """Seed a few skills into the DB for testing."""
+    """Add a few skills to the database for testing."""
     from sqlalchemy import text
     skills = [
         ("Python", ["py", "python3"], "Language"),
@@ -30,7 +30,7 @@ async def _seed_skills(db: AsyncSession) -> None:
 
 @pytest.mark.asyncio
 async def test_known_skill_extracted(db_session: AsyncSession):
-    """Text mentioning 'Python developer' → skills contains 'Python'."""
+    """Text with 'Python developer' gives skills with 'Python' in them."""
     await _seed_skills(db_session)
     result = await extract_fields(db_session, "We need a Python developer for our backend team.")
     assert "Python" in result.skills
@@ -38,7 +38,7 @@ async def test_known_skill_extracted(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_work_mode_extraction(db_session: AsyncSession):
-    """Text mentioning 'remote position' → work_mode='remote'."""
+    """Text with 'remote position' gives work_mode='remote'."""
     await _seed_skills(db_session)
     result = await extract_fields(db_session, "This is a remote position suitable for students.")
     assert result.work_mode == "remote"
@@ -46,7 +46,7 @@ async def test_work_mode_extraction(db_session: AsyncSession):
 
 @pytest.mark.asyncio
 async def test_llm_fallback_triggered(db_session: AsyncSession):
-    """Text with no taxonomy matches and low confidence triggers LLM fallback."""
+    """Text with no skill matches and low sureness asks the model."""
     await _seed_skills(db_session)
 
     mock_response = AsyncMock()
@@ -58,15 +58,15 @@ async def test_llm_fallback_triggered(db_session: AsyncSession):
         "term": None,
         "duration_months": None,
     })) as mock_llm:
-        # Use text with no clear signals to trigger low confidence
+        # Use text with no clear signals so sureness stays low
         await extract_fields(db_session, "Unique role with specialized responsibilities in niche domain.")
-        # Verify LLM was called (confidence < 0.6)
+        # Check the model was asked since sureness was under 0.6
         mock_llm.assert_called_once()
 
 
 @pytest.mark.asyncio
 async def test_term_extraction(db_session: AsyncSession):
-    """Text mentioning 'Summer 2027' → term='Summer 2027'."""
+    """Text with 'Summer 2027' gives term='Summer 2027'."""
     await _seed_skills(db_session)
     result = await extract_fields(db_session, "Join us for a Summer 2027 co-op position.")
     assert result.term == "Summer 2027"

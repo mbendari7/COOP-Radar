@@ -1,8 +1,8 @@
 """
-FastAPI application factory.
+Builds the FastAPI app.
 
-Keeping app creation in a function (create_app) makes it easy to
-instantiate the app in tests with different settings without side effects.
+Making the app inside a function (create_app) lets tests build
+a fresh one with different settings and no side effects.
 """
 
 import asyncio
@@ -34,7 +34,7 @@ from app.store import create_store
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """
-    Startup: verify the DB is reachable, open the session store, and start the background
+    On startup check the database is there, open the session store and start the
     scheduler that imports jobs from the career boards (app/jobs.py).
     """
     async with AsyncSessionLocal() as session:
@@ -59,12 +59,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
 
 async def http_exception_handler(request: Request, exc: Exception) -> JSONResponse:
     """
-    Flatten our error payloads so every error has one shape:
-        {"detail": "Human-readable message", "code": "SNAKE_CASE"}
+    Give every error the same simple shape
+        {"detail": "Message a person can read", "code": "SNAKE_CASE"}
 
-    Services raise HTTPException(detail={"detail": ..., "code": ...}); FastAPI's default
-    handler would nest that under another "detail" key. Plain-string details (e.g. from
-    FastAPI itself) get a generic code derived from the status.
+    Our services raise HTTPException(detail={"detail": ..., "code": ...}) and FastAPI would
+    normally wrap that in another "detail". Plain text details, like the ones FastAPI makes
+    itself, get a code based on the status.
     """
     assert isinstance(exc, HTTPException)
     if isinstance(exc.detail, dict) and "code" in exc.detail:
@@ -76,12 +76,12 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
 
 def mount_frontend(app: FastAPI, static_dir: Path) -> None:
     """
-    Serve the built React app from the API process, so a single server is the whole
-    website (same origin: no CORS, first-party cookies). Must run after the API routers.
+    Serve the built React site from the API too, so one server is the whole website.
+    Same origin means no CORS trouble and normal cookies. Has to run after the API routers.
 
-    - /assets/* → hashed JS/CSS bundles
-    - any other GET that isn't /api/* → a real file if one exists, else index.html,
-      so client-side routes like /saved survive a page refresh.
+    /assets/* gives the hashed JS and CSS files
+    any other GET that is not /api/* gives a real file if there is one or else index.html
+    so pages like /saved still work after a refresh
     """
     index = static_dir / "index.html"
     if not index.is_file():
@@ -95,7 +95,7 @@ def mount_frontend(app: FastAPI, static_dir: Path) -> None:
         if full_path == "api" or full_path.startswith("api/"):
             raise HTTPException(status_code=404, detail="Not found")
         candidate = (root / full_path).resolve()
-        # The parents check blocks path traversal (e.g. /../../etc/passwd)
+        # Checking the parents stops sneaky paths like /../../etc/passwd
         if full_path and candidate.is_file() and root in candidate.parents:
             return FileResponse(candidate)
         return FileResponse(index)
@@ -107,7 +107,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="CoopRadar API",
         description=(
-            "Co-op posting aggregator — browse, search, save, track, and match your resume."
+            "Co-op jobs from real employers. Browse, search, save, track and match your resume."
         ),
         version="0.4.0",
         lifespan=lifespan,
@@ -115,8 +115,8 @@ def create_app() -> FastAPI:
 
     app.add_exception_handler(HTTPException, http_exception_handler)
 
-    # Allow the Vite dev server (and any configured origins) to call the API.
-    # allow_credentials=True is required for cookie-based auth to work cross-origin.
+    # Let the Vite dev server and any sites in the settings call the API
+    # allow_credentials=True is needed so cookies work across origins
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins_list,
@@ -136,7 +136,7 @@ def create_app() -> FastAPI:
 
     @app.get("/api/health", tags=["meta"])
     async def health() -> dict[str, str]:
-        """Liveness probe used by the host and CI — no database calls."""
+        """Health check for the host and CI. It never touches the database."""
         return {"status": "ok"}
 
     if settings.static_dir:
@@ -145,5 +145,5 @@ def create_app() -> FastAPI:
     return app
 
 
-# Module-level app instance so uvicorn can find it via "app.main:app"
+# The app itself so uvicorn can find it at "app.main:app"
 app = create_app()

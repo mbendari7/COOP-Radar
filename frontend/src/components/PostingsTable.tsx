@@ -1,13 +1,13 @@
 /**
- * PostingsTable — TanStack Table in manual mode.
+ * The job results, as a list or a table. TanStack Table runs in manual mode.
  *
- * "Manual" means sorting/filtering/pagination all happen server-side.
- * This component just renders what the API returns and reports user
- * interactions (column header clicks) back to the parent via callbacks.
+ * Manual means sorting, filtering and paging all happen on the server.
+ * This just draws what the API sends back and tells the parent when
+ * someone clicks a column header.
  *
- * view="cards" (the default on the jobs page) shows a PostingCard list at every width, with
- * the selected job highlighted for the details panel beside it; view="table" shows the
- * sortable table on wide screens. Phones always get cards, so nothing scrolls sideways.
+ * view="cards" is the default on the jobs page and shows the list of rows at every width,
+ * with the picked job marked for the details panel beside it. view="table" shows the
+ * sortable table on wide screens. Phones always get the list so nothing scrolls sideways.
  */
 
 import {
@@ -22,17 +22,18 @@ import type { PostingListItem, SortField, SortOrder } from '../api/postings'
 import BookmarkButton from './BookmarkButton'
 import PostingCard from './PostingCard'
 import LiveBadge from './LiveBadge'
+import { ArrowDownIcon, ArrowUpIcon } from './Icons'
 import { formatDate, formatLocation, workModeLabel } from '../utils/format'
 
 const col = createColumnHelper<PostingListItem>()
 
-// Column definitions — id matches the sort field names the API accepts
+// Columns. Each id matches a sort field the API accepts
 const columns = [
   col.accessor('title', {
     id: 'title',
     header: 'Role',
     cell: (info) => (
-      <span className="font-medium text-gray-900">
+      <span className="font-semibold text-gray-900">
         {info.getValue()}
         {info.row.original.source_id && <LiveBadge />}
       </span>
@@ -77,7 +78,7 @@ const columns = [
   }),
 ]
 
-// Sortable column IDs — only these trigger a sort change callback
+// Only these columns can be sorted
 const SORTABLE: Set<string> = new Set(['title', 'company', 'deadline', 'posted_at'])
 
 interface Props {
@@ -89,10 +90,10 @@ interface Props {
   order: SortOrder
   onSortChange: (field: SortField, order: SortOrder) => void
   showBookmarks?: boolean
-  /** Shown as a "Clear all filters" button inside the empty state */
+  /** Shows a Clear all filters button when nothing matches */
   onClearFilters?: () => void
   view?: 'cards' | 'table'
-  /** The job shown in the details panel, and how to pick another (cards view) */
+  /** The job in the details panel and how to pick another, for the list view */
   selectedId?: string | null
   onSelect?: (id: string) => void
 }
@@ -113,21 +114,21 @@ export default function PostingsTable({
 }: Props) {
   const navigate = useNavigate()
 
-  // TanStack Table needs a SortingState array even though we're in manual mode.
-  // We derive it from the current sort/order URL params.
+  // TanStack Table wants a SortingState even in manual mode.
+  // We build it from the sort and order in the URL
   const sorting: SortingState = [{ id: sort, desc: order === 'desc' }]
 
   const table = useReactTable({
     data,
     columns,
     state: { sorting },
-    // Manual mode — we handle sorting server-side, not in the table itself
+    // Manual mode. The server sorts and the table just shows it
     manualSorting: true,
     manualFiltering: true,
     manualPagination: true,
     getCoreRowModel: getCoreRowModel(),
     onSortingChange: (updater) => {
-      // TanStack Table calls this when a header is clicked
+      // TanStack Table calls this when someone clicks a header
       const next = typeof updater === 'function' ? updater(sorting) : updater
       if (next.length > 0) {
         const { id, desc } = next[0]
@@ -138,33 +139,26 @@ export default function PostingsTable({
     },
   })
 
-  // ── Error state ─────────────────────────────────────────────────────────────
+  // When loading failed
   if (isError) {
     return (
-      <div className="rounded-lg border border-red-200 bg-red-50 p-8 text-center">
-        <p className="text-red-700 font-medium">The jobs didn't load. Check your connection and try again.</p>
-        <button
-          onClick={onRetry}
-          className="mt-3 px-4 py-2 bg-red-600 text-white text-sm rounded hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-        >
+      <div className="border-y-[1.5px] border-post-600 px-4 py-10 text-center">
+        <p className="font-semibold text-post-700">The jobs didn't load. Check your connection and try again.</p>
+        <button onClick={onRetry} className="btn-primary mt-4">
           Try again
         </button>
       </div>
     )
   }
 
-  // ── Empty state ─────────────────────────────────────────────────────────────
+  // When nothing matches
   if (!isLoading && data.length === 0) {
     return (
-      <div className="rounded-lg border border-dashed border-gray-300 bg-white p-12 text-center">
-        <p className="font-medium text-gray-800">No jobs match these filters</p>
-        <p className="mt-1 text-sm text-gray-500">Try removing a filter or searching for something broader.</p>
+      <div className="px-6 py-14 text-center">
+        <p className="display text-2xl text-gray-900">No jobs match these filters</p>
+        <p className="mt-1.5 text-sm text-gray-600">Try removing a filter or searching for something broader.</p>
         {onClearFilters && (
-          <button
-            type="button"
-            onClick={onClearFilters}
-            className="mt-3 text-sm font-medium text-blue-700 hover:underline focus:outline-none focus:ring-2 focus:ring-brand-500 rounded"
-          >
+          <button type="button" onClick={onClearFilters} className="btn-secondary mt-4">
             Clear all filters
           </button>
         )}
@@ -174,8 +168,8 @@ export default function PostingsTable({
 
   return (
     <>
-      {/* Cards: always on phones, at every width in card view */}
-      <div className={`${view === 'cards' ? '' : 'md:hidden'} space-y-2`}>
+      {/* The list. Always on phones and at every width in list view */}
+      <div className={`${view === 'cards' ? '' : 'md:hidden'} border-t-[1.5px] border-gray-900`}>
         {isLoading
           ? Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
           : data.map((posting) => (
@@ -190,11 +184,11 @@ export default function PostingsTable({
         }
       </div>
 
-      {/* Desktop table */}
+      {/* The table on wide screens */}
       {view === 'table' && (
-      <div className="hidden md:block overflow-x-auto rounded-lg border border-gray-200 bg-white">
+      <div className="hidden overflow-x-auto border-t-[1.5px] border-gray-900 bg-white md:block">
         <table className="w-full text-sm" role="table" aria-label="Co-op postings">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="border-b border-gray-300">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {showBookmarks && (
@@ -211,8 +205,7 @@ export default function PostingsTable({
                       key={header.id}
                       scope="col"
                       className={`
-                        px-4 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wide
-                        whitespace-nowrap select-none
+                        label-form whitespace-nowrap px-4 py-3 text-left select-none
                         ${sortable ? 'cursor-pointer hover:text-gray-900' : ''}
                       `}
                       onClick={sortable ? header.column.getToggleSortingHandler() : undefined}
@@ -232,10 +225,8 @@ export default function PostingsTable({
                       <span className="flex items-center gap-1">
                         {flexRender(header.column.columnDef.header, header.getContext())}
                         {sortable && (
-                          <span aria-hidden="true" className="text-gray-300">
-                            {isSorted
-                              ? order === 'asc' ? '↑' : '↓'
-                              : '↕'}
+                          <span aria-hidden="true" className={isSorted ? 'text-air-700' : 'text-gray-300'}>
+                            {isSorted && order === 'asc' ? <ArrowUpIcon className="h-3.5 w-3.5" /> : <ArrowDownIcon className="h-3.5 w-3.5" />}
                           </span>
                         )}
                       </span>
@@ -246,7 +237,7 @@ export default function PostingsTable({
             ))}
           </thead>
 
-          <tbody className="divide-y divide-gray-100">
+          <tbody className="divide-y divide-gray-200">
             {isLoading
               ? Array.from({ length: 8 }).map((_, i) => <SkeletonRow key={i} colCount={columns.length} />)
               : table.getRowModel().rows.map((row) => (
@@ -260,10 +251,10 @@ export default function PostingsTable({
                       }
                     }}
                     tabIndex={0}
-                    className="hover:bg-blue-50 cursor-pointer focus:outline-none focus:bg-blue-50 focus:ring-inset focus:ring-2 focus:ring-brand-500"
+                    className="cursor-pointer hover:bg-air-50 focus:bg-air-50 focus:outline-none"
                     aria-label={`${row.original.title} at ${row.original.company}`}
                   >
-                    {/* Same position as the "Saved" header cell: first */}
+                    {/* First, in the same spot as the Saved header */}
                     {showBookmarks && (
                       <td
                         className="px-2 py-3"
@@ -276,7 +267,7 @@ export default function PostingsTable({
                       </td>
                     )}
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-3 text-gray-700 whitespace-nowrap">
+                      <td key={cell.id} className="whitespace-nowrap px-4 py-3 text-gray-800">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
@@ -291,14 +282,14 @@ export default function PostingsTable({
   )
 }
 
-// ── Skeletons ─────────────────────────────────────────────────────────────────
+// Loading placeholders
 
 function SkeletonRow({ colCount }: { colCount: number }) {
   return (
     <tr>
       {Array.from({ length: colCount }).map((_, i) => (
         <td key={i} className="px-4 py-3">
-          <div className="h-4 bg-gray-200 rounded animate-pulse" style={{ width: `${50 + (i * 17) % 40}%` }} />
+          <div className="h-4 animate-pulse bg-gray-200" style={{ width: `${50 + (i * 17) % 40}%` }} />
         </td>
       ))}
     </tr>
@@ -307,10 +298,13 @@ function SkeletonRow({ colCount }: { colCount: number }) {
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-lg border border-gray-200 p-4 space-y-2 animate-pulse">
-      <div className="h-4 bg-gray-200 rounded w-3/4" />
-      <div className="h-3 bg-gray-200 rounded w-1/2" />
-      <div className="h-3 bg-gray-200 rounded w-2/3" />
+    <div className="flex animate-pulse gap-4 border-b border-gray-200 px-5 py-4">
+      <div className="flex-1 space-y-2">
+        <div className="h-4 w-3/4 bg-gray-200" />
+        <div className="h-3 w-1/2 bg-gray-200" />
+        <div className="h-3 w-2/3 bg-gray-100" />
+      </div>
+      <div className="h-16 w-16 rounded-full border-2 border-gray-200" />
     </div>
   )
 }

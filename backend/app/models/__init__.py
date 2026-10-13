@@ -1,4 +1,4 @@
-# Re-export models so `from app.models import Posting` works cleanly
+# Pull every model in here so `from app.models import Posting` just works
 from app.models.application_event import ApplicationEvent
 from app.models.ingest_run import IngestRun
 from app.models.ingest_source import IngestSource

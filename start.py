@@ -2,15 +2,15 @@
 """
 Start the whole CoopRadar website with one command.
 
-    python start.py            set up (first time only) and open http://localhost:8000
-    python start.py --dev      same, plus live reload while you edit code (http://localhost:5173)
-    python start.py --hosted   what a hosting provider runs: migrate, load data, serve on $PORT
+    python start.py            sets things up the first time and opens http://localhost:8000
+    python start.py --dev      same thing plus live reload while you edit code on http://localhost:5173
+    python start.py --hosted   what a host runs. Migrate, load data and serve on $PORT
 
-The first run takes a few minutes: it creates a Python environment (backend/.venv), installs
-the packages, builds the website, and creates a private database in ~/.coopradar (or uses the
-DATABASE_URL in your .env). After that it starts in seconds. Press Ctrl+C to stop.
+The first run takes a few minutes. It makes a Python environment in backend/.venv, installs
+the packages, builds the website and makes a private database in ~/.coopradar, or uses the
+DATABASE_URL in your .env. After that it starts in seconds. Press Ctrl+C to stop.
 
-You need Python 3.12+ and Node.js 20+. Nothing else.
+You need Python 3.12 or newer and Node.js 20 or newer. Nothing else.
 """
 
 import argparse
@@ -31,8 +31,8 @@ ROOT = Path(__file__).resolve().parent
 BACKEND = ROOT / "backend"
 FRONTEND = ROOT / "frontend"
 VENV = BACKEND / ".venv"
-# The local database lives in your home folder, outside the repo (and outside OneDrive/Dropbox
-# sync, which can corrupt a running database). Set COOPRADAR_DATA to put it elsewhere.
+# The local database lives in your home folder outside the repo, and outside OneDrive or
+# Dropbox sync which can break a running database. Set COOPRADAR_DATA to put it somewhere else
 DATA = Path(os.getenv("COOPRADAR_DATA") or Path.home() / ".coopradar")
 IS_WINDOWS = os.name == "nt"
 VENV_PYTHON = VENV / ("Scripts/python.exe" if IS_WINDOWS else "bin/python")
@@ -55,7 +55,7 @@ def run(cmd: list[str], cwd: Path = ROOT, env: dict[str, str] | None = None) -> 
 
 
 def load_dotenv() -> None:
-    """Read KEY=VALUE lines from .env into the environment (real env vars win)."""
+    """Read KEY=VALUE lines from .env into the environment. Real env vars win."""
     env_file = ROOT / ".env"
     if not env_file.is_file():
         return
@@ -69,7 +69,7 @@ def load_dotenv() -> None:
             os.environ.setdefault(key.strip(), value)
 
 
-# ── Step 1: Python environment (runs with whatever Python started this script) ────────────
+# Step 1 is the Python environment. This runs on whatever Python started the script
 
 
 def _fingerprint() -> str:
@@ -77,14 +77,14 @@ def _fingerprint() -> str:
 
 
 def ensure_venv() -> None:
-    """Create backend/.venv and install the backend, unless it's already up to date."""
+    """Make backend/.venv and install the backend unless it is already up to date."""
     uv = shutil.which("uv")
     if not VENV_PYTHON.exists():
         say("Creating a Python environment in backend/.venv (first run only)")
         if uv:
             run([uv, "venv", "--python", "3.12", str(VENV)])
         else:
-            if sys.version_info < (3, 12):  # noqa: UP036 — any Python may run this file
+            if sys.version_info < (3, 12):  # noqa: UP036 any Python might run this file
                 fail("CoopRadar needs Python 3.12 or newer. Get it from https://www.python.org/downloads/")
             run([sys.executable, "-m", "venv", str(VENV)])
 
@@ -101,22 +101,22 @@ def ensure_venv() -> None:
     marker.write_text(_fingerprint())
 
 
-# ── Step 2: database ───────────────────────────────────────────────────────────────────────
+# Step 2 is the database
 
 
 def stop_local_database() -> None:
-    """Shut the local database down cleanly when start.py exits (Ctrl+C or an error)."""
+    """Shut the local database down cleanly when start.py exits from Ctrl+C or an error."""
     import pgserver
 
     try:
         pgserver.pg_ctl(["-w", "-m", "fast", "stop"], pgdata=DATA / "postgres")
         print("Database stopped.", flush=True)
-    except Exception:  # noqa: BLE001 — already stopped
+    except Exception:  # noqa: BLE001 it already stopped
         pass
 
 
 def start_local_database() -> str:
-    """Start a private PostgreSQL (from the pgserver package) and return its URL."""
+    """Start a private Postgres from the pgserver package and give back its URL."""
     try:
         import pgserver
     except ImportError:
@@ -129,8 +129,8 @@ def start_local_database() -> str:
             server = pgserver.get_server(DATA / "postgres", cleanup_mode=None)
             break
         except Exception:  # noqa: BLE001
-            # After a crash or a closed window, Postgres first repairs itself, which can take
-            # longer than pgserver waits. It keeps going in the background, so try again.
+            # After a crash or a closed window Postgres fixes itself first, which can take
+            # longer than pgserver waits. It keeps going in the background so try again
             if attempt == 0:
                 print("    The database wasn't shut down cleanly last time. Repairing it, "
                       "this can take a minute...", flush=True)
@@ -143,7 +143,7 @@ def start_local_database() -> str:
     return str(server.get_uri("coopradar"))
 
 
-# ── Step 3: website ────────────────────────────────────────────────────────────────────────
+# Step 3 is the website
 
 
 def _npm() -> str:
@@ -170,7 +170,7 @@ def ensure_frontend_packages() -> None:
 
 
 def ensure_frontend_build() -> None:
-    """Build the React site into frontend/dist if the source changed since the last build."""
+    """Build the React site into frontend/dist if the code changed since the last build."""
     ensure_frontend_packages()
     index = FRONTEND / "dist" / "index.html"
     sources = [FRONTEND / "src", FRONTEND / "index.html", FRONTEND / "package-lock.json"]
@@ -180,7 +180,7 @@ def ensure_frontend_build() -> None:
     run([_npm(), "run", "build"], cwd=FRONTEND)
 
 
-# ── Step 4: run it ─────────────────────────────────────────────────────────────────────────
+# Step 4 is running it
 
 
 def wait_until_up(url: str, process: subprocess.Popen[bytes], seconds: int = 90) -> bool:
@@ -207,17 +207,17 @@ def main() -> None:
     load_dotenv()
 
     if not args.hosted and Path(sys.prefix).resolve() != VENV.resolve():
-        # Set up backend/.venv, then run this same script again with its Python
+        # Set up backend/.venv, then run this same script again with that Python
         ensure_venv()
         child = subprocess.Popen([str(VENV_PYTHON), __file__, *sys.argv[1:]])
         while True:
-            # Ctrl+C reaches the child too; it shuts everything down cleanly
+            # Ctrl+C reaches the child too and it shuts everything down cleanly
             with suppress(KeyboardInterrupt):
                 sys.exit(child.wait())
 
     env = os.environ.copy()
     if not args.hosted:
-        # Your computer: real jobs only, plain http on localhost is fine
+        # Your own computer. Real jobs only, and plain http on localhost is fine
         env.setdefault("SEED_SAMPLE_POSTINGS", "false")
         env.setdefault("SEED_DEV_SOURCES", "false")
         env.setdefault("COOKIE_SECURE", "false")
@@ -246,7 +246,7 @@ def main() -> None:
     host = "0.0.0.0" if args.hosted else "127.0.0.1"
     server_cmd = [py, "-m", "uvicorn", "app.main:app", "--host", host, "--port", str(args.port)]
     if args.hosted:
-        # Trust X-Forwarded-* from the host's HTTPS proxy
+        # Trust X-Forwarded headers from the host's HTTPS proxy
         server_cmd += ["--proxy-headers", "--forwarded-allow-ips", "*"]
     if args.dev:
         server_cmd += ["--reload", "--reload-dir", "app"]

@@ -19,7 +19,7 @@ def upgrade() -> None:
         "users",
         sa.Column("is_demo", sa.Boolean(), nullable=False, server_default=sa.text("FALSE")),
     )
-    # Cleanup deletes old demo users by (is_demo, created_at)
+    # Cleanup deletes old demo users by is_demo and created_at
     op.create_index("idx_users_demo_created", "users", ["is_demo", "created_at"])
 
 

@@ -1,8 +1,8 @@
 """
-Tests for saved postings endpoints.
+Tests for the saved jobs endpoints.
 
-These tests require a seeded posting to save.  We create one in a fixture
-and rely on the in-memory Redis from conftest.
+These need a job to save, so a fixture makes one, and they use
+the in memory store from conftest.
 """
 
 import pytest
@@ -14,7 +14,7 @@ from app.models.posting import Posting, WorkMode
 
 @pytest.fixture
 async def posting(db_session: AsyncSession) -> Posting:
-    """Create a minimal posting to save in tests."""
+    """Make a small job to save in tests."""
     from datetime import date, datetime
     p = Posting(
         title="Test Co-op",
@@ -36,7 +36,7 @@ async def posting(db_session: AsyncSession) -> Posting:
 
 @pytest.fixture
 async def saved_client(client: AsyncClient, posting: Posting) -> AsyncClient:
-    """Authenticated client — registers a user and injects mock Redis."""
+    """A signed in client. Signs up a user and plugs in the fake store."""
 
     await client.post(
         "/api/auth/register",
@@ -45,17 +45,17 @@ async def saved_client(client: AsyncClient, posting: Posting) -> AsyncClient:
     return client
 
 
-# ── Tests ─────────────────────────────────────────────────────────────────────
+# Tests
 
 async def test_list_saved_unauthenticated_returns_401(client: AsyncClient):
-    """GET /api/saved without cookie returns 401."""
+    """GET /api/saved with no cookie answers 401."""
 
     res = await client.get("/api/saved")
     assert res.status_code == 401
 
 
 async def test_save_posting_returns_201(saved_client: AsyncClient, posting: Posting):
-    """Saving a posting for the first time returns 201."""
+    """Saving a job the first time answers 201."""
     res = await saved_client.post("/api/saved", json={"posting_id": str(posting.id)})
     assert res.status_code == 201
     data = res.json()
@@ -64,14 +64,14 @@ async def test_save_posting_returns_201(saved_client: AsyncClient, posting: Post
 
 
 async def test_save_posting_idempotent_returns_200(saved_client: AsyncClient, posting: Posting):
-    """Saving the same posting twice returns 200 on the second call (FR-007)."""
+    """Saving the same job twice answers 200 the second time."""
     await saved_client.post("/api/saved", json={"posting_id": str(posting.id)})
     res = await saved_client.post("/api/saved", json={"posting_id": str(posting.id)})
     assert res.status_code == 200
 
 
 async def test_list_saved_returns_saved_posting(saved_client: AsyncClient, posting: Posting):
-    """After saving, GET /api/saved returns the posting."""
+    """After saving, GET /api/saved gives back the job."""
     await saved_client.post("/api/saved", json={"posting_id": str(posting.id)})
     res = await saved_client.get("/api/saved")
     assert res.status_code == 200
@@ -81,7 +81,7 @@ async def test_list_saved_returns_saved_posting(saved_client: AsyncClient, posti
 
 
 async def test_unsave_returns_204_and_removes(saved_client: AsyncClient, posting: Posting):
-    """Unsaving a posting removes it from the saved list."""
+    """Unsaving a job takes it off the saved list."""
     save_res = await saved_client.post("/api/saved", json={"posting_id": str(posting.id)})
     saved_id = save_res.json()["id"]
 
@@ -93,7 +93,7 @@ async def test_unsave_returns_204_and_removes(saved_client: AsyncClient, posting
 
 
 async def test_update_status(saved_client: AsyncClient, posting: Posting):
-    """PATCH /api/saved/{id}/status updates the status field."""
+    """PATCH /api/saved/{id}/status changes the status."""
     save_res = await saved_client.post("/api/saved", json={"posting_id": str(posting.id)})
     saved_id = save_res.json()["id"]
 
@@ -104,13 +104,13 @@ async def test_update_status(saved_client: AsyncClient, posting: Posting):
     assert patch_res.status_code == 200
     data = patch_res.json()
     assert data["status"] == "applied"
-    # A status change event should be recorded
+    # A status change event should be logged
     assert len(data["events"]) == 1
     assert data["events"][0]["status"] == "applied"
 
 
 async def test_update_status_clear_to_null(saved_client: AsyncClient, posting: Posting):
-    """Setting status to null clears it."""
+    """Setting the status to null clears it."""
     save_res = await saved_client.post("/api/saved", json={"posting_id": str(posting.id)})
     saved_id = save_res.json()["id"]
 
@@ -121,7 +121,7 @@ async def test_update_status_clear_to_null(saved_client: AsyncClient, posting: P
 
 
 async def test_status_counts_in_list_response(saved_client: AsyncClient, posting: Posting):
-    """GET /api/saved includes status_counts and stats summary."""
+    """GET /api/saved includes status_counts and the stats summary."""
     save_res = await saved_client.post("/api/saved", json={"posting_id": str(posting.id)})
     saved_id = save_res.json()["id"]
     await saved_client.patch(f"/api/saved/{saved_id}/status", json={"status": "applied"})
@@ -136,7 +136,7 @@ async def test_status_counts_in_list_response(saved_client: AsyncClient, posting
 
 
 async def test_add_event_with_notes(saved_client: AsyncClient, posting: Posting):
-    """POST /api/saved/{id}/events records a status change with notes."""
+    """POST /api/saved/{id}/events logs a status change with notes."""
     save_res = await saved_client.post("/api/saved", json={"posting_id": str(posting.id)})
     saved_id = save_res.json()["id"]
 
@@ -167,7 +167,7 @@ async def test_export_csv_downloads_tracker(saved_client: AsyncClient, posting: 
 async def test_deadlines_this_week_includes_postings_without_status(
     saved_client: AsyncClient, db_session: AsyncSession
 ):
-    """NULL status must count as still open (NULL NOT IN (...) used to drop it)."""
+    """A NULL status has to count as still open. NULL NOT IN (...) used to drop it."""
     from datetime import date, timedelta
 
     soon = Posting(

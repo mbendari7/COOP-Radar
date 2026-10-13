@@ -1,9 +1,8 @@
 """
-Business logic for postings.
+The logic for job postings.
 
-All filtering, sorting, and pagination happen here in SQL — never in Python
-memory (Constitution II).  The router calls these functions and returns the
-results directly; no business logic lives in the router.
+All filtering, sorting and paging happens in SQL and never in Python memory.
+The router calls these and sends back what they return, nothing more.
 """
 
 import io
@@ -39,10 +38,10 @@ from app.services.education import PROGRAMS
 
 COUNTRY_LABELS = {"CA": "Canada", "US": "United States"}
 
-# Maps the whitelisted sort param values to their ORM column.
-# Using a dict means we never interpolate user input into SQL —
-# unknown values are already rejected by Pydantic before we get here.
-# Postgres regex: \m = start of word, \M = end of word
+# Maps each allowed sort value to its column.
+# A dict means user input never gets pasted into SQL, and Pydantic already
+# turned away anything we do not know before we get here.
+# In Postgres regex \m means start of word and \M means end of word
 STUDENT_TITLE_PATTERN = (
     r"\m(intern|interns|internship|co-?op|student|new grad(uate)?|apprentice|stagiaire)\M"
 )
@@ -65,35 +64,35 @@ async def list_postings(
     user_id: UUID | None = None,
 ) -> PostingsPage:
     """
-    Return a paginated, filtered, sorted page of postings.
+    One filtered, sorted page of jobs.
 
-    All predicates are added to a single SELECT so Postgres can use indexes
-    efficiently instead of filtering in a subquery or in Python.
+    Every condition goes into one SELECT so Postgres can use its indexes
+    instead of filtering in a subquery or in Python.
     """
 
-    # Build the base query — we'll add WHERE clauses below
+    # The base query. WHERE clauses get added below
     stmt = select(Posting)
 
-    # --- Filters ---
+    # Filters
 
-    # Hide closed postings (those marked by ingest as no longer available)
+    # Hide jobs the import marked as closed
     if not params.show_closed:
         stmt = stmt.where(Posting.closed_at.is_(None))
 
-    # Hide postings whose deadline has already passed unless the user opted in.
-    # CHK008: show_expired is an additional AND predicate on top of all other filters.
+    # Hide jobs whose deadline already passed unless they asked to see them.
+    # show_expired just adds one more AND on top of the other filters
     if not params.show_expired:
         stmt = stmt.where(Posting.deadline >= date.today())
 
     if params.q and params.search_mode == "semantic":
-        # Semantic mode: rank by cosine distance to the query embedding (pgvector).
-        # Postings without an embedding drop out of semantic results.
+        # Smart search ranks by how close each job's embedding is to the query.
+        # Jobs with no embedding drop out of smart results
         from app.ingest.embed import generate_embedding
         from app.models.posting_embedding import PostingEmbedding
 
         try:
             query_vec = await generate_embedding(params.q)
-        except Exception:  # noqa: BLE001 — embedding service down: fall back to keyword
+        except Exception:  # noqa: BLE001 embedding service is down so use keyword search
             query_vec = None
 
         if query_vec is not None:
@@ -105,15 +104,15 @@ async def list_postings(
                 Posting.search_vector.op("@@")(func.websearch_to_tsquery("english", params.q))
             )
     elif params.q:
-        # websearch_to_tsquery handles quoted phrases and minus exclusions
-        # (e.g. "react -native") without crashing on special characters.
+        # websearch_to_tsquery understands quoted phrases and minus to exclude
+        # like "react -native" and does not crash on odd characters
         stmt = stmt.where(
             Posting.search_vector.op("@@")(func.websearch_to_tsquery("english", params.q))
         )
 
     if params.city:
-        # Remote postings always appear in city-filtered results (FR-004a).
-        # We include a posting if its city matches OR it's flagged as remote work.
+        # Remote jobs always show up when filtering by city.
+        # A job counts if its city matches or it is remote
         stmt = stmt.where(
             or_(
                 Posting.city.ilike(params.city),
@@ -122,7 +121,7 @@ async def list_postings(
         )
 
     if params.students_only:
-        # Constant pattern (no user input): whole-word intern / co-op / student / new grad
+        # Fixed pattern with no user input. Whole word intern, co-op, student or new grad
         stmt = stmt.where(Posting.title.op("~*")(STUDENT_TITLE_PATTERN))
 
     if params.hide_senior:
@@ -138,13 +137,13 @@ async def list_postings(
         stmt = stmt.where(Posting.work_mode == params.work_mode)
 
     if params.duration:
-        # Multiple duration values are OR'd — show postings of any selected length
+        # More than one length means any of them, so show jobs of any picked length
         stmt = stmt.where(Posting.duration_months.in_(params.duration))
 
     if params.skills:
-        # AND logic: posting must have ALL selected skills.
-        # .contains() compiles to the Postgres array "contains" operator (@>) with the
-        # list sent as a bound parameter — user input never touches the SQL string.
+        # The job has to have every picked skill.
+        # .contains() turns into the Postgres array contains check with the list
+        # sent as a bound parameter, so user input never touches the SQL text
         stmt = stmt.where(Posting.skills.contains(params.skills))
 
     if params.category:
@@ -165,14 +164,14 @@ async def list_postings(
     if params.grad_year:
         stmt = stmt.where(grad_year_clause(params.grad_year))
 
-    # --- Total count (before pagination) ---
-    # We run this as a subquery so it sees the same WHERE clauses.
+    # Total count before paging.
+    # Run as a subquery so it sees the same WHERE clauses
     count_stmt = select(func.count()).select_from(stmt.subquery())
     total: int = (await db.execute(count_stmt)).scalar_one()
 
-    # --- Sort ---
-    # Semantic mode is already ordered by similarity; otherwise apply the whitelisted sort.
-    # Posting.id is a tiebreaker so pagination is stable when sort values repeat.
+    # Sorting.
+    # Smart search is already in order of closeness. Otherwise use the allowed sort.
+    # Posting.id breaks ties so pages stay steady when sort values repeat
     if params.search_mode != "semantic" or not params.q:
         sort_col = _SORT_MAP[params.sort]
         if params.order == "desc":
@@ -180,13 +179,13 @@ async def list_postings(
         else:
             stmt = stmt.order_by(sort_col.asc(), Posting.id)
 
-    # --- Pagination ---
+    # Paging
     offset = (params.page - 1) * params.page_size
     stmt = stmt.offset(offset).limit(params.page_size)
 
     rows = (await db.execute(stmt)).scalars().all()
 
-    # Build a set of saved posting IDs for this user if authenticated
+    # Work out which of these jobs the signed in person saved
     saved_ids: set[UUID] = set()
     if user_id is not None and rows:
         from app.models.saved_posting import SavedPosting
@@ -213,25 +212,25 @@ async def list_postings(
 
 
 def program_clause(program: str) -> Any:
-    """Jobs for a program: the description names a field it covers, or the title fits its types."""
+    """Jobs for a program. The description names a field it covers or the title fits its types."""
     info = PROGRAMS[program]
     return or_(Posting.fields_of_study.overlap(list(info.fields)), any_category(info.categories))
 
 
 def has_grad_year(year: int) -> Any:
-    """The job names this graduation year (`year = ANY(grad_years)`, year bound as a parameter)."""
+    """The job names this grad year. The year goes in as a bound parameter."""
     return literal(year, SmallInteger) == func.any(Posting.grad_years)
 
 
 def grad_year_clause(year: int) -> Any:
-    """The job doesn't name graduation years, or it names this one."""
+    """The job names no grad years or it names this one."""
     return or_(func.cardinality(Posting.grad_years) == 0, has_grad_year(year))
 
 
 async def get_posting(posting_id: UUID, db: AsyncSession) -> PostingDetail:
     """
-    Fetch a single posting by ID.
-    Raises 404 via HTTPException if the ID doesn't exist.
+    Get one job by id.
+    Answers 404 if the id is not there.
     """
     stmt = select(Posting).where(Posting.id == posting_id)
     posting = (await db.execute(stmt)).scalar_one_or_none()
@@ -247,10 +246,10 @@ async def get_posting(posting_id: UUID, db: AsyncSession) -> PostingDetail:
 
 async def get_filter_meta(db: AsyncSession) -> FilterMeta:
     """
-    Return the distinct values available for each filter dropdown.
+    The choices for each filter menu.
 
-    Values come from the actual postings table so the UI never shows a
-    city or skill that has zero matching postings.
+    They come from the real jobs table so the site never offers a
+    city or skill with no jobs behind it.
     """
 
     cities_result = await db.execute(
@@ -268,8 +267,8 @@ async def get_filter_meta(db: AsyncSession) -> FilterMeta:
     )
     terms = [r for (r,) in terms_result.all() if r]
 
-    # Unnest the skills arrays to get a flat list of distinct skills.
-    # unnest() expands TEXT[] into individual rows, DISTINCT deduplicates.
+    # Unpack the skills arrays into one flat list of skills.
+    # unnest() turns each text array into rows and DISTINCT drops repeats
     skills_result = await db.execute(
         select(func.unnest(Posting.skills).label("skill"))
         .distinct()
@@ -300,8 +299,8 @@ class _OpenCounts:
     work_modes: list[WorkModeCount]
 
 
-# Job type counts run nine title regexes over every open posting (~250 ms at 10k rows), and
-# jobs only change every few hours, so the result is kept for a couple of minutes.
+# Job type counts run nine title regexes over every open job, about 250 ms at 10k rows, and
+# jobs only change every few hours, so we keep the result for a couple of minutes
 _COUNTS_TTL = 120.0
 _counts_cache: tuple[float, _OpenCounts] | None = None
 
@@ -312,7 +311,7 @@ def clear_category_counts_cache() -> None:
 
 
 async def _open_counts(db: AsyncSession) -> _OpenCounts:
-    """Open postings in total and per job type, country and work mode (one pass over the table)."""
+    """Open jobs in total and by job type, country and work mode in one pass over the table."""
     global _counts_cache
     if _counts_cache is not None and time.monotonic() - _counts_cache[0] < _COUNTS_TTL:
         return _counts_cache[1]
@@ -355,7 +354,7 @@ async def _open_counts(db: AsyncSession) -> _OpenCounts:
 
 
 def _clean(value: object) -> str:
-    """Normalise a pandas cell: NaN/None become '', everything else a stripped string."""
+    """Clean up a pandas cell. NaN and None become '' and anything else a trimmed string."""
     if value is None:
         return ""
     text_value = str(value).strip()
@@ -368,9 +367,9 @@ async def upload_csv(
     file_bytes: bytes,
 ) -> CsvUploadResult:
     """
-    Parse a CSV file and bulk-insert valid, non-duplicate postings.
-    Returns a CsvUploadResult with counts and per-row errors.
-    New postings get an embedding job queued after the commit.
+    Read a CSV file and add every good row that is not a duplicate.
+    Gives back counts and the problems found in each row.
+    New jobs get an embedding job queued after the commit.
     """
     import pandas as pd
 
@@ -411,7 +410,7 @@ async def upload_csv(
     new_postings: list[Posting] = []
 
     for i, row in enumerate(df.to_dict(orient="records")):
-        row_num = i + 2  # 1-indexed, header is row 1
+        row_num = i + 2  # counting from 1 and the header is row 1
         row_errors = validate_csv_row(row, row_num)
         if row_errors:
             errors.extend(
@@ -443,7 +442,7 @@ async def upload_csv(
             skills=[s.strip() for s in skills_val.split(",") if s.strip()],
         )
         db.add(posting)
-        # Flush so the next row's duplicate check sees this one too
+        # Flush so the next row's duplicate check can see this one
         await db.flush()
         new_postings.append(posting)
         added += 1
@@ -461,8 +460,8 @@ async def create_manual(
     data: ManualPostingIn,
 ) -> PostingListItem:
     """
-    Insert a single manually-entered posting.
-    Raises 409 DUPLICATE if a near-identical posting already exists.
+    Add one job typed in by hand.
+    Answers 409 DUPLICATE if almost the same job is already there.
     """
     from app.ingest.dedup import duplicate_exists
     from app.ingest.embed import enqueue_embed_job
@@ -499,8 +498,8 @@ async def similar_postings(
     limit: int = 5,
 ) -> SimilarPostingsResponse:
     """
-    Return up to `limit` open postings most similar to the target by cosine similarity.
-    Returns an empty list if the target has no embedding yet.
+    Up to `limit` open jobs most like this one by embedding.
+    Gives back an empty list if this job has no embedding yet.
     """
     from app.models.posting_embedding import PostingEmbedding
 

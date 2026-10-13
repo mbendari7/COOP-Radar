@@ -1,12 +1,12 @@
 """
-Saved postings router — all endpoints require authentication.
+Saved jobs. Every route needs you to be signed in.
 
-GET  /api/saved               — list with pagination + optional status filter
-POST /api/saved               — save a posting (idempotent)
-DELETE /api/saved/{id}        — unsave
-PATCH  /api/saved/{id}/status — update application status (creates event)
-POST   /api/saved/{id}/events — manually add an event with notes
-GET    /api/saved/export/csv  — download tracker as CSV
+GET    /api/saved               list with pages and an optional status filter
+POST   /api/saved               save a job, safe to repeat
+DELETE /api/saved/{id}          unsave it
+PATCH  /api/saved/{id}/status   change the application status and log it
+POST   /api/saved/{id}/events   add a dated note by hand
+GET    /api/saved/export/csv    download the tracker as a CSV
 """
 
 from uuid import UUID
@@ -32,7 +32,7 @@ router = APIRouter(prefix="/saved", tags=["saved"])
 
 
 async def _load_full(saved_id: UUID, db: AsyncSession) -> SavedPostingOut:
-    """Fetch a SavedPosting with its posting + events eagerly loaded."""
+    """Load a saved job together with its posting and events."""
     from sqlalchemy import select
     from sqlalchemy.orm import selectinload
 
@@ -67,8 +67,8 @@ async def export_csv(
     current_user: User = Depends(get_current_user),
 ) -> StreamingResponse:
     """
-    Download the current user's full tracker as a CSV file.
-    Generated server-side with pandas; streamed directly to the browser.
+    Download your whole tracker as a CSV file.
+    Built on the server with pandas and sent straight to the browser.
     """
     import io
     csv_bytes = await svc.export_csv(db, current_user.id)
@@ -84,14 +84,14 @@ async def export_csv(
 async def list_saved(
     status_filter: ApplicationStatus | None = Query(default=None, alias="status"),
     page: int = Query(default=1, ge=1),
-    # The board view loads up to 200 cards at once; the table uses 25
+    # The board loads up to 200 cards at once and the table loads 25
     page_size: int = Query(default=25, ge=1, le=200),
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> SavedPostingsPage:
     """
-    Return the current user's saved postings with status counts, deadlines, and stats.
-    Optionally filter by status.  Ordered by most recently saved.
+    Your saved jobs plus status counts, deadlines and stats.
+    You can filter by status. Newest saves come first.
     """
     return await svc.list_saved(db, current_user.id, status_filter, page, page_size)
 
@@ -103,8 +103,8 @@ async def save_posting(
     current_user: User = Depends(get_current_user),
 ) -> SavedPostingOut:
     """
-    Bookmark a posting.  Idempotent — returns 201 on first save, 200 if already saved.
-    Returns 404 if the posting_id doesn't exist.
+    Save a job. Safe to repeat. Answers 201 the first time and 200 after that.
+    Answers 404 if the job does not exist.
     """
     from fastapi.responses import JSONResponse
 
@@ -120,7 +120,7 @@ async def unsave_posting(
     db: AsyncSession = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ) -> None:
-    """Remove a saved posting. Returns 404 if not found or owned by another user."""
+    """Unsave a job. Answers 404 if it is not there or belongs to someone else."""
     await svc.unsave_posting(db, current_user.id, saved_posting_id)
 
 
@@ -132,8 +132,8 @@ async def update_status(
     current_user: User = Depends(get_current_user),
 ) -> SavedPostingOut:
     """
-    Update the application status on a saved posting and record the change as an event.
-    Pass null status to clear. Returns 404 if not found or owned by another user.
+    Change the application status on a saved job and log the change.
+    Send null to clear it. Answers 404 if it is not there or belongs to someone else.
     """
     await svc.update_status(
         db, current_user.id, saved_posting_id, body.status, body.notes, body.event_date
@@ -153,8 +153,8 @@ async def add_event(
     current_user: User = Depends(get_current_user),
 ) -> SavedPostingOut:
     """
-    Manually add a status event (e.g. note an interview date retroactively).
-    Also updates the current status on the saved posting.
+    Add a status event by hand, like noting an interview date after the fact.
+    This also changes the current status on the saved job.
     """
     await svc.add_event(
         db, current_user.id, saved_posting_id, body.status, body.notes, body.event_date

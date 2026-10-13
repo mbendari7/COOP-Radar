@@ -1,5 +1,5 @@
 /**
- * TanStack Query hooks for the resume + match API.
+ * TanStack Query hooks for the resume and matching API.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
@@ -7,7 +7,7 @@ import { aiHeaders } from './aiKey'
 import { API_BASE, apiFetch, toApiError } from './client'
 import type { CategoryKey, CountryCode, ProgramKey, WorkMode } from './postings'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// Types
 
 export interface ResumeOut {
   id: string
@@ -24,20 +24,20 @@ export interface MatchResultOut {
   province: string
   term: string
   deadline: string
-  score: number        // 0-100
+  score: number        // 0 to 100
   reason: string
   work_mode: string
-  /** The posting's skills that the resume shows, and the ones it doesn't */
+  /** The job's skills that the resume shows and the ones it does not */
   matched_skills: string[]
   missing_skills: string[]
   country: string
-  /** Why the job fits, read from its description: role, program, graduation year, term, skills */
+  /** Why the job fits, read from its description. Role, program, grad year, term and skills */
   fit_notes: string[]
 }
 
 export type Degree = '' | 'diploma' | 'bachelors' | 'masters' | 'phd'
 
-/** What was read from the resume's education section ('' / null when not found) */
+/** What we read from the education part of the resume. Empty or null when not found */
 export interface DetectedEducation {
   program: ProgramKey | ''
   program_label: string
@@ -45,20 +45,20 @@ export interface DetectedEducation {
   grad_year: number | null
 }
 
-/** What the student is looking for; matching only considers jobs that fit. */
+/** What the student is looking for. Matching only looks at jobs that fit. */
 export interface JobPreferences {
   categories: CategoryKey[]
   keywords: string
   province: string
   city: string
   work_modes: WorkMode[]
-  /** entry: students + entry-level · students: co-op/intern only · all */
+  /** entry is students plus entry level, students is co-op and intern only, all is everything */
   level: 'entry' | 'students' | 'all'
-  /** About the student; blank = read from the resume */
+  /** About the student. Blank means read it from the resume */
   program: ProgramKey | ''
   degree: Degree
   grad_year: number | null
-  /** Co-op term they want, e.g. "Summer 2027" */
+  /** The co-op term they want, like Summer 2027 */
   term: string
   countries: CountryCode[]
 }
@@ -84,7 +84,7 @@ export interface MatchesResponse {
 
 export interface DemandSkill {
   skill: string
-  /** How many open postings ask for it */
+  /** How many open jobs ask for it */
   postings: number
 }
 
@@ -107,7 +107,7 @@ export interface ResumeInsights {
 /** What the per-job assistant should do */
 export type AskMode = 'question' | 'tailor' | 'cover_letter'
 
-// ── Fetchers ──────────────────────────────────────────────────────────────────
+// Calls to the server
 
 const fetchMatches = () => apiFetch<MatchesResponse>('/api/resume/matches')
 
@@ -120,9 +120,9 @@ function uploadResumeFile({ file, preferences }: { file: File; preferences?: Job
 
 const deleteResumeFile = () => apiFetch<void>('/api/resume', { method: 'DELETE' })
 
-// ── Hooks ─────────────────────────────────────────────────────────────────────
+// Hooks
 
-/** Get stored ranked match results. Returns empty list when no resume on file. */
+/** The saved ranked matches. An empty list when there is no resume yet. */
 export function useMatches(enabled = true) {
   return useQuery({
     queryKey: ['matches'],
@@ -131,7 +131,7 @@ export function useMatches(enabled = true) {
   })
 }
 
-/** Upload a resume file; on success invalidates resume + matches queries. */
+/** Upload a resume file. When it works the resume and matches get fetched again. */
 export function useUploadResume() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -144,7 +144,7 @@ export function useUploadResume() {
   })
 }
 
-/** Save what the student is looking for and re-match the stored resume (free). */
+/** Save what the student is looking for and match the saved resume again for free. */
 export function useUpdatePreferences() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -158,7 +158,7 @@ export function useUpdatePreferences() {
   })
 }
 
-/** Free insights (skills found, in-demand skills missing) plus the cached AI review. */
+/** Free insights like skills found and popular skills missing, plus the saved AI review. */
 export function useInsights(enabled: boolean) {
   return useQuery({
     queryKey: ['insights'],
@@ -167,7 +167,7 @@ export function useInsights(enabled: boolean) {
   })
 }
 
-/** Run the AI resume review with the visitor's key; the result is cached server-side. */
+/** Run the AI resume review on the visitor's key. The server saves the result. */
 export function useGenerateInsights() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -177,7 +177,7 @@ export function useGenerateInsights() {
   })
 }
 
-/** Re-rank the stored resume against current postings with the visitor's AI. */
+/** Rank the saved resume against today's jobs again with the visitor's AI. */
 export function useRematch() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -187,7 +187,7 @@ export function useRematch() {
   })
 }
 
-/** Delete the stored resume; on success invalidates resume + matches queries. */
+/** Delete the saved resume. When it works the resume and matches get fetched again. */
 export function useDeleteResume() {
   const queryClient = useQueryClient()
   return useMutation({
@@ -200,12 +200,12 @@ export function useDeleteResume() {
   })
 }
 
-// ── SSE streaming Q&A ─────────────────────────────────────────────────────────
+// Streamed answers about a job
 
 /**
- * Ask about a matched posting using SSE streaming.
- * mode 'question' answers `question`; 'tailor' and 'cover_letter' need no question.
- * Calls onDelta for each token, onDone when stream ends, onError on failure.
+ * Ask about a matched job and get the answer streamed back.
+ * mode question answers `question`. tailor and cover_letter need no question.
+ * Calls onDelta for each piece, onDone at the end and onError if it fails.
  */
 export async function askAboutPosting(
   postingId: string,
@@ -250,9 +250,9 @@ export async function askAboutPosting(
         try {
           parsed = JSON.parse(payload) as { delta?: string; error?: string }
         } catch {
-          continue // skip malformed SSE lines
+          continue // skip broken lines
         }
-        // The backend reports failures in-band once streaming has started
+        // Once streaming starts the backend reports errors inside the stream
         if (parsed.error) throw new Error(parsed.error)
         if (parsed.delta) onDelta(parsed.delta)
       }

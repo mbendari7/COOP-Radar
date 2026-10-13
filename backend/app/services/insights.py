@@ -1,11 +1,11 @@
 """
-Resume insights: what your resume is good at, what the market wants, and how to improve it.
+Resume insights. What your resume is good at, what employers want and how to improve it.
 
-Two layers:
-  - Free (no AI, always available): skills found in the resume, and the most in-demand
-    skills across open postings that the resume doesn't mention.
-  - AI (visitor's own key): summary, strengths, improvements, tailoring tips, roles to search,
-    and keywords to add. Generated on request and cached on the resume row.
+Two parts
+  Free with no AI and always there. Skills found in the resume and the most wanted
+  skills across open jobs that the resume never mentions.
+  AI with the visitor's own key. A summary, strengths, fixes, tailoring tips, roles to
+  search and keywords to add. Made when asked and saved on the resume.
 """
 
 from typing import Any
@@ -46,7 +46,7 @@ async def _all_posting_skills(db: AsyncSession) -> list[str]:
 
 
 async def _skill_demand(db: AsyncSession, limit: int = 40) -> list[tuple[str, int]]:
-    """Most-requested skills across open postings, with how many postings ask for each."""
+    """The most asked for skills across open jobs and how many jobs ask for each."""
     skill = func.unnest(Posting.skills).label("skill")
     inner = select(skill).where(*_OPEN).subquery()
     stmt = (
@@ -59,7 +59,7 @@ async def _skill_demand(db: AsyncSession, limit: int = 40) -> list[tuple[str, in
 
 
 async def free_insights(db: AsyncSession, resume_text: str) -> tuple[list[str], list[DemandSkill]]:
-    """Skills in the resume + the most in-demand skills it's missing (no AI)."""
+    """Skills in the resume plus the most wanted skills it is missing. No AI."""
     found = skills_in_text(await _all_posting_skills(db), resume_text)
     have = {s.lower() for s in found}
     demand = await _skill_demand(db)
@@ -91,7 +91,7 @@ def _parse_ai(raw: str) -> AIInsights | None:
 
 
 async def get_insights(db: AsyncSession, resume: Resume) -> ResumeInsights:
-    """Free insights plus any cached AI insights (no AI call)."""
+    """Free insights plus any saved AI review. No AI call."""
     found, missing = await free_insights(db, resume.extracted_text)
     cached = AIInsights.model_validate(resume.insights) if resume.insights else None
     return ResumeInsights(skills_found=found, in_demand_missing=missing, ai=cached)
@@ -100,7 +100,7 @@ async def get_insights(db: AsyncSession, resume: Resume) -> ResumeInsights:
 async def generate_ai_insights(
     db: AsyncSession, resume: Resume, creds: AICredentials
 ) -> ResumeInsights:
-    """Ask the visitor's AI for a resume review, cache it on the resume, return everything."""
+    """Ask the visitor's AI for a resume review, save it on the resume and give everything back."""
     found, missing = await free_insights(db, resume.extracted_text)
     market = (
         f"Skills this resume shows: {', '.join(found) or 'none detected'}\n"

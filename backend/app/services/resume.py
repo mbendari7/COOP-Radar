@@ -1,19 +1,19 @@
 """
-Resume upload, text extraction, match pipeline, and delete logic.
+Resume upload, reading the text, matching and delete.
 
-Match pipeline (two stages):
-  0. Only open postings that fit the student's preferences (job type, location, country, work
-     mode, level, graduation year) are considered. Program and graduation year come from the
-     preferences or, when blank, from the resume's education section. With no job types picked,
-     the program's job types are used (Mechanical Engineering -> Hardware & engineering).
-     Keywords ("data analyst"), postings that name the student's field or graduation year, and
-     the wanted co-op term rank higher.
-  1. Shortlist ~40 of them. Default: by the share of each posting's skills found in the
-     resume (pure SQL, no AI key needed). If the site owner set OPENAI_API_KEY, by embedding
-     similarity instead.
-  2. The visitor's own AI (Claude, ChatGPT, or Gemini — see app/ai.py) scores the shortlist
-     0-100 with a one-sentence reason and the top 20 are kept. If the AI reply is unusable,
-     the stage-1 order is used so uploads don't fail; a rejected key is reported instead.
+How matching works
+  0. We only look at open jobs that fit what the student wants, like job type, place, country,
+     work mode, level and grad year. Program and grad year come from what they picked or, if
+     blank, from the education part of the resume. With no job types picked we use the ones
+     their program leads to, so Mechanical Engineering gives Hardware and engineering.
+     Keywords like "data analyst", jobs that name their field or grad year, and the term they
+     want all rank higher.
+  1. Shortlist about 40 of them. By default by how many of each job's skills show up in the
+     resume, which is plain SQL with no AI key. If the owner set OPENAI_API_KEY we use
+     embedding closeness instead.
+  2. The visitor's own AI, Claude or ChatGPT or Gemini (see app/ai.py), scores the shortlist
+     from 0 to 100 with a one line reason and we keep the top 20. If the AI reply is no good
+     we keep the order from step 1 so uploads never fail. A rejected key gets reported though.
 """
 
 import io
@@ -61,13 +61,11 @@ _MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
 _ALLOWED_EXTENSIONS = {".pdf", ".docx"}
 
 
-# ---------------------------------------------------------------------------
-# Text extraction
-# ---------------------------------------------------------------------------
+# Reading the text
 
 
 def extract_pdf_text(data: bytes) -> str:
-    """Extract plain text from PDF bytes using pypdf."""
+    """Pull plain text out of a PDF with pypdf."""
     from pypdf import PdfReader
 
     reader = PdfReader(io.BytesIO(data))
@@ -80,7 +78,7 @@ def extract_pdf_text(data: bytes) -> str:
 
 
 def extract_docx_text(data: bytes) -> str:
-    """Extract plain text from DOCX bytes using python-docx."""
+    """Pull plain text out of a DOCX with python-docx."""
     from docx import Document
 
     doc = Document(io.BytesIO(data))
@@ -89,8 +87,8 @@ def extract_docx_text(data: bytes) -> str:
 
 def extract_text(filename: str, data: bytes) -> str:
     """
-    Dispatch to the correct extractor based on file extension.
-    Raises ValueError for unsupported formats.
+    Pick the right reader for the file type.
+    Raises ValueError for types we do not support.
     """
     ext = filename.rsplit(".", 1)[-1].lower() if "." in filename else ""
     if ext == "pdf":
@@ -100,12 +98,10 @@ def extract_text(filename: str, data: bytes) -> str:
     raise ValueError(f"Unsupported file extension: .{ext}")
 
 
-# ---------------------------------------------------------------------------
-# Match pipeline
-# ---------------------------------------------------------------------------
+# Matching
 
-_RESUME_CHARS = 8000          # ~2000 tokens of resume text sent to the model
-_POSTING_CHARS = 1500         # per-candidate description excerpt in the ranking prompt
+_RESUME_CHARS = 8000          # about 2000 tokens of resume text sent to the model
+_POSTING_CHARS = 1500         # how much of each job description goes in the ranking prompt
 _CANDIDATES = 40
 _TOP_N = 20
 
@@ -121,13 +117,13 @@ _RERANK_PROMPT = (
     '[{"posting_id": "<uuid>", "score": <int 0-100>, "reason": "<one sentence>"}]'
 )
 
-# Everything ranking and the "why it fits" notes need from each candidate posting
+# Everything ranking and the why it fits notes need from each job
 _CANDIDATE_COLUMNS = (
     Posting.id, Posting.title, Posting.company, Posting.city, Posting.province, Posting.term,
     Posting.deadline, Posting.description, Posting.skills, Posting.work_mode, Posting.country,
     Posting.grad_years, Posting.fields_of_study,
 )
-_MIN_SKILLS = 3  # a posting listing 1 skill shouldn't score 100 on one match
+_MIN_SKILLS = 3  # a job that lists 1 skill should not score 100 off one match
 _OPEN = (Posting.closed_at.is_(None), Posting.deadline >= func.current_date())
 
 
@@ -135,7 +131,7 @@ _OPEN = (Posting.closed_at.is_(None), Posting.deadline >= func.current_date())
 def effective_preferences(
     prefs: JobPreferences | None, resume_text: str | None
 ) -> JobPreferences | None:
-    """The preferences, with a blank program / degree / graduation year read from the resume."""
+    """The preferences, with a blank program or degree or grad year filled in from the resume."""
     if resume_text is None:
         return prefs
     found = detect_education(resume_text)
@@ -158,7 +154,7 @@ def detected_education(resume_text: str) -> DetectedEducation:
 
 
 def _job_types(prefs: JobPreferences) -> list[str]:
-    """The job types chosen, or the ones the student's program leads to."""
+    """The job types they picked or the ones their program leads to."""
     if prefs.categories:
         return list(prefs.categories)
     if prefs.program:
@@ -166,26 +162,26 @@ def _job_types(prefs: JobPreferences) -> list[str]:
     return []
 
 
-# How much each part of a match counts (out of 1). Skills carry most of it; the rest rewards
-# what makes a job right for this student. Only a job that fits on every count reaches 100.
-_W_SKILLS = 0.65      # share of the posting's skills on the resume (senior titles count half)
-_W_STUDENT = 0.15     # a co-op / intern / student / new-grad title
-_W_PROGRAM = 0.10     # the description names the student's field of study
-_W_GRAD_YEAR = 0.05   # ... or their graduation year
+# How much each part of a match counts out of 1. Skills carry most of it and the rest rewards
+# what makes a job right for this student. Only a job that fits on every count reaches 100
+_W_SKILLS = 0.65      # share of the job's skills on the resume. Senior titles count half
+_W_STUDENT = 0.15     # a co-op, intern, student or new grad title
+_W_PROGRAM = 0.10     # the description names the student's program
+_W_GRAD_YEAR = 0.05   # or their grad year
 _W_TERM = 0.05        # the co-op term they want
-_W_KEYWORDS = 0.20    # matches the keywords they typed ("data analyst")
+_W_KEYWORDS = 0.20    # matches the keywords they typed like "data analyst"
 
 
 def _student_fit(similarity: Any, prefs: JobPreferences | None = None) -> Any:
     """
-    A 0-1 match score for a student from a 0-1 skill relevance, using the weights above.
-    Capped at 1.
+    A match score from 0 to 1 for a student, built from a 0 to 1 skill score and the weights above.
+    Never goes over 1.
     """
     seniority = case((Posting.title.op("~*")(SENIOR_TITLE_PATTERN), 0.5), else_=1.0)
     student = case((Posting.title.op("~*")(STUDENT_TITLE_PATTERN), _W_STUDENT), else_=0.0)
     adjusted = similarity * seniority * _W_SKILLS + student
     if prefs is not None and prefs.keywords.strip():
-        # websearch_to_tsquery takes the keywords as a bound parameter, never as SQL
+        # websearch_to_tsquery takes the keywords as a bound parameter and never as SQL
         query = func.websearch_to_tsquery("english", prefs.keywords.strip())
         adjusted = adjusted + case((Posting.search_vector.op("@@")(query), _W_KEYWORDS), else_=0.0)
     if prefs is not None and prefs.program:
@@ -199,7 +195,7 @@ def _student_fit(similarity: Any, prefs: JobPreferences | None = None) -> Any:
 
 
 def preference_filters(prefs: JobPreferences | None) -> list[Any]:
-    """SQL conditions for the postings a student wants to see (none = everything open)."""
+    """SQL checks for the jobs a student wants to see. None means every open job."""
     if prefs is None:
         return []
     remote = Posting.work_mode == WorkMode.remote
@@ -210,9 +206,9 @@ def preference_filters(prefs: JobPreferences | None) -> list[Any]:
     if prefs.countries:
         clauses.append(Posting.country.in_(prefs.countries))
     if prefs.grad_year:
-        # Jobs asking for other graduation years are left out; most don't say, and stay in
+        # Jobs asking for other grad years are left out. Most do not say and those stay in
         clauses.append(grad_year_clause(prefs.grad_year))
-    # Remote jobs can be done from anywhere, so they always count as "in" a location
+    # Remote jobs can be done from anywhere so they always count as being in a location
     if prefs.province:
         clauses.append(or_(Posting.province.ilike(prefs.province), remote))
     if prefs.city:
@@ -227,7 +223,7 @@ def preference_filters(prefs: JobPreferences | None) -> list[Any]:
 
 
 def skills_in_text(skills: list[str], text_value: str) -> list[str]:
-    """Skills mentioned in the text as whole words ("C" must not match "C++" or "CSS")."""
+    """Skills named in the text as whole words, so "C" never matches "C++" or "CSS"."""
     lowered = text_value.lower()
     return [skill for skill in skills if mentions(skill, text_value, lowered)]
 
@@ -236,17 +232,17 @@ async def _candidates_by_skills(
     db: AsyncSession, resume_text: str, prefs: JobPreferences | None = None
 ) -> list[Any]:
     """
-    Shortlist without any AI or embeddings: rank open postings by the share of their
-    required skills that appear in the resume (postings listing fewer than 3 skills can't
-    score full marks from one match), adjusted for student fit. Works for every visitor,
-    at no cost.
+    Shortlist with no AI or embeddings. Rank open jobs by how many of their skills
+    show up in the resume, adjusted for how well they fit a student. Jobs that list
+    fewer than 3 skills cannot get full marks off one match. Works for every
+    visitor and costs nothing.
     """
     all_skills = list(
         (await db.execute(select(func.unnest(Posting.skills)).distinct())).scalars().all()
     )
     resume_skills = skills_in_text([s for s in all_skills if s], resume_text)
 
-    # unnest(postings.skills) AS u(s): one row per required skill of the outer posting
+    # unnest(postings.skills) AS u(s) gives one row for each skill of the outer job
     unnested = func.unnest(Posting.skills).table_valued("s").render_derived(name="u")
     overlap = (
         select(func.count())
@@ -271,8 +267,8 @@ async def _candidates_by_embedding(
     db: AsyncSession, resume_text: str, prefs: JobPreferences | None = None
 ) -> list[Any] | None:
     """
-    Shortlist by meaning (pgvector). Only used when the site owner set OPENAI_API_KEY, which
-    also powers smart search; returns None when unavailable so the skill shortlist is used.
+    Shortlist by meaning with pgvector. Only used when the owner set OPENAI_API_KEY, which
+    also runs smart search. Gives back None when it is not there so we use the skill shortlist.
     """
     from app.ingest.embed import generate_embedding
 
@@ -300,7 +296,7 @@ async def _candidates_by_embedding(
 async def find_candidates(
     db: AsyncSession, resume_text: str, prefs: JobPreferences | None = None
 ) -> list[Any]:
-    """Stage 1: the ~40 most promising open postings for this resume and preferences."""
+    """Step 1. The 40 or so most promising open jobs for this resume and these preferences."""
     return await _candidates_by_embedding(db, resume_text, prefs) or await _candidates_by_skills(
         db, resume_text, prefs
     )
@@ -310,9 +306,9 @@ async def rank_with_ai(
     creds: AICredentials, resume_snippet: str, rows: list[Any]
 ) -> list[dict[str, Any]] | None:
     """
-    Stage 2: the visitor's AI scores each candidate. Returns None when the reply can't be used
-    (the caller falls back to the stage-1 order). A rejected key is raised, not hidden, so the
-    visitor learns their key is wrong instead of silently getting non-AI results.
+    Step 2. The visitor's AI scores each job. Gives back None when the reply is no good
+    and the caller keeps the step 1 order. A rejected key gets raised and not hidden so the
+    visitor finds out their key is wrong instead of quietly getting results without AI.
     """
     candidates = json.dumps(
         [
@@ -342,7 +338,7 @@ async def rank_with_ai(
 
 
 def _skill_reason(posting_skills: list[str], resume_text: str) -> str:
-    """'You have Python, SQL; the posting also asks for Go.' — no AI involved."""
+    """Something like 'You have Python and SQL. The job also asks for Go.' No AI involved."""
     if not posting_skills:
         return "Matched on how closely your resume's wording fits the posting."
     have = skills_in_text(posting_skills, resume_text)
@@ -354,7 +350,7 @@ def _skill_reason(posting_skills: list[str], resume_text: str) -> str:
 def _shortlist_rankings(
     rows: list[Any], resume_text: str, ai_failed: bool = False
 ) -> list[dict[str, Any]]:
-    """Ranking without AI: the stage-1 relevance as a 0-100 score, explained by skills."""
+    """Ranking with no AI. The step 1 score as 0 to 100, explained by skills."""
     note = " (AI ranking unavailable.)" if ai_failed else ""
     return [
         {
@@ -381,8 +377,8 @@ def fit_notes(
     row: Any, prefs: JobPreferences | None, have: list[str], total_skills: int
 ) -> list[str]:
     """
-    Plain reasons this job fits the student, all read from the posting: the kind of role, the
-    field of study and graduation years it names, the term, and how many of its skills they have.
+    Plain reasons this job fits the student, all read from the job itself. The kind of role,
+    the program and grad years it names, the term and how many of its skills they have.
     """
     notes: list[str] = []
     role = role_of(str(row["title"]))
@@ -431,8 +427,8 @@ async def embed_and_rank(
     prefs: JobPreferences | None = None,
 ) -> list[MatchResultOut]:
     """
-    Run both stages and return up to 20 results, best first. Without AI credentials the
-    free skill-overlap ranking is used (stage 1 only).
+    Run both steps and give back up to 20 results, best first. Without AI credentials
+    we use the free skill overlap ranking, which is step 1 only.
     """
     prefs = effective_preferences(prefs, extracted_text)
     rows = await find_candidates(db, extracted_text, prefs)
@@ -450,7 +446,7 @@ async def embed_and_rank(
     seen: set[str] = set()
     for item in rankings:
         pid = str(item.get("posting_id", ""))
-        # Skip IDs the model invented and duplicates (match_results has a unique constraint)
+        # Skip ids the model made up and repeats since match_results only allows each once
         if pid not in posting_by_id or pid in seen:
             continue
         seen.add(pid)
@@ -485,9 +481,7 @@ async def embed_and_rank(
     return results[:_TOP_N]
 
 
-# ---------------------------------------------------------------------------
-# Upload, fetch, delete
-# ---------------------------------------------------------------------------
+# Upload, fetch and delete
 
 
 async def upload_resume(
@@ -499,8 +493,8 @@ async def upload_resume(
     prefs: JobPreferences | None = None,
 ) -> UploadResponse:
     """
-    Validate, extract text, run match pipeline, and store results.
-    Replaces any existing resume for this user atomically.
+    Check the file, read the text, run matching and save the results.
+    Swaps out any old resume for this person in one go.
     """
     if len(file_bytes) > _MAX_FILE_SIZE:
         raise HTTPException(
@@ -520,7 +514,7 @@ async def upload_resume(
 
     try:
         extracted = extract_text(filename, file_bytes)
-    except Exception as exc:  # noqa: BLE001 — corrupt files raise many different errors
+    except Exception as exc:  # noqa: BLE001 broken files raise all kinds of errors
         raise HTTPException(
             status_code=422,
             detail={
@@ -538,15 +532,15 @@ async def upload_resume(
             },
         )
 
-    # A new version of the resume keeps the preferences set for the old one
+    # A new version of the resume keeps the preferences from the old one
     if prefs is None:
         previous = await get_resume(db, user_id)
         prefs = stored_preferences(previous) if previous else None
 
-    # Delete existing resume (cascades to match_results)
+    # Delete the old resume and its match results go with it
     await db.execute(delete(Resume).where(Resume.user_id == user_id))
 
-    # Insert new resume row
+    # Add the new resume row
     resume = Resume(
         user_id=user_id,
         filename=filename,
@@ -555,7 +549,7 @@ async def upload_resume(
         preferences=prefs.model_dump(mode="json") if prefs else None,
     )
     db.add(resume)
-    await db.flush()  # populate resume.id before FK use
+    await db.flush()  # gets us resume.id before we link things to it
 
     matches = await embed_and_rank(db, extracted, creds, prefs)
     await _store_matches(db, resume, matches)
@@ -578,7 +572,7 @@ def stored_preferences(resume: Resume) -> JobPreferences | None:
 async def rematch_resume(
     db: AsyncSession, resume: Resume, creds: AICredentials | None
 ) -> UploadResponse:
-    """Re-run matching on the stored resume (with AI after adding a key, or new preferences)."""
+    """Match the saved resume again, with AI after adding a key or with new preferences."""
     matches = await embed_and_rank(db, resume.extracted_text, creds, stored_preferences(resume))
     await db.execute(delete(MatchResult).where(MatchResult.resume_id == resume.id))
     await _store_matches(db, resume, matches)
@@ -588,7 +582,7 @@ async def rematch_resume(
 async def update_preferences(
     db: AsyncSession, resume: Resume, prefs: JobPreferences, creds: AICredentials | None
 ) -> UploadResponse:
-    """Save what the student is looking for and re-match the stored resume against it."""
+    """Save what the student wants and match the saved resume against it again."""
     resume.preferences = prefs.model_dump(mode="json")
     return await rematch_resume(db, resume, creds)
 
@@ -612,15 +606,15 @@ async def _store_matches(db: AsyncSession, resume: Resume, matches: list[MatchRe
 
 
 async def get_resume(db: AsyncSession, user_id: UUID) -> Resume | None:
-    """Return the stored resume for a user, or None if none exists."""
+    """The saved resume for a person or None if there is not one."""
     result = await db.execute(select(Resume).where(Resume.user_id == user_id))
     return result.scalar_one_or_none()
 
 
 async def delete_resume(db: AsyncSession, user_id: UUID) -> None:
     """
-    Permanently delete the resume and all associated match results (via CASCADE).
-    Raises 404 if no resume exists.
+    Delete the resume and all its match results for good.
+    Answers 404 if there is no resume.
     """
     resume = await get_resume(db, user_id)
     if resume is None:
@@ -634,14 +628,14 @@ async def delete_resume(db: AsyncSession, user_id: UUID) -> None:
 
 async def get_matches(db: AsyncSession, user_id: UUID) -> MatchesResponse:
     """
-    Return stored match results for the user's current resume.
-    Returns empty list if no resume exists.
+    The saved match results for the person's current resume.
+    An empty list if there is no resume.
     """
     resume = await get_resume(db, user_id)
     if resume is None:
         return MatchesResponse(items=[], resume=None, preferences=None)
 
-    # Fetch match_results joined with postings for display fields
+    # Get match_results joined with the jobs for the fields we show
     sql = text(
         """
         SELECT mr.posting_id, mr.score, mr.reason,

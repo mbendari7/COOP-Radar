@@ -1,13 +1,13 @@
 """
-Programs of study and graduation years, read from job descriptions and resumes. Pure regex, no AI.
+Programs and grad years read from job descriptions and resumes. Just regex, no AI.
 
-Postings: `fields_in_posting` finds the programs a job asks for ("Bachelor's in Computer Science,
-Engineering or a related field" -> cs, engineering) and `grad_years_in_posting` the graduation
-years it wants ("graduating between December 2026 and June 2027" -> 2026, 2027). Both are stored
-on the posting at import time so matching and filtering can use them in SQL.
+Jobs. `fields_in_posting` finds the programs a job asks for, so "Bachelor's in Computer
+Science, Engineering or a related field" gives cs and engineering. `grad_years_in_posting`
+finds the grad years it wants, so "graduating between December 2026 and June 2027" gives
+2026 and 2027. Both get saved on the job when we import it so SQL can match and filter on them.
 
-Resumes: `detect_education` reads the student's program, degree and graduation year from the
-education lines, so matching works even when the student hasn't filled those in.
+Resumes. `detect_education` reads the student's program, degree and grad year from the
+education lines, so matching works even if the student never filled those in.
 """
 
 import re
@@ -15,7 +15,7 @@ from dataclasses import dataclass
 from datetime import date
 from typing import Literal
 
-# Field-of-study tags stored on postings: tag -> pattern (searched only in degree sentences)
+# Program tags saved on jobs, tag to pattern. We only search sentences about degrees
 FIELD_PATTERNS: dict[str, str] = {
     "cs": r"computer science|computing|software engineering|computer engineering|informatics"
           r"|\bcs\b|génie logiciel|informatique",
@@ -58,12 +58,12 @@ ProgramKey = Literal[
 @dataclass(frozen=True)
 class Program:
     label: str
-    resume_pattern: str        # how the program is written on a resume
-    fields: tuple[str, ...]    # posting field tags that welcome this program
-    categories: tuple[str, ...]  # job types (app/services/categories.py) it leads to
+    resume_pattern: str        # how the program shows up on a resume
+    fields: tuple[str, ...]    # job program tags that welcome this program
+    categories: tuple[str, ...]  # job types it leads to (app/services/categories.py)
 
 
-# Order matters for resume detection: specific programs before general ones
+# Order matters when reading resumes. Specific programs go before general ones
 PROGRAMS: dict[str, Program] = {
     "software_engineering": Program(
         "Software Engineering", r"software engineering|génie logiciel",
@@ -136,7 +136,7 @@ def _sentences_with_degree(text: str) -> list[str]:
 
 
 def fields_in_posting(text: str) -> list[str]:
-    """Field tags a posting asks for, e.g. ["cs", "engineering"]. Only degree sentences count."""
+    """Program tags a job asks for, like ["cs", "engineering"]. Only degree sentences count."""
     sentences = _sentences_with_degree(text)
     found = [
         tag for tag, pattern in FIELD_PATTERNS.items()
@@ -152,9 +152,9 @@ _GRAD_CUE = re.compile(
 
 def grad_years_in_posting(text: str, today: date | None = None) -> list[int]:
     """
-    Graduation years a posting asks for, from the text right after a graduation phrase:
-    "graduating between December 2026 and June 2027" -> [2026, 2027]. Years far in the past or
-    future are ignored. Empty = the posting doesn't say.
+    Grad years a job asks for, read from the text right after a graduation phrase.
+    "graduating between December 2026 and June 2027" gives [2026, 2027]. Years way in the past
+    or future are ignored. Empty means the job does not say.
     """
     this_year = (today or date.today()).year
     years: set[int] = set()
@@ -169,13 +169,13 @@ def grad_years_in_posting(text: str, today: date | None = None) -> list[int]:
 
 @dataclass
 class Education:
-    program: str = ""       # a PROGRAMS key, or "" when not found
-    degree: str = ""        # a DEGREE_LABELS key, or ""
+    program: str = ""       # a PROGRAMS key or "" when not found
+    degree: str = ""        # a DEGREE_LABELS key or ""
     grad_year: int | None = None
 
 
 def _education_lines(text: str) -> list[str]:
-    """Resume lines that look like they're about school, plus the two lines after each."""
+    """Resume lines that look like they are about school plus the two lines after each."""
     lines = [line.strip() for line in (text or "").splitlines() if line.strip()]
     picked: set[int] = set()
     for i, line in enumerate(lines):
@@ -185,7 +185,7 @@ def _education_lines(text: str) -> list[str]:
 
 
 def detect_education(text: str, today: date | None = None) -> Education:
-    """Best guess at the student's program, degree and graduation year from their resume."""
+    """Our best guess at the student's program, degree and grad year from their resume."""
     this_year = (today or date.today()).year
     lines = _education_lines(text)
     joined = "\n".join(lines)
@@ -200,14 +200,14 @@ def detect_education(text: str, today: date | None = None) -> Education:
             result.degree = key
             break
 
-    # 1. "Expected graduation: April 2028", "Class of 2027", "Graduating 2027"
+    # 1. Things like "Expected graduation: April 2028" or "Class of 2027" or "Graduating 2027"
     explicit = re.search(
         r"(?i)(expected|anticipated|graduat\w*|class of|convocation)\D{0,40}?" + _YEAR, joined
     )
     if explicit:
         result.grad_year = int(explicit.group(2))
         return result
-    # 2. "Sept 2023 - Apr 2028" / "2024 – Present": the end of a date range in the education lines
+    # 2. The end of a date range near school like "Sept 2023 to Apr 2028" or "2024 to Present"
     ends = [
         int(m.group(2))
         for m in re.finditer(_YEAR + r"\s*[-–—to]+\s*(?:[A-Za-z.]+\s*)?" + _YEAR, joined)
@@ -216,7 +216,7 @@ def detect_education(text: str, today: date | None = None) -> Education:
     if future:
         result.grad_year = max(future)
         return result
-    # 3. The latest plausible year mentioned near school
+    # 3. The latest year that makes sense near the school lines
     years = [int(y) for y in re.findall(_YEAR, joined) if this_year <= int(y) <= this_year + 6]
     if years:
         result.grad_year = max(years)

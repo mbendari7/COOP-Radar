@@ -1,4 +1,4 @@
-"""JsonApiAdapter — fetches postings from a JSON API endpoint."""
+"""Gets jobs from a JSON API."""
 
 import asyncio
 import json
@@ -22,13 +22,13 @@ def _read_local_json(url: str) -> Any:
 
 class JsonApiAdapter(BaseAdapter):
     """
-    Fetches postings from a JSON REST API.
+    Gets jobs from a JSON REST API.
 
-    source.config must contain:
-      - url: str            — the API endpoint URL
-      - field_map: dict     — maps RawPosting field names to response keys
-                              e.g. {"title": "job_title", "company": "employer"}
-                              Fields not in the map fall back to the RawPosting field name.
+    source.config needs
+      url        the API address
+      field_map  maps RawPosting field names to keys in the response,
+                 like {"title": "job_title", "company": "employer"}.
+                 Fields not in the map use the RawPosting field name.
     """
 
     async def fetch(self, source: Any) -> list[RawPosting]:
@@ -37,7 +37,7 @@ class JsonApiAdapter(BaseAdapter):
         field_map: dict[str, str] = config.get("field_map", {})
 
         if url.startswith("file://"):
-            # Local fixture files (used by the dev seed sources) — httpx can't read file://
+            # Local test files used by the dev seed sources, since httpx cannot read file://
             data = await asyncio.to_thread(_read_local_json, url)
         else:
             transport = httpx.AsyncHTTPTransport(retries=3)
@@ -61,7 +61,7 @@ class JsonApiAdapter(BaseAdapter):
                 raise AdapterError(f"JsonApiAdapter got invalid JSON from {url}") from exc
 
         if not isinstance(data, list):
-            # Support {"items": [...]} envelope
+            # Handle responses wrapped like {"items": [...]}
             data = data.get("items", data.get("postings", []))
 
         return [self._map(item, field_map) for item in data]

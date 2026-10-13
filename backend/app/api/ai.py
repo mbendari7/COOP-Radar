@@ -1,8 +1,8 @@
 """
-Bring-your-own-key: verify a visitor's AI key and list the models it can use.
+Check a visitor's own AI key and list the models it can use.
 
-The key is forwarded to the provider once (to list models) and never stored or logged.
-Rate-limited per IP so the endpoint can't be used to test stolen keys in bulk.
+The key goes to the provider once to list models and is never saved or logged.
+There is a per IP limit so nobody can use this to test stolen keys in bulk.
 """
 
 from fastapi import APIRouter, Depends, Header, HTTPException, Request, status
@@ -23,7 +23,7 @@ async def check_key(
     x_forwarded_for: str | None = Header(default=None),
     store: Store = Depends(get_store),
 ) -> AIKeyCheckOut:
-    """Verify the key with its provider. 400 AI_KEY_INVALID if rejected; 429 when over the limit."""
+    """Ask the provider if the key works. 400 AI_KEY_INVALID if not and 429 when over the limit."""
     ip = (x_forwarded_for or "").split(",")[0].strip() or (
         request.client.host if request.client else "unknown"
     )

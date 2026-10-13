@@ -1,8 +1,8 @@
 """
-Tests for GET /api/postings, GET /api/postings/{id}, GET /api/postings/meta/filters.
+Tests for GET /api/postings, GET /api/postings/{id} and GET /api/postings/meta/filters.
 
-Each test seeds only the data it needs via the rolled-back db_session fixture,
-so tests are fast and independent.
+Each test adds only the data it needs through the db_session fixture, which rolls back,
+so tests stay fast and do not affect each other.
 """
 
 from datetime import UTC, date, datetime, timedelta
@@ -13,12 +13,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.posting import Posting, WorkMode
 
-# --- Helpers ------------------------------------------------------------------
+# Helpers
 
 def make_posting(**kwargs) -> Posting:
     """
-    Build a Posting with sane defaults — override only the fields under test.
-    This keeps test setup short without hiding what's actually being tested.
+    Build a Posting with sensible defaults. Only change the fields being tested.
+    That keeps setup short without hiding what the test is really about.
     """
     defaults = dict(
         title="Test Co-op",
@@ -28,7 +28,7 @@ def make_posting(**kwargs) -> Posting:
         work_mode=WorkMode.hybrid,
         term="Summer 2027",
         duration_months=4,
-        deadline=date.today() + timedelta(days=30),   # active by default
+        deadline=date.today() + timedelta(days=30),   # open by default
         posted_at=datetime.now(tz=UTC),
         description="A great co-op role.",
         skills=["Python", "SQL"],
@@ -41,10 +41,10 @@ def make_posting(**kwargs) -> Posting:
 async def add(session: AsyncSession, *postings: Posting) -> None:
     for p in postings:
         session.add(p)
-    await session.flush()  # write to DB without committing (rolled back after test)
+    await session.flush()  # write to the database without committing so it rolls back after
 
 
-# --- US1: Browse postings -----------------------------------------------------
+# Browsing jobs
 
 async def test_list_returns_200_and_page_shape(client: AsyncClient, db_session: AsyncSession) -> None:
     await add(db_session, make_posting(title="Alpha"), make_posting(title="Beta"))
@@ -63,7 +63,7 @@ async def test_total_reflects_active_postings(client: AsyncClient, db_session: A
         db_session,
         make_posting(title="Active 1"),
         make_posting(title="Active 2"),
-        # Expired posting — should be hidden by default
+        # An expired job that should be hidden by default
         make_posting(title="Expired", deadline=date(2020, 1, 1)),
     )
 
@@ -110,13 +110,13 @@ async def test_page_beyond_last_returns_empty_items(
     assert body["total"] == 1
 
 
-# --- US2: Search & filter ------------------------------------------------------
+# Search and filters
 
 async def test_keyword_search_filters_by_title(client: AsyncClient, db_session: AsyncSession) -> None:
     await add(
         db_session,
         make_posting(title="Python Developer"),
-        # Override the default skills (which include Python) so only the title differs
+        # Swap out the default skills, which include Python, so only the title differs
         make_posting(title="Java Engineer", skills=["Java"]),
     )
 
@@ -128,7 +128,7 @@ async def test_keyword_search_filters_by_title(client: AsyncClient, db_session: 
 
 
 async def test_skills_filter_uses_and_logic(client: AsyncClient, db_session: AsyncSession) -> None:
-    """Posting must have ALL selected skills — AND logic per FR-004."""
+    """A job has to have every picked skill."""
     await add(
         db_session,
         make_posting(title="Both", skills=["React", "TypeScript", "SQL"]),
@@ -143,7 +143,7 @@ async def test_skills_filter_uses_and_logic(client: AsyncClient, db_session: Asy
 
 
 async def test_city_filter_keeps_remote_postings(client: AsyncClient, db_session: AsyncSession) -> None:
-    """Remote postings always appear in city-filtered results (FR-004a)."""
+    """Remote jobs always show up when filtering by city."""
     await add(
         db_session,
         make_posting(title="Waterloo Job", city="Waterloo", work_mode=WorkMode.onsite),
@@ -160,7 +160,7 @@ async def test_city_filter_keeps_remote_postings(client: AsyncClient, db_session
 
 
 async def test_duration_filter_uses_or_logic(client: AsyncClient, db_session: AsyncSession) -> None:
-    """Multiple duration values are OR'd — show any matching duration."""
+    """Picking more than one length shows jobs of any of them."""
     await add(
         db_session,
         make_posting(title="4 Month", duration_months=4),
@@ -176,7 +176,7 @@ async def test_duration_filter_uses_or_logic(client: AsyncClient, db_session: As
     assert "12 Month" not in titles
 
 
-# --- US3: Sort -----------------------------------------------------------------
+# Sorting
 
 async def test_sort_by_deadline_ascending(client: AsyncClient, db_session: AsyncSession) -> None:
     await add(
@@ -201,7 +201,7 @@ async def test_invalid_page_size_returns_422(client: AsyncClient) -> None:
     assert response.status_code == 422
 
 
-# --- US4: Posting detail -------------------------------------------------------
+# One job's details
 
 async def test_get_posting_returns_full_detail(client: AsyncClient, db_session: AsyncSession) -> None:
     posting = make_posting(
@@ -228,17 +228,17 @@ async def test_get_unknown_posting_returns_404(client: AsyncClient) -> None:
     assert response.json()["code"] == "POSTING_NOT_FOUND"
 
 
-# --- is_saved field (Feature 002) ---------------------------------------------
+# The is_saved field
 
 async def test_unauthenticated_list_has_no_is_saved(client: AsyncClient, db_session: AsyncSession) -> None:
-    """Unauthenticated GET /api/postings: is_saved should be null/absent."""
+    """GET /api/postings with nobody signed in. is_saved should be null or missing."""
     await add(db_session, make_posting(title="Anon Test"))
     body = (await client.get("/api/postings")).json()
     for item in body["items"]:
         assert item.get("is_saved") is None
 
 
-# --- Filter meta ---------------------------------------------------------------
+# Filter choices
 
 async def test_filter_meta_returns_sorted_distinct_values(
     client: AsyncClient, db_session: AsyncSession
@@ -257,10 +257,10 @@ async def test_filter_meta_returns_sorted_distinct_values(
     assert body["skills"] == sorted(body["skills"])
 
 
-# --- Regression tests ------------------------------------------------------------
+# Bugs that should never come back
 
 async def test_skills_filter_treats_input_as_data(client: AsyncClient, db_session: AsyncSession) -> None:
-    """Quotes/brackets in a skill value are bound parameters, never SQL (was f-string SQL)."""
+    """Quotes and brackets in a skill go in as bound parameters and never as SQL. It used to be f string SQL."""
     await add(db_session, make_posting(title="Safe"))
 
     response = await client.get(
@@ -269,7 +269,7 @@ async def test_skills_filter_treats_input_as_data(client: AsyncClient, db_sessio
 
     assert response.status_code == 200
     assert response.json()["total"] == 0
-    assert (await client.get("/api/postings")).json()["total"] == 1  # table still there
+    assert (await client.get("/api/postings")).json()["total"] == 1  # the table is still there
 
 
 async def test_semantic_search_orders_by_similarity(
@@ -322,7 +322,7 @@ async def test_similar_postings_returns_nearest(client: AsyncClient, db_session:
 
     body = (await client.get(f"/api/postings/{target.id}/similar")).json()
 
-    assert [item["title"] for item in body["items"]] == ["Twin"]  # never itself, never closed
+    assert [item["title"] for item in body["items"]] == ["Twin"]  # never itself and never closed
     assert body["items"][0]["similarity"] > 0.99
 
 
@@ -331,7 +331,7 @@ async def test_error_responses_have_flat_shape(client: AsyncClient) -> None:
     assert body == {"detail": "Posting not found", "code": "POSTING_NOT_FOUND"}
 
 
-# --- Job types, employers, recency --------------------------------------------
+# Job types, employers and how recent
 
 async def test_category_filter_matches_job_type_from_title(
     client: AsyncClient, db_session: AsyncSession
@@ -393,7 +393,7 @@ async def test_filter_meta_lists_job_types_and_employers(
 
     body = (await client.get("/api/postings/meta/filters")).json()
 
-    assert body["companies"] == ["Lyft", "Shopify"]  # open postings only
+    assert body["companies"] == ["Lyft", "Shopify"]  # open jobs only
     assert body["open_jobs"] == 2
     counts = {c["key"]: c["count"] for c in body["categories"]}
     assert counts["software"] == 2
@@ -401,7 +401,7 @@ async def test_filter_meta_lists_job_types_and_employers(
     assert body["categories"][0]["label"] == "Software & web"
 
 
-# --- Country, program of study, graduation year --------------------------------
+# Country, program and grad year
 
 async def test_country_filter_and_role(client: AsyncClient, db_session: AsyncSession) -> None:
     await add(
@@ -427,7 +427,7 @@ async def test_program_filter_uses_named_fields_or_job_types(
         db_session,
         # names Mechanical Engineering in the description
         make_posting(title="Operations Co-op", fields_of_study=["mechanical", "engineering"]),
-        # a hardware title, nothing named
+        # a hardware title with nothing named
         make_posting(title="Embedded Firmware Intern"),
         make_posting(title="Account Executive"),
     )

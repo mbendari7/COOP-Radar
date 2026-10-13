@@ -1,7 +1,7 @@
 """
-Tests for job preferences: what a student is looking for limits and orders their matches.
-Covers the upload `preferences` field, PUT /api/resume/preferences, and the skill split on
-each match. No AI key is used, so matching takes the free skill-overlap path.
+Tests for job preferences. What a student is looking for limits and orders their matches.
+Covers the upload `preferences` field, PUT /api/resume/preferences and the skill split on
+each match. No AI key is used so matching takes the free skill overlap path.
 """
 
 import json
@@ -16,7 +16,7 @@ from app.models.posting import Posting, WorkMode
 
 @pytest.fixture(autouse=True)
 def no_ai_key(client: AsyncClient) -> None:
-    """A visitor without an AI key: matching uses the free skill-overlap ranking."""
+    """A visitor with no AI key. Matching uses the free skill overlap ranking."""
     for header in ("X-AI-Provider", "X-AI-Key", "X-AI-Model"):
         client.headers.pop(header, None)
 
@@ -75,7 +75,7 @@ async def test_upload_with_job_type_only_matches_that_type(
     stored = (await client.get("/api/resume/matches")).json()
     assert stored["preferences"]["categories"] == ["data"]
     match = stored["items"][0]
-    assert match["matched_skills"] == ["Python"]  # the resume lists Python, not SQL
+    assert match["matched_skills"] == ["Python"]  # the resume lists Python but not SQL
     assert match["missing_skills"] == ["SQL"]
     assert match["work_mode"] == "onsite"
 
@@ -90,7 +90,7 @@ async def test_update_preferences_rematches_by_location_and_level(
     res = await client.put("/api/resume/preferences", json={"province": "ON", "level": "entry"})
 
     assert res.status_code == 200
-    # Ontario jobs without senior titles, plus remote jobs (doable from Ontario)
+    # Ontario jobs without senior titles plus remote jobs, which you can do from Ontario
     assert _titles(res.json()["matches"]) == {"Software Developer Co-op", "Marketing Coordinator"}
     stored = (await client.get("/api/resume/matches")).json()
     assert _titles(stored["items"]) == {"Software Developer Co-op", "Marketing Coordinator"}
@@ -125,7 +125,7 @@ async def test_keywords_rank_matching_jobs_higher(
     res = await client.put("/api/resume/preferences", json={"level": "all", "keywords": "marketing"})
     after = res.json()["matches"]
 
-    assert score(before, "Marketing Coordinator") == 0  # none of its skills on the resume
+    assert score(before, "Marketing Coordinator") == 0  # none of its skills are on the resume
     assert score(after, "Marketing Coordinator") == 20
 
 

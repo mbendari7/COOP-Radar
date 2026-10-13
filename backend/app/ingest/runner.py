@@ -1,17 +1,17 @@
 """
-run_source — imports one source. Started in the background by app/jobs.py.
+run_source imports one source. app/jobs.py starts it in the background.
 
-Each call:
-  1. Opens a DB session and loads the IngestSource
-  2. Reuses the IngestRun created by "Run now" (run_id) or creates a new one
-  3. Calls the source's adapter to fetch RawPostings
-  4. For each RawPosting:
-       - same source + same source_ref  -> update the existing row (re-open if closed)
-       - near-duplicate of another posting (company + city + ~title) -> skip
-       - otherwise -> fill missing fields via extract_fields() and insert
-  5. Marks this source's postings that disappeared from the feed as closed
-  6. Updates consecutive_failures / auto_paused on the source
-  7. Commits the run, then queues embedding jobs for new postings
+Every run
+  1. Opens a database session and loads the IngestSource
+  2. Reuses the IngestRun made by Run now (run_id) or makes a new one
+  3. Asks the source's adapter for RawPostings
+  4. For each one
+       same source and same source_ref updates the row we have and reopens it if closed
+       almost the same as another job (company, city, close title) gets skipped
+       anything else gets missing fields filled by extract_fields() and is added
+  5. Marks this source's jobs that left the feed as closed
+  6. Updates consecutive_failures and auto_paused on the source
+  7. Commits the run, then queues embedding jobs for new jobs
 """
 
 from datetime import UTC, date, datetime, timedelta
@@ -31,15 +31,15 @@ from app.models.posting import Posting, WorkMode
 from app.services.education import fields_in_posting, grad_years_in_posting
 
 _AUTO_PAUSE_THRESHOLD = 3
-# Most career boards don't publish a deadline. Postings without one get an *estimated*
-# "apply by" date this far ahead, flagged in low_confidence_fields and pushed forward on every
-# run while the job is still listed (it gets closed as soon as it disappears from the board).
+# Most career boards never give a deadline. Jobs without one get a guessed apply by date
+# this far ahead. It is flagged in low_confidence_fields and pushed forward on every run
+# while the job is still listed, and the job closes as soon as it leaves the board
 _ESTIMATED_DEADLINE = timedelta(days=45)
 _VALID_DURATIONS = {4, 8, 12, 16}
 
 
 async def run_source(source_id: UUID, run_id: UUID | None = None) -> None:
-    """Background job entry point: run one import, then queue embeddings for new postings."""
+    """Where the background job starts. Run one import then queue embeddings for new jobs."""
     from app.ingest.embed import enqueue_embed_job
 
     async with AsyncSessionLocal() as db:
@@ -51,7 +51,7 @@ async def run_source(source_id: UUID, run_id: UUID | None = None) -> None:
 async def _execute_run(
     db: AsyncSession, source_id: UUID, run_id: UUID | None = None
 ) -> list[UUID]:
-    """Run one ingestion pass and commit it. Returns the IDs of newly inserted postings."""
+    """Run one import pass and commit it. Gives back the ids of the new jobs."""
     source = await db.get(IngestSource, source_id)
     if source is None:
         return []
@@ -79,9 +79,9 @@ async def _execute_run(
 
     for raw in raw_postings:
         try:
-            # Same posting seen before from this source -> update, never duplicate.
-            # This check must come before the fuzzy dedup check, otherwise every
-            # re-run would treat its own postings as duplicates and then close them.
+            # We already have this job from this source so update it and never duplicate.
+            # This has to come before the fuzzy duplicate check or every run would
+            # treat its own jobs as duplicates and then close them
             if raw.source_ref:
                 seen_refs.add(raw.source_ref)
                 existing = (
@@ -102,17 +102,17 @@ async def _execute_run(
 
             posting = await _raw_to_posting(db, raw, source_id)
             db.add(posting)
-            await db.flush()  # later rows' duplicate checks must see this one
+            await db.flush()  # later rows need to see this one when checking duplicates
             new_postings.append(posting)
             added += 1
-        except Exception as exc:  # noqa: BLE001 — one bad row must not fail the run
+        except Exception as exc:  # noqa: BLE001 one bad row should not fail the whole run
             errors += 1
             error_log.append(f"Row error for {raw.title!r}: {exc}")
             if status == "success":
                 status = "partial"
 
-    # Close this source's postings that disappeared from the feed. Skipped when the
-    # fetch failed or returned nothing, so an outage never closes everything.
+    # Close this source's jobs that left the feed. Skipped when the fetch failed
+    # or came back empty so an outage never closes everything
     if seen_refs:
         stale = (
             await db.execute(
@@ -143,29 +143,31 @@ async def _execute_run(
     run.updated = updated
     run.closed = closed
     run.errors = errors
-    run.error_log = error_log[:100]  # cap at 100 entries
+    run.error_log = error_log[:100]  # keep at most 100 entries
 
     await db.commit()
     return [p.id for p in new_postings]
 
 
 def _apply_updates(existing: Posting, raw: RawPosting) -> None:
-    """Refresh mutable fields from the feed and re-open the posting if it was closed."""
+    """Refresh the fields that can change and reopen the job if it was closed."""
     existing.closed_at = None
     if raw.title:
         existing.title = raw.title
+    if raw.company:
+        existing.company = raw.company
     if raw.description:
         existing.description = raw.description
     if raw.deadline:
         existing.deadline = raw.deadline
     elif "deadline" in (existing.low_confidence_fields or {}):
-        # Still listed → keep the estimated apply-by date ahead of today
+        # Still listed so keep the guessed apply by date ahead of today
         existing.deadline = max(existing.deadline, date.today() + _ESTIMATED_DEADLINE)
     if raw.source_url:
         existing.source_url = raw.source_url
     if raw.skills:
         existing.skills = raw.skills
-    # Boards edit locations, and parsing improves: keep the location current
+    # Boards edit locations and our parsing gets better, so keep the location fresh
     if raw.city:
         existing.city = raw.city
     if raw.province is not None:
@@ -175,7 +177,7 @@ def _apply_updates(existing: Posting, raw: RawPosting) -> None:
 
 
 def _set_education(posting: Posting) -> None:
-    """Programs of study and graduation years the posting asks for (used by co-op matching)."""
+    """Programs and grad years the job asks for. Co-op matching uses these."""
     text = f"{posting.title}\n{posting.description or ''}"
     posting.fields_of_study = fields_in_posting(text)
     posting.grad_years = grad_years_in_posting(text)
@@ -183,8 +185,8 @@ def _set_education(posting: Posting) -> None:
 
 async def _raw_to_posting(db: AsyncSession, raw: RawPosting, source_id: UUID) -> Posting:
     """
-    Convert a RawPosting into a Posting, filling missing fields from the posting text.
-    Fields we had to guess are recorded in low_confidence_fields for admin review.
+    Turn a RawPosting into a Posting and fill missing fields from the job text.
+    Fields we had to guess go in low_confidence_fields so an admin can check them.
     """
     work_mode_str = (raw.work_mode or "").lower() or None
     term = raw.term or None
@@ -218,7 +220,7 @@ async def _raw_to_posting(db: AsyncSession, raw: RawPosting, source_id: UUID) ->
         title=raw.title,
         company=raw.company,
         city=raw.city or "Unknown",
-        # Career boards give a province when they can; RSS/JSON feeds rarely do
+        # Career boards give a province when they can. RSS and JSON feeds rarely do
         province=raw.province if raw.province is not None else "ON",
         country=raw.country,
         work_mode=work_mode,

@@ -1,0 +1,89 @@
+{
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "cramped-padding",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/assigned.html"
+        ],
+        "createdAt": "2026-10-13T07:43:08.311Z",
+        "reason": "model-written decision sketch, a throwaway preview for choosing a direction, never shipped"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/assigned.html"
+        ],
+        "createdAt": "2026-10-13T07:43:08.605Z",
+        "reason": "model-written decision sketch, a throwaway preview for choosing a direction, never shipped"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/assigned.html"
+        ],
+        "createdAt": "2026-10-13T07:43:08.937Z",
+        "reason": "model-written decision sketch, a throwaway preview for choosing a direction, never shipped"
+      },
+      {
+        "rule": "low-contrast",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/assigned.html"
+        ],
+        "createdAt": "2026-10-13T07:43:09.252Z",
+        "reason": "model-written decision sketch, a throwaway preview for choosing a direction, never shipped"
+      },
+      {
+        "rule": "undersized-ui-text",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/assigned.html"
+        ],
+        "createdAt": "2026-10-13T07:43:09.594Z",
+        "reason": "model-written decision sketch, a throwaway preview for choosing a direction, never shipped"
+      },
+      {
+        "rule": "design-system-color",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/model-pick.html"
+        ],
+        "createdAt": "2026-10-13T07:43:09.919Z",
+        "reason": "model-written decision sketch, a throwaway preview for choosing a direction, never shipped"
+      },
+      {
+        "rule": "design-system-font-size",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/model-pick.html"
+        ],
+        "createdAt": "2026-10-13T07:43:10.226Z",
+        "reason": "model-written decision sketch, a throwaway preview for choosing a direction, never shipped"
+      },
+      {
+        "rule": "design-system-radius",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/model-pick.html"
+        ],
+        "createdAt": "2026-10-13T07:43:10.543Z",
+        "reason": "model-written decision sketch, a throwaway preview for choosing a direction, never shipped"
+      },
+      {
+        "rule": "kicker-above-heading",
+        "value": "*",
+        "files": [
+          ".impeccable/mocks/decision/model-pick.html"
+        ],
+        "createdAt": "2026-10-13T07:43:10.853Z",
+        "reason": "model-written decision sketch, a throwaway preview for choosing a direction, never shipped"
+      }
+    ]
+  }
+}

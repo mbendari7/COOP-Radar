@@ -1,4 +1,4 @@
-"""Tests for reading programs of study and graduation years from postings and resumes."""
+"""Tests for reading programs and grad years from jobs and resumes."""
 
 from datetime import date
 
@@ -13,7 +13,7 @@ from app.services.education import (
 TODAY = date(2026, 10, 12)
 
 
-# ── Postings ──────────────────────────────────────────────────────────────────
+# Jobs
 
 def test_fields_come_from_degree_sentences_only() -> None:
     text = (
@@ -42,14 +42,14 @@ def test_no_degree_sentence_means_no_fields() -> None:
         ("Class of 2028 students only", [2028]),
         ("Founded in 2015, we have 300 people. Graduates welcome.", []),
         ("Must be returning to school after the work term.", []),
-        ("graduation date in 2045", []),  # too far out to be real
+        ("graduation date in 2045", []),  # too far away to be real
     ],
 )
 def test_grad_years(text: str, years: list[int]) -> None:
     assert grad_years_in_posting(text, today=TODAY) == years
 
 
-# ── Resumes ───────────────────────────────────────────────────────────────────
+# Resumes
 
 def test_detects_program_degree_and_expected_graduation() -> None:
     resume = (

@@ -1,4 +1,4 @@
-"""Public, unauthenticated app configuration the frontend needs to render (e.g. the demo button)."""
+"""Public settings the site needs to draw itself, like whether to show the demo button."""
 
 from fastapi import APIRouter
 
@@ -10,7 +10,7 @@ router = APIRouter(tags=["meta"])
 
 @router.get("/config", response_model=PublicConfig)
 async def public_config() -> PublicConfig:
-    """Feature flags for the UI. Never includes secrets — only whether features are on."""
+    """Feature switches for the site. Never any secrets, just whether things are on."""
     settings = get_settings()
     return PublicConfig(
         demo_enabled=settings.demo_enabled,

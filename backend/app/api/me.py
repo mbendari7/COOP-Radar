@@ -1,7 +1,7 @@
 """
-Account management router — GET /me, PATCH /me/password, DELETE /me.
+Your account. GET /me, PATCH /me/password and DELETE /me.
 
-All routes require authentication via get_current_user dependency.
+Every route here needs you to be signed in.
 """
 
 from fastapi import APIRouter, Cookie, Depends, Response, status
@@ -20,7 +20,7 @@ router = APIRouter(prefix="/me", tags=["account"])
 
 @router.get("", response_model=UserOut)
 async def get_me(current_user: User = Depends(get_current_user)) -> UserOut:
-    """Return the currently authenticated user's profile."""
+    """Give back the signed in person's profile."""
     return UserOut.model_validate(current_user)
 
 
@@ -31,8 +31,8 @@ async def change_password(
     current_user: User = Depends(get_current_user),
 ) -> None:
     """
-    Change the user's password.
-    Returns 401 if current_password is wrong, 422 if new_password < 10 chars.
+    Change your password.
+    Answers 401 if the current password is wrong and 422 if the new one is under 10 characters.
     """
     await auth_service.change_password(
         db, current_user, body.current_password, body.new_password
@@ -49,8 +49,8 @@ async def delete_account(
     store: Store = Depends(get_store),
 ) -> None:
     """
-    Permanently delete the account and all associated data (saved postings, statuses).
-    CASCADE delete in the DB handles the cascade.  Returns 401 if password is wrong.
+    Delete the account and everything tied to it for good, like saved jobs and statuses.
+    The database cascade does the cleanup. Answers 401 if the password is wrong.
     """
     await auth_service.delete_account(
         db, store, current_user, session or "", body.password
@@ -65,7 +65,7 @@ async def claim(
     current_user: User = Depends(get_current_user),
 ) -> UserOut:
     """
-    Keep a temporary (guest/demo) account: add an email + password. All saved jobs, the resume,
-    and matches stay. 400 ALREADY_CLAIMED for normal accounts, 409 EMAIL_TAKEN if in use.
+    Keep a temporary or demo account by adding an email and password. Saved jobs, the resume
+    and matches all stay. 400 ALREADY_CLAIMED for normal accounts and 409 EMAIL_TAKEN if in use.
     """
     return UserOut.model_validate(await claim_account(db, current_user, body.email, body.password))

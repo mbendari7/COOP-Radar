@@ -1,15 +1,15 @@
 """
-Streaming Q&A with citation grounding for the AI Resume Matcher.
+Streamed answers with sources for questions about a matched job.
 
-Runs on the visitor's own AI key (Claude, ChatGPT, or Gemini — see app/ai.py).
+Runs on the visitor's own AI key, Claude or ChatGPT or Gemini (see app/ai.py).
 
-stream_answer() yields SSE-formatted chunks then a [DONE] sentinel.
-Each chunk: 'data: {"delta": "..."}\n\n'
-Errors:     'data: {"error": "..."}\n\n'
-Final:      'data: [DONE]\n\n'
+stream_answer() sends SSE pieces and then a [DONE] marker.
+Each piece  'data: {"delta": "..."}\n\n'
+Errors      'data: {"error": "..."}\n\n'
+The end     'data: [DONE]\n\n'
 
-The model is constrained to cite only from the provided POSTING and RESUME context.
-When it cannot answer, it must reply: "I don't have enough information to answer that."
+The model can only cite the POSTING and RESUME text we give it.
+When it cannot answer it has to say "I don't have enough information to answer that."
 """
 
 import json
@@ -21,8 +21,8 @@ from app.ai import AICredentials
 
 logger = logging.getLogger(__name__)
 
-_RESUME_CHARS = 8000   # ~2000 tokens
-_POSTING_CHARS = 6000  # ~1500 tokens
+_RESUME_CHARS = 8000   # about 2000 tokens
+_POSTING_CHARS = 6000  # about 1500 tokens
 
 _SYSTEM_PROMPT = (
     "You are a co-op application assistant helping a student understand how well they match "
@@ -85,11 +85,11 @@ async def stream_answer(
     mode: str = "question",
 ) -> AsyncIterator[str]:
     """
-    Stream a cited Q&A response as SSE events.
+    Stream an answer with sources as SSE events.
 
-    Yields strings already formatted as SSE lines, e.g.:
+    Each string is already a ready SSE line like
         'data: {"delta": "Based "}\n\n'
-    Ends with:
+    and the last one is
         'data: [DONE]\n\n'
     """
     user_message = (
@@ -103,7 +103,7 @@ async def stream_answer(
         async for text_chunk in ai.stream(creds, system, user_message, max_tokens=2500):
             yield _sse({"delta": text_chunk})
     except ai.AIProviderError as exc:
-        # The HTTP status is already 200 once streaming starts, so report errors in-band.
+        # Once streaming starts the status is already 200 so errors go inside the stream
         logger.warning("Resume Q&A failed (%s): %s", creds.provider, exc.code)
         yield _sse({"error": exc.message})
 

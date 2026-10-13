@@ -1,13 +1,13 @@
 """
-Authentication business logic.
+Everything to do with accounts and signing in.
 
-All auth operations live here — routers stay thin and just call these
-functions.  Session tokens are 32 random bytes (256-bit entropy) stored
-in the session store (app/store.py) as `session:<hex-token>` hashes with a 7-day rolling TTL.
+The routers stay thin and call these. Session tokens are 32 random bytes kept in
+the session store (app/store.py) as session:<token> with a 7 day expiry that keeps
+moving forward while you use the site.
 
-Password hashing uses argon2id via argon2-cffi with library defaults:
+Passwords are hashed with argon2id using the library defaults
   time_cost=2, memory_cost=65536 (64 MB), parallelism=1
-These are adequate for a web app at this scale (Constitution III).
+That is plenty for a site this size.
 """
 
 import secrets
@@ -23,23 +23,23 @@ from app.config import get_settings
 from app.models.user import User
 from app.store import Store
 
-_ph = PasswordHasher()  # singleton — thread-safe, cheap to keep
+_ph = PasswordHasher()  # one shared hasher is safe and cheap to keep around
 _SESSION_TTL = 60 * 60 * 24 * 7  # 7 days
 
-# ── Login rate limiting ────────────────────────────────────────────────────────
-# 5 failed attempts per email within a 15-minute window triggers a 429.
-# Counter lives in the session store alongside sessions.
+# Slowing down password guessing
+# 5 failed tries for one email within 15 minutes gets a 429.
+# The counter lives in the session store next to the sessions
 _RATE_PREFIX = "login_attempts:"
 _MAX_ATTEMPTS = 5
 _RATE_WINDOW = 60 * 15  # 15 minutes in seconds
 
 
 async def _check_login_rate_limit(store: Store, email: str) -> None:
-    """Increment the attempt counter for this email; raise 429 if over limit."""
+    """Add one to the tries for this email and answer 429 if it is over the limit."""
     key = f"{_RATE_PREFIX}{email}"
     count = await store.incr(key)
     if count == 1:
-        # First attempt in this window — set the TTL
+        # First try in this window so start the clock
         await store.expire(key, _RATE_WINDOW)
     if count > _MAX_ATTEMPTS:
         raise HTTPException(
@@ -52,29 +52,29 @@ async def _check_login_rate_limit(store: Store, email: str) -> None:
 
 
 async def _clear_login_rate_limit(store: Store, email: str) -> None:
-    """Remove the attempt counter after a successful login."""
+    """Clear the tries counter after a good sign in."""
     await store.delete(f"{_RATE_PREFIX}{email}")
 
 
-# ── Cookie helpers ────────────────────────────────────────────────────────────
+# Cookies
 
 def set_session_cookie(response: Response, token: str) -> None:
-    """Attach the session cookie to a response (login / register)."""
+    """Put the session cookie on the response after sign in or sign up."""
     response.set_cookie(
         key="session",
         value=token,
         httponly=True,
-        # Secure by default (browsers treat http://localhost as secure, so dev still works);
-        # COOKIE_SECURE=false is only for non-browser clients such as the test suite.
+        # Secure by default. Browsers treat http://localhost as secure so local dev still works.
+        # COOKIE_SECURE=false is only for clients that are not browsers, like the tests
         secure=get_settings().cookie_secure,
-        samesite="lax",       # CSRF protection on same-origin navigations
+        samesite="lax",       # stops other sites from riding on the cookie
         path="/",
         max_age=_SESSION_TTL,
     )
 
 
 def clear_session_cookie(response: Response) -> None:
-    """Remove the session cookie from the browser (logout / delete account)."""
+    """Take the session cookie off the browser on sign out or account delete."""
     response.set_cookie(
         key="session",
         value="",
@@ -86,18 +86,18 @@ def clear_session_cookie(response: Response) -> None:
     )
 
 
-# ── Session helpers ───────────────────────────────────────────────────────────
+# Sessions
 
 async def _create_session(store: Store, user_id: UUID) -> str:
-    """Create a new session and return the token."""
-    token = secrets.token_hex(32)  # 256 bits of entropy
+    """Make a new session and give back its token."""
+    token = secrets.token_hex(32)  # 256 random bits
     key = f"session:{token}"
     await store.hset(key, "user_id", str(user_id))
     await store.expire(key, _SESSION_TTL)
     return token
 
 
-# ── Auth operations ───────────────────────────────────────────────────────────
+# Account actions
 
 async def register(
     db: AsyncSession,
@@ -106,15 +106,15 @@ async def register(
     password: str,
 ) -> tuple[User, str]:
     """
-    Create a new user account and start a session.
+    Make a new account and sign in.
 
-    Returns (user, session_token).
-    Raises HTTP 409 if the email is already registered.
-    Email is normalised to lowercase before storage (FR-003).
+    Gives back the user and the session token.
+    Answers 409 if the email is already taken.
+    The email is saved in lowercase.
     """
     normalised = email.lower().strip()
 
-    # Check uniqueness before hashing to avoid unnecessary work
+    # Check the email is free before hashing so we do not waste the work
     existing = (
         await db.execute(select(User).where(User.email == normalised))
     ).scalar_one_or_none()
@@ -142,16 +142,16 @@ async def login(
     password: str,
 ) -> tuple[User, str]:
     """
-    Verify credentials and start a session.
+    Check the email and password and sign in.
 
-    Returns (user, session_token).
-    Raises HTTP 401 with the same message whether the email is unknown or the
-    password is wrong — preventing account enumeration (FR-014).
-    Raises HTTP 429 after 5 failed attempts within a 15-minute window.
+    Gives back the user and the session token.
+    Answers the same 401 whether the email is unknown or the password is wrong
+    so nobody can tell which emails have accounts.
+    Answers 429 after 5 failed tries within 15 minutes.
     """
     normalised = email.lower().strip()
 
-    # Check rate limit before any DB work (prevents enumeration via timing too)
+    # Check the limit before touching the database so timing gives nothing away either
     await _check_login_rate_limit(store, normalised)
 
     invalid = HTTPException(
@@ -164,7 +164,7 @@ async def login(
     ).scalar_one_or_none()
 
     if user is None:
-        # Run a dummy hash to keep timing consistent (resist timing attacks)
+        # Hash something anyway so the timing looks the same either way
         _ph.hash(password)
         raise invalid
 
@@ -173,10 +173,10 @@ async def login(
     except VerifyMismatchError:
         raise invalid from None
 
-    # Successful login — clear the rate limit counter
+    # Good sign in so clear the counter
     await _clear_login_rate_limit(store, normalised)
 
-    # Re-hash if argon2 parameters have changed (argon2-cffi handles this automatically)
+    # Hash again if the argon2 settings changed. argon2-cffi tells us when
     if _ph.check_needs_rehash(user.hashed_password):
         user.hashed_password = _ph.hash(password)
         await db.commit()
@@ -186,7 +186,7 @@ async def login(
 
 
 async def logout(store: Store, token: str) -> None:
-    """Invalidate a session immediately — next request with this cookie gets 401."""
+    """End a session right away. The next request with this cookie gets 401."""
     await store.delete(f"session:{token}")
 
 
@@ -197,8 +197,8 @@ async def change_password(
     new_password: str,
 ) -> None:
     """
-    Update a user's password after verifying the current one.
-    Raises HTTP 401 if current_password is wrong.
+    Change a password after checking the current one.
+    Answers 401 if the current password is wrong.
     """
     try:
         _ph.verify(user.hashed_password, current_password)
@@ -220,12 +220,12 @@ async def delete_account(
     password: str,
 ) -> None:
     """
-    Permanently delete a user account and all associated data.
+    Delete an account and everything tied to it for good.
 
-    ON DELETE CASCADE in the DB removes saved_postings automatically.
-    The session is deleted first so the user can't make requests
-    in the tiny window between the cookie being cleared and the DB delete.
-    Raises HTTP 401 if password is wrong.
+    The database cascade removes saved jobs on its own.
+    We delete the session first so nobody can sneak in a request
+    in the tiny gap between clearing the cookie and deleting the row.
+    Answers 401 if the password is wrong.
     """
     try:
         _ph.verify(user.hashed_password, password)
@@ -235,7 +235,7 @@ async def delete_account(
             detail={"detail": "Current password is incorrect", "code": "WRONG_PASSWORD"},
         ) from exc
 
-    # Invalidate session before deleting the row
+    # End the session before deleting the row
     await store.delete(f"session:{token}")
     await db.delete(user)
     await db.commit()

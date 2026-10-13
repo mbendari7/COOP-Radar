@@ -1,0 +1,153 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-13T00:00:00Z",
+  "title": "Design System: CoopRadar",
+  "extensions": {
+    "colorMeta": {
+      "postal-red": { "role": "primary", "displayName": "Postal Red", "canonical": "#c8281e", "tonalRamp": ["#3e0907", "#721b16", "#8a1c16", "#a81f17", "#c8281e", "#e2655b", "#f6c1bd", "#fdf1f0"] },
+      "postal-red-deep": { "role": "primary", "displayName": "Postal Red Deep", "canonical": "#a81f17", "tonalRamp": ["#3e0907", "#721b16", "#8a1c16", "#a81f17", "#c8281e", "#e2655b", "#f6c1bd", "#fdf1f0"] },
+      "airmail-blue": { "role": "secondary", "displayName": "Airmail Blue", "canonical": "#1e3a8a", "tonalRamp": ["#111a38", "#1b2c5c", "#1c3272", "#1e3a8a", "#2f4aa3", "#6d87cf", "#c3d0ee", "#eef2fb"] },
+      "airmail-blue-deep": { "role": "secondary", "displayName": "Airmail Blue Deep", "canonical": "#1c3272", "tonalRamp": ["#111a38", "#1b2c5c", "#1c3272", "#1e3a8a", "#2f4aa3", "#6d87cf", "#c3d0ee", "#eef2fb"] },
+      "airmail-wash": { "role": "secondary", "displayName": "Airmail Wash", "canonical": "#eef2fb", "tonalRamp": ["#111a38", "#1b2c5c", "#1c3272", "#1e3a8a", "#2f4aa3", "#6d87cf", "#c3d0ee", "#eef2fb"] },
+      "airmail-tint": { "role": "secondary", "displayName": "Airmail Tint", "canonical": "#c3d0ee", "tonalRamp": ["#111a38", "#1b2c5c", "#1c3272", "#1e3a8a", "#2f4aa3", "#6d87cf", "#c3d0ee", "#eef2fb"] },
+      "letter-paper": { "role": "neutral", "displayName": "Letter Paper", "canonical": "#ffffff", "tonalRamp": ["#0d0f13", "#16181d", "#252a34", "#3a4150", "#687185", "#c4cbd8", "#eef1f6", "#ffffff"] },
+      "security-tint": { "role": "neutral", "displayName": "Envelope Security Tint", "canonical": "#eef1f6", "tonalRamp": ["#0d0f13", "#16181d", "#252a34", "#3a4150", "#687185", "#c4cbd8", "#eef1f6", "#f6f7fa"] },
+      "ink": { "role": "neutral", "displayName": "Ink", "canonical": "#16181d", "tonalRamp": ["#0d0f13", "#16181d", "#252a34", "#3a4150", "#687185", "#c4cbd8", "#eef1f6", "#f6f7fa"] },
+      "ink-soft": { "role": "neutral", "displayName": "Ink Soft", "canonical": "#3a4150", "tonalRamp": ["#0d0f13", "#16181d", "#252a34", "#3a4150", "#687185", "#c4cbd8", "#eef1f6", "#f6f7fa"] },
+      "ink-muted": { "role": "neutral", "displayName": "Ink Muted", "canonical": "#4e5667", "tonalRamp": ["#0d0f13", "#16181d", "#252a34", "#4e5667", "#687185", "#c4cbd8", "#eef1f6", "#f6f7fa"] },
+      "field-stroke": { "role": "neutral", "displayName": "Field Stroke", "canonical": "#98a1b3", "tonalRamp": ["#0d0f13", "#16181d", "#3a4150", "#687185", "#98a1b3", "#c4cbd8", "#eef1f6", "#f6f7fa"] },
+      "rule-faint": { "role": "neutral", "displayName": "Faint Rule", "canonical": "#dde2eb", "tonalRamp": ["#0d0f13", "#16181d", "#3a4150", "#687185", "#c4cbd8", "#dde2eb", "#eef1f6", "#f6f7fa"] }
+    },
+    "typographyMeta": {
+      "display": { "displayName": "Display", "purpose": "Page titles and the picked job title in the details panel. 36px rising to 48px, 28px to 34px for the job title." },
+      "headline": { "displayName": "Headline", "purpose": "Section heads, empty state lines and the list header that names the range in view." },
+      "title": { "displayName": "Title", "purpose": "Job titles in list rows." },
+      "body": { "displayName": "Body", "purpose": "Most UI text, with tabular numbers." },
+      "body-reading": { "displayName": "Body Reading", "purpose": "Job description and facts in the details panel, capped at 70ch." },
+      "label": { "displayName": "Label", "purpose": "Uppercase form labels, fact names and short list headings. Never a kicker above a heading." },
+      "wordmark": { "displayName": "Wordmark", "purpose": "CoopRadar on the red bar only." },
+      "stamp": { "displayName": "Stamp", "purpose": "Text inside postmarks and stage stamps." }
+    },
+    "shadows": [
+      { "name": "overlay", "value": "0 18px 40px rgba(22, 24, 29, 0.18)", "purpose": "Sign in dialog and filters drawer." },
+      { "name": "lifted", "value": "0 10px 24px rgba(22, 24, 29, 0.12)", "purpose": "A tracker card being dragged, tilted 2 degrees." }
+    ],
+    "motion": [
+      { "name": "color-change", "value": "150ms cubic-bezier(0.4, 0, 0.2, 1)", "purpose": "Color and border changes on buttons, chips, fields, rows and tabs." },
+      { "name": "stamp", "value": "260ms cubic-bezier(0.2, 0.8, 0.2, 1)", "purpose": "The postmark lands like a stamp when a job is picked. Off under reduced motion." }
+    ],
+    "breakpoints": [
+      { "name": "sm", "value": "640px" },
+      { "name": "md", "value": "768px" },
+      { "name": "lg", "value": "1024px" }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The main action, such as Apply, Find jobs and Upload resume.",
+      "html": "<button class=\"ds-btn-primary\">Upload resume</button>",
+      "css": ".ds-btn-primary { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: 2px solid #c8281e; border-radius: 0; background: #c8281e; color: #ffffff; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 700; line-height: 20px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1), border-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-primary:hover { background: #a81f17; border-color: #a81f17; } .ds-btn-primary:focus-visible { outline: 2px solid #1e3a8a; outline-offset: 2px; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Outlined ink button for second choices like Save and Try a sample.",
+      "html": "<button class=\"ds-btn-secondary\">Try a sample</button>",
+      "css": ".ds-btn-secondary { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: 2px solid #16181d; border-radius: 0; background: #ffffff; color: #16181d; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 700; line-height: 20px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-secondary:hover { background: #eef1f6; } .ds-btn-secondary:focus-visible { outline: 2px solid #1e3a8a; outline-offset: 2px; }"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Borderless airmail blue button for small actions.",
+      "html": "<button class=\"ds-btn-quiet\">Clear filters</button>",
+      "css": ".ds-btn-quiet { display: inline-flex; align-items: center; gap: 8px; padding: 8px 16px; border: 2px solid transparent; border-radius: 0; background: transparent; color: #1e3a8a; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 700; line-height: 20px; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-btn-quiet:hover { background: #eef2fb; } .ds-btn-quiet:focus-visible { outline: 2px solid #1e3a8a; outline-offset: 2px; }"
+    },
+    {
+      "name": "Field",
+      "kind": "input",
+      "refersTo": "field",
+      "description": "Text inputs and selects with an uppercase label above.",
+      "html": "<label class=\"ds-field-wrap\"><span class=\"ds-label\">Job title or keywords</span><input class=\"ds-field\" placeholder=\"For example: data analyst\" /></label>",
+      "css": ".ds-field-wrap { display: flex; flex-direction: column; gap: 6px; width: 320px; } .ds-label { font-family: Archivo, ui-sans-serif, system-ui, sans-serif; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-stretch: 78%; color: #4e5667; } .ds-field { padding: 8px 12px; border: 1.5px solid #98a1b3; border-radius: 0; background: #ffffff; color: #16181d; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; font-size: 14px; line-height: 20px; caret-color: #c8281e; transition: border-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-field::placeholder { color: #687185; } .ds-field:hover { border-color: #4e5667; } .ds-field:focus { outline: none; border-color: #1e3a8a; }"
+    },
+    {
+      "name": "Filter Chip",
+      "kind": "chip",
+      "refersTo": "chip",
+      "description": "Toggle filters. Picked chips fill airmail blue.",
+      "html": "<div class=\"ds-chips\"><button class=\"ds-chip\">On-site</button><button class=\"ds-chip ds-chip-on\">Hybrid</button><button class=\"ds-chip\">Remote</button></div>",
+      "css": ".ds-chips { display: flex; gap: 8px; } .ds-chip { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border: 1.5px solid #98a1b3; border-radius: 0; background: #ffffff; color: #252a34; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; font-size: 14px; font-weight: 600; line-height: 20px; cursor: pointer; transition: border-color 150ms cubic-bezier(0.4,0,0.2,1), background-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-chip:hover { border-color: #3a4150; } .ds-chip:focus-visible { outline: 2px solid #1e3a8a; outline-offset: 2px; } .ds-chip-on { border-color: #1e3a8a; background: #1e3a8a; color: #ffffff; } .ds-chip-on:hover { border-color: #1c3272; }"
+    },
+    {
+      "name": "Red Bar Navigation",
+      "kind": "nav",
+      "refersTo": "nav-bar",
+      "description": "Full width postal red bar with the condensed wordmark and tabs. The open tab gets a white bar under it.",
+      "html": "<header class=\"ds-nav\"><span class=\"ds-nav-mark\">CoopRadar</span><nav class=\"ds-nav-tabs\"><a class=\"ds-nav-tab ds-nav-tab-on\" href=\"#\">Find jobs</a><a class=\"ds-nav-tab\" href=\"#\">Match my resume</a><a class=\"ds-nav-tab\" href=\"#\">AI key</a></nav><button class=\"ds-nav-signin\">Sign in</button></header>",
+      "css": ".ds-nav { display: flex; align-items: stretch; height: 56px; padding: 0 16px; background: #c8281e; color: #ffffff; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; } .ds-nav-mark { display: flex; align-items: center; font-size: 22px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.03em; font-stretch: 75%; } .ds-nav-tabs { display: flex; margin-left: auto; gap: 2px; } .ds-nav-tab { position: relative; display: flex; align-items: center; padding: 0 12px; color: #fdf1f0; font-size: 15px; font-weight: 600; text-decoration: none; transition: color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-nav-tab::after { content: ''; position: absolute; left: 12px; right: 12px; bottom: 0; height: 3px; background: transparent; } .ds-nav-tab:hover { color: #ffffff; } .ds-nav-tab:hover::after { background: rgba(255,255,255,0.4); } .ds-nav-tab-on { color: #ffffff; } .ds-nav-tab-on::after, .ds-nav-tab-on:hover::after { background: #ffffff; } .ds-nav-tab:focus-visible { outline: 2px solid #ffffff; outline-offset: -2px; } .ds-nav-signin { align-self: center; margin-left: 16px; padding: 4px 14px; border: 2px solid #ffffff; border-radius: 0; background: #ffffff; color: #a81f17; font-size: 14px; font-weight: 700; cursor: pointer; } .ds-nav-signin:hover { background: #fdf1f0; }"
+    },
+    {
+      "name": "Job Row",
+      "kind": "card",
+      "refersTo": "job-row-selected",
+      "description": "A job in the list. A plain row split by a faint rule, with the postmark on the right. Picked rows take the airmail wash.",
+      "html": "<article class=\"ds-row\" tabindex=\"0\"><div class=\"ds-row-main\"><h3 class=\"ds-row-title\">Data Intern, Product Analytics</h3><p class=\"ds-row-sub\"><b>1Password</b> &middot; Remote</p><p class=\"ds-row-meta\"><span class=\"ds-row-new\">New</span><span class=\"ds-row-role\">Internship</span><span>Winter 2027</span></p></div><span class=\"ds-pm\"><span class=\"ds-pm-ring\"></span><span class=\"ds-pm-sm\">Remote</span><span class=\"ds-pm-lg\">12 OCT</span><span class=\"ds-pm-sm\">Canada</span></span></article>",
+      "css": ".ds-row { display: flex; align-items: flex-start; gap: 16px; width: 520px; padding: 12px 20px; border-bottom: 1px solid #dde2eb; background: #ffffff; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; cursor: pointer; transition: background-color 150ms cubic-bezier(0.4,0,0.2,1); } .ds-row:hover { background: #f6f7fa; } .ds-row:hover .ds-row-title { color: #1e3a8a; } .ds-row:focus-visible { outline: none; background: #eef2fb; } .ds-row-main { flex: 1; min-width: 0; } .ds-row-title { margin: 0; font-size: 16px; font-weight: 700; line-height: 1.375; color: #16181d; } .ds-row-sub { margin: 2px 0 0; font-size: 14px; color: #3a4150; } .ds-row-sub b { color: #16181d; font-weight: 600; } .ds-row-meta { display: flex; gap: 12px; margin: 6px 0 0; font-size: 13px; font-weight: 600; color: #252a34; } .ds-row-new, .ds-row-role { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; font-stretch: 78%; } .ds-row-new { color: #c8281e; } .ds-row-role { color: #1e3a8a; } .ds-pm { position: relative; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 68px; height: 68px; flex-shrink: 0; border: 2px solid currentColor; border-radius: 9999px; color: #1e3a8a; text-transform: uppercase; line-height: 1; transform: rotate(-6deg); } .ds-pm-ring { position: absolute; inset: 4px; border: 1px solid currentColor; border-radius: 9999px; opacity: 0.7; } .ds-pm-sm { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; font-stretch: 75%; } .ds-pm-lg { margin: 3px 0; font-size: 17px; font-weight: 800; letter-spacing: -0.025em; font-stretch: 75%; }"
+    },
+    {
+      "name": "Postmark",
+      "kind": "custom",
+      "refersTo": "postmark",
+      "description": "The signature round two ring stamp: city, posted day, region. Blue at rest, red and stamped in when the job is picked.",
+      "html": "<div class=\"ds-pm-pair\"><span class=\"ds-postmark\"><span class=\"ds-postmark-ring\"></span><span class=\"ds-postmark-sm\">Toronto</span><span class=\"ds-postmark-lg\">12 OCT</span><span class=\"ds-postmark-sm\">ON</span></span><span class=\"ds-postmark ds-postmark-picked\"><span class=\"ds-postmark-ring\"></span><span class=\"ds-postmark-sm\">Toronto</span><span class=\"ds-postmark-lg\">12 OCT</span><span class=\"ds-postmark-sm\">ON</span></span></div>",
+      "css": ".ds-pm-pair { display: flex; gap: 24px; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; } .ds-postmark { --tilt: -8deg; position: relative; display: inline-flex; flex-direction: column; align-items: center; justify-content: center; width: 78px; height: 78px; border: 2px solid currentColor; border-radius: 9999px; color: #1e3a8a; text-transform: uppercase; line-height: 1; transform: rotate(var(--tilt)); } .ds-postmark-ring { position: absolute; inset: 4px; border: 1px solid currentColor; border-radius: 9999px; opacity: 0.7; } .ds-postmark-sm { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; font-stretch: 75%; } .ds-postmark-lg { margin: 3px 0; font-size: 17px; font-weight: 800; letter-spacing: -0.025em; font-stretch: 75%; } .ds-postmark-picked { --tilt: 3deg; color: #c8281e; animation: ds-stamp 260ms cubic-bezier(0.2, 0.8, 0.2, 1); } .ds-postmark-picked:hover { animation: ds-stamp 260ms cubic-bezier(0.2, 0.8, 0.2, 1); } @keyframes ds-stamp { 0% { transform: rotate(var(--tilt)) scale(1.18); opacity: 0.4; } 60% { transform: rotate(var(--tilt)) scale(0.97); opacity: 1; } 100% { transform: rotate(var(--tilt)) scale(1); } } @media (prefers-reduced-motion: reduce) { .ds-postmark-picked { animation: none; } }"
+    },
+    {
+      "name": "Days Left Bar",
+      "kind": "custom",
+      "refersTo": "days-left",
+      "description": "Time to apply drawn to scale from posted day to deadline. Blue fill, red in the last 7 days.",
+      "html": "<div class=\"ds-days\"><p class=\"ds-days-head\">46 days left to apply</p><div class=\"ds-days-track\"><div class=\"ds-days-fill\"></div></div><p class=\"ds-days-ends\"><span>Posted Oct 12, 2026</span><span>Nov 27, 2026</span></p></div>",
+      "css": ".ds-days { width: 420px; font-family: Archivo, ui-sans-serif, system-ui, sans-serif; } .ds-days-head { margin: 0; font-size: 18px; font-weight: 800; font-stretch: 87%; color: #16181d; } .ds-days-track { margin-top: 8px; height: 10px; background: #dde2eb; } .ds-days-fill { height: 100%; width: 4%; background: #1e3a8a; } .ds-days-ends { display: flex; justify-content: space-between; margin: 6px 0 0; font-size: 12px; color: #4e5667; font-variant-numeric: tabular-nums; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "Registered Mail",
+    "overview": "Every application is a letter you send and every job wears a postmark. The site looks like a Canadian post office counter. A postal red bar runs across the top. Airmail blue marks links, fit notes and anything you picked. The ground is plain white letter paper, and the filter strip and picked rows take the pale blue grey of an envelope security tint. Headings and form labels are set in narrow capitals like the print on a customs slip.\n\nThe page is dense on purpose. Students scan many jobs at once between classes, so lists are rows split by thin rules and type size, not boxed cards. Ink rules at 1.5px frame each section. Corners are square everywhere except the round things a post office really has: postmarks and dots.\n\nThe signature is the postmark. Each job carries a round two ring stamp with its city, the day it was posted and its region, at its own small tilt so the list looks stamped by hand. The same mark comes back as cancellation stamps for tracker stages.",
+    "keyCharacteristics": [
+      "Postal red owns the top bar and the main action. Airmail blue owns links, fit and selection.",
+      "White letter paper ground with an envelope tint for the filter strip and picked rows.",
+      "Archivo at narrow widths for headings and labels, normal width for reading, tabular numbers.",
+      "Square corners and 1.5px ink rules. Rows, not cards.",
+      "The tilted postmark and stage stamp are the one round, playful element."
+    ],
+    "rules": [
+      { "name": "The Two Stamps Rule", "body": "Red means act or urgent. Blue means link, fit or picked. Never swap them, and never add a third accent.", "section": "colors" },
+      { "name": "The Region Rule", "body": "Color owns whole regions, not small decorations. The red bar spans the full width and the tint fills the whole filter strip.", "section": "colors" },
+      { "name": "The Customs Slip Rule", "body": "Uppercase belongs to labels, the wordmark and stamps. Headings and body stay in sentence case.", "section": "typography" },
+      { "name": "The Tabular Rule", "body": "Numbers are tabular across the whole site so counts, dates and days left line up.", "section": "typography" },
+      { "name": "The Flat Paper Rule", "body": "Nothing resting on the page casts a shadow. A shadow means it floats or is in your hand.", "section": "elevation" }
+    ],
+    "dos": [
+      "Do keep the red bar full width and the filter strip fully tinted.",
+      "Do split lists into rows with faint rules and frame sections with 1.5px ink rules.",
+      "Do set headings at 82% width, weight 800, tight tracking, in sentence case.",
+      "Do use the 11px uppercase label style for form labels and fact names.",
+      "Do reuse the postmark or stage stamp when a date or stage needs a mark.",
+      "Do keep every corner square unless the thing is a stamp or a dot.",
+      "Do write UI text in plain short words with no dashes and no emoji."
+    ],
+    "donts": [
+      "Don't use rounded corners on buttons, fields, chips or panels.",
+      "Don't box job rows as separate cards with shadows.",
+      "Don't use red for links or blue for the main action.",
+      "Don't add shadows to anything that rests on the page.",
+      "Don't put a small uppercase line above a heading as a kicker. Labels name fields and lists, they do not introduce headlines."
+    ]
+  }
+}

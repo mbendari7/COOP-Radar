@@ -1,6 +1,6 @@
 """
-Tests for resume insights (GET/POST /api/resume/insights) and the tailor / cover-letter modes.
-AI calls are mocked; no live API calls.
+Tests for resume insights (GET and POST /api/resume/insights) and the tailor and cover letter modes.
+AI calls are faked so there are no live API calls.
 """
 
 import json
@@ -36,7 +36,7 @@ async def _upload(
     resume_bytes: bytes,
     mock_claude_create: Callable[[str], AsyncMock],
 ) -> Posting:
-    """Seed postings, register, upload a resume (Python/Django/PostgreSQL/Docker)."""
+    """Add jobs, sign up and upload a resume with Python, Django, PostgreSQL and Docker."""
     target = _posting("Python Developer Co-op", ["Python", "Kubernetes"])
     db_session.add_all([
         target,
@@ -68,7 +68,7 @@ async def test_free_insights_show_found_and_missing_skills(
     body = res.json()
     assert "Python" in body["skills_found"]
     missing = {m["skill"]: m["postings"] for m in body["in_demand_missing"]}
-    assert missing["Kubernetes"] == 3  # asked for by all three open postings
+    assert missing["Kubernetes"] == 3  # all three open jobs ask for it
     assert "Python" not in missing
     assert body["ai"] is None
 
@@ -93,7 +93,7 @@ async def test_ai_insights_are_generated_and_cached(
     res = await client.post("/api/resume/insights")
     assert res.status_code == 200
     assert res.json()["ai"]["strengths"] == ["Python APIs with FastAPI"]
-    # The market context (missing in-demand skills) is sent to the model
+    # What employers want, like the missing popular skills, gets sent to the model
     assert "Kubernetes" in create.call_args.kwargs["messages"][0]["content"]
 
     cached = (await client.get("/api/resume/insights")).json()

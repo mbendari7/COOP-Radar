@@ -1,7 +1,7 @@
 """
-Tests for resume upload, match pipeline, stored results, and delete endpoints.
-Covers US1 (upload + match), US3 (view metadata, delete, cross-user isolation).
-All Anthropic and OpenAI calls are mocked.
+Tests for resume upload, matching, saved results and delete.
+Covers uploading and matching, viewing details, deleting and keeping users apart.
+Every Anthropic and OpenAI call is faked.
 """
 
 from unittest.mock import AsyncMock, MagicMock
@@ -10,9 +10,7 @@ from uuid import uuid4
 import pytest
 from httpx import AsyncClient
 
-# ---------------------------------------------------------------------------
 # Helpers
-# ---------------------------------------------------------------------------
 
 async def _register_and_login(client: AsyncClient, email: str) -> None:
     await client.post(
@@ -26,7 +24,7 @@ async def _register_and_login(client: AsyncClient, email: str) -> None:
 
 
 def _make_mock_haiku_response(n: int = 5) -> MagicMock:
-    """Return a mocked Anthropic message with JSON rankings."""
+    """Give back a fake Anthropic message with JSON rankings."""
     import json
 
     items = [
@@ -39,7 +37,7 @@ def _make_mock_haiku_response(n: int = 5) -> MagicMock:
 
 
 def _mock_embed(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Patch generate_embedding to return a deterministic 1536-dim vector."""
+    """Patch generate_embedding to give back the same 1536 number vector every time."""
     monkeypatch.setattr(
         "app.ingest.embed.generate_embedding",
         AsyncMock(return_value=[0.1] * 1536),
@@ -47,7 +45,7 @@ def _mock_embed(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _mock_anthropic(monkeypatch: pytest.MonkeyPatch, n: int = 5) -> None:
-    """Patch Anthropic client.messages.create to return fake rankings."""
+    """Patch Anthropic client.messages.create to give back fake rankings."""
     mock_client = AsyncMock()
     mock_client.messages.create = AsyncMock(return_value=_make_mock_haiku_response(n))
     monkeypatch.setattr(
@@ -56,9 +54,7 @@ def _mock_anthropic(monkeypatch: pytest.MonkeyPatch, n: int = 5) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# US1: Upload
-# ---------------------------------------------------------------------------
+# Uploading
 
 
 @pytest.mark.asyncio
@@ -167,18 +163,16 @@ async def test_reupload_replaces_previous(
     assert r2.status_code == 200
     id2 = r2.json()["resume"]["id"]
 
-    # Second upload produces a new resume row
+    # A second upload makes a new resume row
     assert id1 != id2
 
-    # GET /matches returns results for the new resume
+    # GET /matches gives back results for the new resume
     matches = await client.get("/api/resume/matches")
     assert matches.status_code == 200
     assert matches.json()["resume"]["id"] == id2
 
 
-# ---------------------------------------------------------------------------
-# US3: View and Delete
-# ---------------------------------------------------------------------------
+# Viewing and deleting
 
 
 @pytest.mark.asyncio
@@ -263,7 +257,7 @@ async def test_cross_user_isolation(
         files={"file": ("a.pdf", sample_pdf_bytes, "application/pdf")},
     )
 
-    # User B logs in (separate session via logout first)
+    # User B signs in, after signing out first for a separate session
     await client.post("/api/auth/logout")
     await _register_and_login(client, "user_b@test.com")
 

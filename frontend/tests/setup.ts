@@ -1,2 +1,2 @@
-// Extend Vitest's expect with Testing Library matchers like toBeInTheDocument()
+// Add Testing Library checks like toBeInTheDocument() to Vitest's expect
 import '@testing-library/jest-dom'

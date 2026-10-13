@@ -1,14 +1,17 @@
 /**
- * PostingCard: one job in the results list, laid out like a job board's list item.
+ * One job in the results list. A plain row split from the next by a thin rule, with the
+ * job's postmark on the right showing where it is and the day it was posted.
  *
- * On wide screens the jobs page shows the list next to a details panel: clicking a card
- * selects it (onSelect). On phones, or when there's no panel, it opens the job's own page.
- * The bookmark button saves the job without opening it.
+ * On wide screens clicking a row picks it for the details panel next to the list (onSelect).
+ * On phones, or when there is no panel, it opens the job's own page.
+ * The bookmark saves the job without opening it.
  */
 
 import { useNavigate } from 'react-router-dom'
 import type { PostingListItem } from '../api/postings'
 import BookmarkButton from './BookmarkButton'
+import Postmark from './Postmark'
+import { postmarkPlace } from './postal'
 import { ROLE_LABELS, splitViewVisible } from './roles'
 import { formatLocation, timeAgo, workModeLabel } from '../utils/format'
 
@@ -16,9 +19,10 @@ interface Props {
   posting: PostingListItem
   showBookmark?: boolean
   selected?: boolean
-  /** Called instead of opening the job page when the details panel is visible */
+  /** Runs instead of opening the job page when the details panel is showing */
   onSelect?: (id: string) => void
 }
+
 
 export default function PostingCard({ posting, showBookmark = false, selected = false, onSelect }: Props) {
   const navigate = useNavigate()
@@ -27,6 +31,7 @@ export default function PostingCard({ posting, showBookmark = false, selected = 
     else navigate(`/postings/${posting.id}`)
   }
   const isNew = Date.now() - new Date(posting.posted_at).getTime() < 3 * 86_400_000
+  const { place, region } = postmarkPlace(posting)
 
   return (
     <article
@@ -39,72 +44,57 @@ export default function PostingCard({ posting, showBookmark = false, selected = 
         }
       }}
       aria-current={selected ? 'true' : undefined}
-      className={`group relative cursor-pointer border bg-white px-4 py-3.5 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 sm:rounded-md ${
-        selected ? 'border-gray-200 lg:border-blue-600 lg:ring-1 lg:ring-blue-600' : 'border-gray-200 hover:border-gray-400'
+      className={`group relative cursor-pointer border-b border-gray-200 px-4 py-3 transition-colors focus:outline-none focus-visible:bg-air-50 sm:px-5 ${
+        selected ? 'lg:bg-air-50' : 'hover:bg-gray-50'
       }`}
       aria-label={`${posting.title} at ${posting.company}`}
     >
-      <div className="flex items-start gap-3">
-        <CompanyInitial name={posting.company} />
-
+      <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
-          <div className="flex items-start justify-between gap-2">
-            <h3 className={`text-[15px] font-semibold leading-snug ${selected ? 'text-gray-900 lg:text-blue-800' : 'text-gray-900 group-hover:underline'}`}>
-              {posting.title}
-            </h3>
-            {showBookmark && (
-              <div className="-mr-1.5 -mt-1 shrink-0">
-                <BookmarkButton postingId={posting.id} isSaved={posting.is_saved === true} />
-              </div>
-            )}
-          </div>
-          <p className="text-sm text-gray-800">{posting.company}</p>
-          <p className="text-sm text-gray-600">
+          <h3 className={`text-[16px] font-bold leading-snug ${selected ? 'text-gray-900 lg:text-air-700' : 'text-gray-900 group-hover:text-air-700'}`}>
+            {posting.title}
+          </h3>
+          <p className="mt-0.5 text-sm text-gray-700">
+            <span className="font-semibold text-gray-900">{posting.company}</span>
+            <span className="mx-1.5 text-gray-400" aria-hidden="true">·</span>
             {formatLocation(posting.city, posting.province, posting.country)}
             {posting.work_mode !== 'onsite' && posting.city !== 'Remote' && <> ({workModeLabel(posting.work_mode)})</>}
           </p>
 
-          <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
-            {posting.role !== 'job' && <Tag tone="accent">{ROLE_LABELS[posting.role]}</Tag>}
-            {posting.term && posting.term !== 'Open' && <Tag>{posting.term}</Tag>}
-            {posting.grad_years.length > 0 && <Tag>Grads {posting.grad_years.join(', ')}</Tag>}
-            {posting.skills.slice(0, 3).map((s) => <Tag key={s}>{s}</Tag>)}
-          </div>
-
-          <p className="mt-2 text-xs text-gray-500">
-            {isNew && <span className="mr-1.5 font-semibold text-green-700">New</span>}
-            Posted {timeAgo(posting.posted_at)}
+          <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
+            {isNew && <span className="label-form !text-post-600">New</span>}
+            {posting.role !== 'job' && <span className="label-form !text-air-700">{ROLE_LABELS[posting.role]}</span>}
+            {posting.term && posting.term !== 'Open' && <span className="font-semibold text-gray-800">{posting.term}</span>}
+            {posting.grad_years.length > 0 && <span className="text-gray-700">Grads {posting.grad_years.join(', ')}</span>}
+            {posting.skills.length > 0 && <span className="text-gray-600">{posting.skills.slice(0, 3).join(' · ')}</span>}
+            <span className="text-gray-600">Posted {timeAgo(posting.posted_at)}</span>
           </p>
+        </div>
+
+        <div className="flex shrink-0 items-start gap-1">
+          <Postmark
+            place={place}
+            region={region}
+            date={new Date(posting.posted_at)}
+            seed={posting.id}
+            tone={selected ? 'post' : 'air'}
+            size="sm"
+            stamp={selected}
+          />
+          {showBookmark && <BookmarkButton postingId={posting.id} isSaved={posting.is_saved === true} />}
         </div>
       </div>
     </article>
   )
 }
 
-/** A square with the company's first letter, in a colour picked from its name. */
-export function CompanyInitial({ name, size = 'md' }: { name: string; size?: 'md' | 'lg' }) {
-  const palette = [
-    'bg-[#e6eef8] text-[#1f4a8f]', 'bg-[#efe9e1] text-[#7a4f24]', 'bg-[#e4f1ea] text-[#24603f]',
-    'bg-[#f1e7ea] text-[#7b3346]', 'bg-[#ece9f2] text-[#4e3f73]', 'bg-[#eef0e0] text-[#59612a]',
-  ]
-  const hash = [...name].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) >>> 0, 7)
-  const dims = size === 'lg' ? 'h-14 w-14 text-xl' : 'h-10 w-10 text-base'
-  return (
-    <span
-      className={`flex shrink-0 items-center justify-center rounded font-bold ${dims} ${palette[hash % palette.length]}`}
-      aria-hidden="true"
-    >
-      {name.replace(/^\W+/, '').charAt(0).toUpperCase() || '?'}
-    </span>
-  )
-}
-
+/** A tag for a skill or fact. Square, light and quiet */
 export function Tag({
   children, tone = 'plain',
 }: { children: React.ReactNode; tone?: 'plain' | 'accent' }) {
   const cls = {
-    plain: 'bg-gray-100 text-gray-700',
-    accent: 'bg-blue-50 text-blue-800 ring-1 ring-inset ring-blue-200',
+    plain: 'border-gray-300 bg-white text-gray-800',
+    accent: 'border-air-200 bg-air-50 text-air-800',
   }[tone]
-  return <span className={`rounded px-1.5 py-0.5 font-medium ${cls}`}>{children}</span>
+  return <span className={`inline-block rounded-sm border px-2 py-0.5 font-medium ${cls}`}>{children}</span>
 }

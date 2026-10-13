@@ -1,6 +1,6 @@
 """
-Co-op matching by program of study and graduation year, read from the resume or set by the
-student, with "why it fits" notes on each match. No AI key: the free skill-overlap path.
+Co-op matching by program and grad year, read from the resume or set by the student,
+with why it fits notes on each match. No AI key, so this is the free skill overlap path.
 """
 
 from datetime import date, timedelta
@@ -44,7 +44,7 @@ async def _seed(db: AsyncSession) -> None:
             "Mechanical Design Co-op", fields_of_study=["mechanical", "engineering"],
             grad_years=[2028], description="Must be returning to school after the term.",
         ),
-        _posting("Robotics Intern", grad_years=[2026]),        # wrong graduation year
+        _posting("Robotics Intern", grad_years=[2026]),        # wrong grad year
         _posting("Hardware Test Intern", country="US", city="Austin", province="TX"),
         _posting("Account Executive", skills=["Python"]),     # not a mechanical job type
     ])
@@ -74,7 +74,7 @@ async def test_program_and_grad_year_come_from_the_resume(
         "degree": "bachelors",
         "grad_year": 2028,
     }
-    # Hardware job types only (from the program), Canada only (default), 2028 or unstated
+    # Hardware job types only from the program, Canada only by default, and 2028 or not stated
     assert [m["title"] for m in body["matches"]] == ["Mechanical Design Co-op"]
     notes = body["matches"][0]["fit_notes"]
     assert "Co-op role" in notes

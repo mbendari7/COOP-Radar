@@ -1,12 +1,12 @@
 /**
- * TanStack Query hooks for admin ingest source management.
+ * TanStack Query hooks for the admin page that manages import sources.
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 
 import { apiFetch } from './client'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
+// Types
 
 export interface IngestSourceOut {
   id: string
@@ -51,7 +51,7 @@ export interface SourcePatchIn {
   auto_paused?: boolean
 }
 
-// ── Fetchers ──────────────────────────────────────────────────────────────────
+// Calls to the server
 
 const fetchAdminSources = () => apiFetch<IngestSourceOut[]>('/api/admin/sources')
 
@@ -64,7 +64,7 @@ const postTriggerRun = (sourceId: string) =>
 const patchSource = (sourceId: string, data: SourcePatchIn) =>
   apiFetch<IngestSourceOut>(`/api/admin/sources/${sourceId}`, { method: 'PATCH', json: data })
 
-// ── Hooks ─────────────────────────────────────────────────────────────────────
+// Hooks
 
 export function useAdminSources() {
   return useQuery({

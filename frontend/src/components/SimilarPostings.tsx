@@ -1,3 +1,5 @@
+/** Jobs that read most like this one. Only there when smart search is on. */
+
 import { Link } from 'react-router-dom'
 import { useSimilarPostings } from '../api/postings'
 
@@ -12,7 +14,7 @@ export function SimilarPostings({ postingId }: SimilarPostingsProps) {
     return (
       <div className="space-y-3" aria-busy="true" aria-label="Loading similar postings">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="animate-pulse rounded-md bg-gray-100 h-16" />
+          <div key={i} className="h-16 animate-pulse bg-gray-100" />
         ))}
       </div>
     )
@@ -24,18 +26,18 @@ export function SimilarPostings({ postingId }: SimilarPostingsProps) {
 
   if (data.items.length === 0) {
     return (
-      <p className="text-sm text-gray-500">Similar jobs show up here when smart search is on.</p>
+      <p className="text-sm text-gray-600">Similar jobs show up here when smart search is on.</p>
     )
   }
 
   return (
-    <ul className="space-y-3" aria-label="Similar postings">
+    <ul className="divide-y divide-gray-200 border-t-[1.5px] border-gray-900" aria-label="Similar postings">
       {data.items.map((item) => (
-        <li key={item.id} className="rounded-md border border-gray-200 bg-white p-3 hover:border-gray-400 transition-colors">
-          <Link to={`/postings/${item.id}`} className="block">
-            <p className="text-sm font-medium text-gray-900 line-clamp-2">{item.title}</p>
-            <p className="text-xs text-gray-500 mt-0.5">{item.company} · {item.city}</p>
-            <p className="text-xs text-blue-600 mt-1">
+        <li key={item.id} className="py-3">
+          <Link to={`/postings/${item.id}`} className="group block">
+            <p className="line-clamp-2 text-sm font-bold text-gray-900 group-hover:text-air-700">{item.title}</p>
+            <p className="mt-0.5 text-xs text-gray-700">{item.company} · {item.city}</p>
+            <p className="label-form mt-1 !text-air-700">
               {Math.round(item.similarity * 100)}% similar
             </p>
           </Link>

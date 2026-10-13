@@ -1,7 +1,7 @@
 """
-Pydantic schemas for authentication endpoints.
+Shapes for sign up, sign in and account endpoints.
 
-Shapes match the API contracts in specs/002-accounts-tracker/contracts/api.md.
+They match the contracts in specs/002-accounts-tracker/contracts/api.md.
 """
 
 from datetime import datetime
@@ -11,19 +11,19 @@ from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
 class RegisterIn(BaseModel):
-    """Registration payload — email must be valid format, password ≥ 10 chars."""
+    """Sign up body. The email has to look real and the password needs 10 or more characters."""
     email: EmailStr
     password: str = Field(min_length=10)
 
 
 class LoginIn(BaseModel):
-    """Login payload — password has no min length here (wrong pw → 401, not 422)."""
+    """Sign in body. No length rule here so a wrong password gets 401 and not 422."""
     email: EmailStr
     password: str
 
 
 class UserOut(BaseModel):
-    """Public user representation — never includes hashed_password."""
+    """The user we send back. Never has hashed_password in it."""
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
@@ -34,11 +34,11 @@ class UserOut(BaseModel):
 
 
 class ChangePasswordIn(BaseModel):
-    """Password change payload — new password must meet the same rules as registration."""
+    """Change password body. The new one follows the same rules as sign up."""
     current_password: str
     new_password: str = Field(min_length=10)
 
 
 class DeleteAccountIn(BaseModel):
-    """Account deletion — requires password confirmation to prevent accidental deletion."""
+    """Delete account body. Asks for the password so nobody deletes by accident."""
     password: str

@@ -1,1 +1,1 @@
-# Ingest package — source adapters, runner, dedup, extract, embed
+# Importing jobs. Source adapters, the runner, duplicates, extraction and embeddings

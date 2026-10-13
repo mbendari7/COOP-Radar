@@ -1,5 +1,5 @@
 """
-Resume test fixtures — in-memory PDF and DOCX bytes with skill keywords.
+Resume test fixtures. PDF and DOCX files made in memory with skill words in them.
 """
 
 import io
@@ -10,8 +10,8 @@ import pytest
 @pytest.fixture
 def sample_pdf_bytes() -> bytes:
     """
-    Minimal valid PDF containing resume-like text with skill keywords.
-    Generated programmatically so tests have no binary file dependency.
+    A small valid PDF with resume like text and skill words.
+    Made in code so tests do not depend on a binary file.
     """
     content = (
         "John Doe\n"
@@ -27,7 +27,7 @@ def sample_pdf_bytes() -> bytes:
 @pytest.fixture
 def sample_docx_bytes() -> bytes:
     """
-    Minimal valid DOCX containing resume-like text with skill keywords.
+    A small valid DOCX with resume like text and skill words.
     """
     from docx import Document  # type: ignore[import-untyped]
 
@@ -48,8 +48,8 @@ def sample_docx_bytes() -> bytes:
 
 def _build_minimal_pdf(text: str) -> bytes:
     """
-    Build a minimal valid single-page PDF with embedded text.
-    This bypasses pypdf's lack of text-writing API for blank pages.
+    Build a small valid one page PDF with text in it.
+    We do it by hand because pypdf cannot write text onto a blank page.
     """
     lines = text.strip().splitlines()
     stream_lines = []
