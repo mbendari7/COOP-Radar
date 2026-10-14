@@ -21,7 +21,7 @@ import ResumeFitPanel from './ResumeFitPanel'
 import RichText from './RichText'
 import { FIELD_LABELS, ROLE_LABELS } from './roles'
 import { SEASONS, SEASON_DOT, lengthLabel, termLabel } from './terms'
-import { formatDate, formatLocation, parseDay, timeAgo, workModeLabel } from '../utils/format'
+import { formatDate, formatLocation, isAdzuna, parseDay, timeAgo, workModeLabel } from '../utils/format'
 
 const DAY = 86_400_000
 
@@ -37,6 +37,7 @@ export default function PostingDetailView({
   const hasResume = Boolean(matches?.resume)
   const term = termLabel(posting.term)
   const seasonMonths = SEASONS.find((x) => x.value === posting.season)?.months
+  const viaAdzuna = isAdzuna(posting.source_url)
 
   return (
     <article aria-label={`${posting.title} at ${posting.company}`}>
@@ -64,7 +65,7 @@ export default function PostingDetailView({
         <div className="mt-5 flex flex-wrap items-center gap-2">
           {posting.source_url && (
             <a href={posting.source_url} target="_blank" rel="noopener noreferrer" className="btn-primary max-w-full whitespace-normal px-5 py-2.5 text-left text-[15px]">
-              {posting.source_id ? `Apply on ${posting.company}'s site` : 'View original posting'}
+              {viaAdzuna ? 'Apply via Adzuna' : posting.source_id ? `Apply on ${posting.company}'s site` : 'View original posting'}
               <ExternalIcon className="h-4 w-4" />
             </a>
           )}
@@ -78,6 +79,12 @@ export default function PostingDetailView({
             </Link>
           )}
         </div>
+        {viaAdzuna && (
+          <p className="mt-2 text-xs text-gray-600">
+            Jobs by{' '}
+            <a href="https://www.adzuna.ca" target="_blank" rel="noopener noreferrer" className="link">Adzuna</a>
+          </p>
+        )}
       </header>
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-y border-gray-300 py-4 sm:grid-cols-3">

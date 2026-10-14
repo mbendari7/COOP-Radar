@@ -35,6 +35,11 @@ services:
         sync: false
       - key: OPENAI_API_KEY
         sync: false
+      # Optional and paid (developer.adzuna.com). Both set = also import student jobs from Adzuna
+      - key: ADZUNA_APP_ID
+        sync: false
+      - key: ADZUNA_APP_KEY
+        sync: false
       - key: DEMO_ENABLED
         value: "true"
       - key: AI_DAILY_LIMIT

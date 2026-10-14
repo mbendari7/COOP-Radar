@@ -218,7 +218,7 @@ COOP-Radar/
 │   │   ├── services/             postings, resume (matching), education, categories, insights, auth, ...
 │   │   ├── ingest/               boards.py (Greenhouse/Lever/Ashby/SmartRecruiters), workday.py, adzuna.py, terms.py (term and length), runner, dedup, skill_match
 │   │   ├── schemas/ · models/ · agent/ · ai.py · jobs.py · store.py
-│   ├── alembic/versions/         0001 to 0011
+│   ├── alembic/versions/         0001 to 0012
 │   ├── seed/                     skills · job_boards (~170 employers) · sample postings
 │   └── tests/                    api/ · ingest/ · resume/ · eval/ · perf/
 └── frontend/

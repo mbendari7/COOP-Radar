@@ -17,6 +17,7 @@ and a board that fails three runs in a row pauses itself.
 
 import asyncio
 import json
+from pathlib import Path
 
 from sqlalchemy import text
 
@@ -213,6 +214,34 @@ JOB_BOARDS: list[tuple[str, str, str] | tuple[str, str, str, dict[str, str]]] = 
     ("NVIDIA", "workday", "nvidia.wd5/NVIDIAExternalCareerSite"),
 ]
 
+# Workable's public job search. Thousands of small employers in every field post there
+WORKABLE_SOURCES: list[tuple[str, dict[str, str]]] = [
+    ("Workable jobs (Canada)", {"location": "Canada"}),
+    ("Workable student jobs (US)", {
+        "location": "United States", "queries": "intern|co-op|student|new grad", "pages": "60",
+    }),
+]
+
+_DISCOVERED = Path(__file__).with_name("discovered_boards.json")
+
+
+def discovered_boards() -> list[dict[str, str]]:
+    """
+    Boards seed/discover_boards.py found in Common Crawl that had jobs in Canada or US student
+    roles. An empty list when the file is missing or broken.
+    """
+    try:
+        rows = json.loads(_DISCOVERED.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return []
+    adapters = {"greenhouse", "lever", "ashby", "workday", "smartrecruiters"}
+    return [
+        {"company": str(r["company"]), "adapter_type": str(r["adapter_type"]), "board": str(r["board"])}
+        for r in rows
+        if isinstance(r, dict) and r.get("adapter_type") in adapters and r.get("board") and r.get("company")
+    ]
+
+
 # Adzuna gathers jobs from employer sites in every field. Only added when its keys are set
 ADZUNA_SOURCES: list[tuple[str, dict[str, str]]] = [
     ("Adzuna student jobs (Canada)", {"country": "ca"}),
@@ -231,6 +260,14 @@ async def seed_job_boards() -> None:
     for company, adapter_type, board, *extra in JOB_BOARDS:
         config = {"board": board, "company": company, **(extra[0] if extra else {})}
         entries.append((f"{company} careers", adapter_type, config))
+    taken = {name for name, _, _ in entries}
+    for row in discovered_boards():
+        name = f"{row['company']} careers"
+        if name in taken:
+            name = f"{row['company']} careers ({row['board']})"
+        taken.add(name)
+        entries.append((name, row["adapter_type"], {"board": row["board"], "company": row["company"]}))
+    entries += [(name, "workable", config) for name, config in WORKABLE_SOURCES]
     if adzuna_configured():
         entries += [(name, "adzuna", config) for name, config in ADZUNA_SOURCES]
 

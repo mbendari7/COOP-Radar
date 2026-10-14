@@ -237,8 +237,13 @@ with adapter types `greenhouse`, `lever`, `ashby`, `smartrecruiters` and `workda
 home city). Workday (`ingest/workday.py`) is what most big employers outside tech use: banks, insurers, energy, health,
 pharma, aerospace, food, retail, accounting and universities. Its careers page loads jobs from a public JSON endpoint
 (`/wday/cxs/<tenant>/<site>/jobs`, allowed by robots.txt); sites with up to 300 jobs keep every Canadian job and bigger
-ones keep student and campus roles (`scope`). With `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` set, two `adzuna` sources are
-seeded too (`ingest/adzuna.py`). The runner reads each job's term and length with `ingest/terms.py` on import and
+ones keep student and campus roles (`scope`). Small and niche employers come from two more places. `seed/discover_boards.py`
+(run by the owner now and then, not by `start.py`) reads Common Crawl's free URL index for every Greenhouse, Lever,
+Ashby and Workday careers page it saw, asks each board's own API once, and writes the ones with jobs in Canada or US
+student roles to `seed/discovered_boards.json`, which `job_boards.py` seeds next to the hand picked list. And two
+`workable` sources (`ingest/workable.py`, migration 0012) page through Workable's public job search at
+jobs.workable.com (robots.txt allows it): every job in Canada, and US intern, co-op, student and new grad roles. With
+`ADZUNA_APP_ID` and `ADZUNA_APP_KEY` (a paid Adzuna plan) set, two `adzuna` sources are seeded too (`ingest/adzuna.py`). The runner reads each job's term and length with `ingest/terms.py` on import and
 again on every re-import. These official public job-board APIs exist
 for syndicating a company's openings. `boards.py → choose_location()` keeps every location matching
 `INGEST_LOCATION_FILTER` (Canada; "Vancouver, WA" is excluded by its state code) and, per `INGEST_US_JOBS`, US jobs

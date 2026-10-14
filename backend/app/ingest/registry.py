@@ -10,6 +10,7 @@ from app.ingest.boards import (
 )
 from app.ingest.json_api import JsonApiAdapter
 from app.ingest.rss import RssAdapter
+from app.ingest.workable import WorkableAdapter
 from app.ingest.workday import WorkdayAdapter
 
 _ADAPTERS: dict[str, type[BaseAdapter]] = {
@@ -21,6 +22,7 @@ _ADAPTERS: dict[str, type[BaseAdapter]] = {
     "smartrecruiters": SmartRecruitersAdapter,
     "workday": WorkdayAdapter,
     "adzuna": AdzunaAdapter,
+    "workable": WorkableAdapter,
 }
 
 

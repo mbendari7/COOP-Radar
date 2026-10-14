@@ -73,3 +73,13 @@ export function timeAgo(value: string, now: Date = new Date()): string {
   if (days < 60) return `${Math.floor(days / 7)} weeks ago`
   return formatDate(value)
 }
+
+/** Adzuna jobs link to an adzuna.ca or adzuna.com page that sends you on to the employer. Adzuna asks to be credited */
+export function isAdzuna(url: string | null | undefined): boolean {
+  if (!url) return false
+  try {
+    return /(^|\.)adzuna\.[a-z.]+$/.test(new URL(url).hostname)
+  } catch {
+    return false
+  }
+}

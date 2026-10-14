@@ -1,7 +1,7 @@
 """
 Adzuna, a job search API that gathers postings from thousands of employer sites and job
 boards in every field. Optional. It only runs when the owner sets ADZUNA_APP_ID and
-ADZUNA_APP_KEY (free at developer.adzuna.com), and seed/job_boards.py only adds the
+ADZUNA_APP_KEY (a paid plan at developer.adzuna.com), and seed/job_boards.py only adds the
 source when they are set.
 
 Adzuna's terms ask sites to credit them, so these jobs say "via Adzuna" on the details panel
