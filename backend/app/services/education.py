@@ -31,6 +31,15 @@ FIELD_PATTERNS: dict[str, str] = {
     "it": r"information technology|information systems|\bmis\b|cyber ?security|networking",
     "science": r"physics|chemistry|biology|life sciences|biochemistry|geology|earth sciences?"
                r"|environmental science|mining|metallurgy",
+    "health": r"nursing|health sciences?|kinesiology|pharmacy|public health|biomedical|nutrition"
+              r"|medicine|medical|physiotherapy|dental|paramedic",
+    "social": r"psychology|sociology|political science|criminology|social work|anthropology"
+              r"|\bhistory\b|philosophy|humanities|liberal arts|social sciences?"
+              r"|international (development|relations)|public (administration|policy)|\blaw\b",
+    "environment": r"environmental (studies|science|management)|geography|urban planning"
+                   r"|\bplanning\b|\bgis\b|sustainability",
+    "education": r"\beducation\b|teaching|early childhood",
+    "trades": r"technician|technologist|engineering technology|skilled trades|apprentice\w*",
 }
 FIELD_LABELS: dict[str, str] = {
     "cs": "Computer Science / Software", "engineering": "Engineering",
@@ -38,6 +47,9 @@ FIELD_LABELS: dict[str, str] = {
     "data_math": "Math, Stats or Data Science", "business": "Business / Commerce",
     "finance": "Finance, Accounting or Economics", "marketing": "Marketing / Communications",
     "design": "Design", "it": "IT / Information Systems", "science": "Science",
+    "health": "Health Sciences / Nursing", "social": "Social Sciences / Humanities",
+    "environment": "Environment / Geography", "education": "Education",
+    "trades": "Technology / Skilled Trades",
 }
 
 # A sentence counts as a degree requirement when it mentions one of these
@@ -52,6 +64,7 @@ ProgramKey = Literal[
     "computer_science", "software_engineering", "computer_engineering", "electrical_engineering",
     "mechanical_engineering", "other_engineering", "data_science", "mathematics",
     "information_technology", "business", "finance_accounting", "marketing", "design", "science",
+    "health_sciences", "social_sciences", "environment", "education", "engineering_technology",
 ]
 
 
@@ -101,15 +114,38 @@ PROGRAMS: dict[str, Program] = {
     "design": Program(
         "Design / Media", r"\bdesign\b|fine arts|media arts|interaction design|\bhci\b",
         ("design",), ("design", "product")),
+    "engineering_technology": Program(
+        "Engineering Technology / Skilled Trades (college)",
+        r"engineering technolog\w*|technician|technologist|skilled trades|apprentice\w*",
+        ("trades", "engineering"), ("trades", "hardware")),
     "other_engineering": Program(
         "Other Engineering (civil, chemical, industrial...)",
         r"(civil|chemical|industrial|systems|environmental|mining|materials|nuclear"
         r"|engineering physics) engineering|\bengineering\b",
         ("engineering", "science"), ("hardware",)),
+    "health_sciences": Program(
+        "Health Sciences / Nursing / Kinesiology",
+        r"nursing|health sciences?|kinesiology|pharmacy|public health|biomedical|nutrition"
+        r"|physiotherapy|paramedic|medical laboratory",
+        ("health", "science"), ("health",)),
     "science": Program(
         "Science (physics, chemistry, biology...)",
         r"physics|chemistry|biology|biochemistry|life sciences|geology|earth sciences",
-        ("science", "data_math"), ("data", "hardware")),
+        ("science", "data_math", "health"), ("health", "data", "hardware")),
+    "environment": Program(
+        "Environment / Geography / Planning",
+        r"environmental (studies|science|management)|geography|urban planning|\bgis\b"
+        r"|sustainability",
+        ("environment", "science"), ("health", "public", "hardware")),
+    "education": Program(
+        "Education", r"\beducation\b|teaching|early childhood", ("education", "social"),
+        ("public",)),
+    "social_sciences": Program(
+        "Arts / Social Sciences / Humanities",
+        r"psychology|sociology|political science|criminology|social work|anthropology"
+        r"|\bhistory\b|philosophy|humanities|liberal arts|social sciences?|english literature"
+        r"|international (development|relations)|bachelor of arts|\bb\.?a\.?\b",
+        ("social",), ("public", "business", "customer")),
 }
 
 Degree = Literal["", "diploma", "bachelors", "masters", "phd"]

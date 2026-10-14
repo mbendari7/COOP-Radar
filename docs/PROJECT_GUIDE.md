@@ -151,7 +151,7 @@ erDiagram
 
 **Migrations** (`backend/alembic/versions/`) build this schema step by step: 0001 postings, 0002 auth and saved
 postings, 0003 tracker events, 0004 ingestion, pgvector, and admin, 0005 resume matcher, 0006 demo users, 0007
-career boards and cached insights, 0008 the `kv_store` session table, 0009 `resumes.preferences` (what the student is looking for), 0010 `postings.country`, `grad_years`, `fields_of_study` and the `smartrecruiters` adapter type. Two subtleties:
+career boards and cached insights, 0008 the `kv_store` session table, 0009 `resumes.preferences` (what the student is looking for), 0010 `postings.country`, `grad_years`, `fields_of_study` and the `smartrecruiters` adapter type, 0011 the generated `postings.season` and `term_start` columns, a nullable `duration_months` (unknown instead of a made up 4), and the `workday` and `adzuna` adapter types. Two subtleties:
 - Generated columns may only call IMMUTABLE functions. `array_to_string()` is only STABLE, so 0001 creates the
   wrapper `coopradar_skills_text()`. The model attaches the same function so `create_all()` (used by tests) works.
 - Every index exists in **both** the migration and the model's `__table_args__`. CI runs `alembic check` to prove
@@ -178,7 +178,7 @@ career boards and cached insights, 0008 the `kv_store` session table, 0009 `resu
 | `app/services/*.py` | The logic behind each router (see section 6). |
 | `app/ingest/` | `base.py` (`RawPosting`, `BaseAdapter`), `boards.py` (Greenhouse / Lever / Ashby adapters, location filter + parser, HTML to text), `json_api.py`, `rss.py`, `registry.py` (adapter_type → class), `runner.py` (one ingest pass, estimated deadlines), `dedup.py` (difflib title similarity), `skill_match.py` (context-aware skill detection), `extract.py` (skills/term/work mode, then Claude if the owner set a key), `embed.py` (OpenAI + backfill CLI; skipped without a key), `csv_validator.py`. |
 | `app/agent/resume_qa.py` | The streaming, citation-grounded Q&A. |
-| `seed/` | `python -m seed`: skills (always; aliases updated on re-run), `job_boards.py` (~120 employers; a board that moved systems is repointed), sample postings, and two fixture sources, each behind a `SEED_*` flag. Idempotent. |
+| `seed/` | `python -m seed`: skills (always; aliases updated on re-run), `job_boards.py` (~170 employers; a board that moved systems is repointed), sample postings, and two fixture sources, each behind a `SEED_*` flag. Idempotent. |
 | `app/services/insights.py` | Free insights (skills found, in-demand skills missing via `unnest … GROUP BY`) and the cached AI review. |
 
 ---
@@ -232,8 +232,14 @@ flowchart TD
     I --> E["after commit: jobs.enqueue('embed_posting') per new posting"]
 ```
 
-**Career boards (the main source):** `seed/job_boards.py` lists ~120 employers as `(company, adapter_type, board)`,
-with adapter types `greenhouse`, `lever`, `ashby` and `smartrecruiters`. These official public job-board APIs exist
+**Career boards (the main source):** `seed/job_boards.py` lists ~170 employers as `(company, adapter_type, board)`,
+with adapter types `greenhouse`, `lever`, `ashby`, `smartrecruiters` and `workday` (an optional fourth item adds config like a
+home city). Workday (`ingest/workday.py`) is what most big employers outside tech use: banks, insurers, energy, health,
+pharma, aerospace, food, retail, accounting and universities. Its careers page loads jobs from a public JSON endpoint
+(`/wday/cxs/<tenant>/<site>/jobs`, allowed by robots.txt); sites with up to 300 jobs keep every Canadian job and bigger
+ones keep student and campus roles (`scope`). With `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` set, two `adzuna` sources are
+seeded too (`ingest/adzuna.py`). The runner reads each job's term and length with `ingest/terms.py` on import and
+again on every re-import. These official public job-board APIs exist
 for syndicating a company's openings. `boards.py → choose_location()` keeps every location matching
 `INGEST_LOCATION_FILTER` (Canada; "Vancouver, WA" is excluded by its state code) and, per `INGEST_US_JOBS`, US jobs
 (default: only titles matching the student pattern). It parses `City, Province` / `City, State` (work-mode words like
@@ -458,7 +464,7 @@ is a classic bug class:
 - **Spec 004 remainder**: a tool-use assistant (search/compare/save with a UI confirmation step),
   an MCP server exposing the same tools, `agent_runs` logging (tokens, latency, cost), and a YAML eval runner that
   gates CI at 80%. The `agent-tools` skill describes the intended design.
-- **More sources**: ~120 employer boards today; add more employers, and schools' public feeds where terms allow.
+- **More sources**: ~170 employer boards today; add more employers, and schools' public feeds where terms allow.
 - **Admin UX**: creating sources is SQL-only; there's no UI to add sources or review `low_confidence_fields`.
 - **Fit breakdown**: the spec's "60% required skills / 25% similarity / 15% eligibility" breakdown isn't shown; the
   score is a single number with a reason.

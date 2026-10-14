@@ -64,6 +64,13 @@ CoopRadar never applies for you. You always apply on the employer's own website.
 
 ---
 
+### Term and length
+
+Every job shows its term and length when it says them, like **Summer 2027 · 4 months**, with a small coloured dot
+for the season (blue for Winter, amber for Summer, orange for Fall). Use the **Any term** and **Any length** menus
+in the strip above the results, or **All filters**, to pick seasons and lengths. **Sort by** can put the soonest
+term first, or the shortest or longest first. Jobs that don't say their term or length show "Not stated".
+
 ## 3. Match your resume
 
 Click **Match my resume** at the top. There are three short steps.
@@ -108,6 +115,16 @@ The **Resume feedback** tab shows, for free, the skills employers can see on you
 ask for most that your resume doesn't show.
 
 ---
+
+### Make your resume fit a job
+
+Open any job, or any match, and look for **Make your resume fit this job**. It's free and needs no AI key. You get:
+- quick checks, like whether your program and graduation year are ones it asks for, and whether your resume says you're free for its term
+- the edits to make, in order, such as adding "Available for a 4 month Summer 2027 co-op term" near the top
+- the job's skills and words, split into ones already on your resume and ones worth adding if they're true for you
+
+Only add things you've really done. Matching is lenient on purpose: jobs that aren't a perfect fit still show up
+lower down, because applying widely is how most students land a co-op.
 
 ## 4. Keep track of applications
 
@@ -154,7 +171,7 @@ Then:
    ```
 4. The first time takes a few minutes: it installs everything, builds the site and creates a private database in
    a `.coopradar` folder in your home folder. Then your browser opens **http://localhost:8000**. Real jobs appear a
-   few minutes later (it pulls them from about 120 employers).
+   few minutes later (it pulls them from about 170 employers).
 
 Next time, `python start.py` starts in seconds. To stop it, press **Ctrl + C** in the terminal. To start over with
 empty data, delete the `.coopradar` folder in your home folder.

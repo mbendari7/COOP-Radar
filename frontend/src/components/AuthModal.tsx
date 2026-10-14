@@ -90,7 +90,7 @@ export default function AuthModal({ open, onClose, initialTab = 'register' }: Pr
         className="relative mx-4 w-full max-w-md bg-white shadow-xl"
       >
         <div className="flex items-center justify-between bg-post-600 px-6 py-3.5 text-white">
-          <h2 id="auth-modal-title" className="stretch-condensed text-xl font-extrabold uppercase tracking-[0.03em]">
+          <h2 id="auth-modal-title" className="text-xl font-bold">
             {tab === 'register' ? 'Create account' : 'Sign in'}
           </h2>
           <button onClick={onClose} className="rounded-sm p-1 hover:bg-white/15" aria-label="Close">

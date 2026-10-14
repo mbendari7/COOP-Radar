@@ -149,7 +149,7 @@ export default function App() {
           </Routes>
         </Suspense>
       </main>
-      <footer className="border-t-[1.5px] border-gray-900 bg-white">
+      <footer className="border-t border-gray-300 bg-white">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-2">
             <LogoMark className="h-5 w-5 text-post-600" />

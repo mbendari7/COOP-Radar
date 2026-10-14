@@ -62,4 +62,21 @@ test.describe('jobs page', () => {
     await page.getByRole('button', { name: 'Remove filter: Past week' }).click()
     await expect(page).not.toHaveURL(/posted_within/)
   })
+
+  test('term season, length and term sorting work together', async ({ page }) => {
+    await page.goto('/?level=all')
+    await page.getByLabel('Term season').selectOption('winter')
+    await expect(page).toHaveURL(/season=winter/)
+    await page.getByLabel('Term length').selectOption('8')
+    await expect(page).toHaveURL(/duration=8/)
+    await page.getByLabel('Sort by').selectOption('term_start:asc')
+    await expect(page).toHaveURL(/sort=term_start/)
+
+    // Every row shown says Winter, since the filter is on
+    const rows = page.getByRole('article')
+    if (await rows.count()) await expect(rows.first()).toContainText('Winter')
+
+    await page.getByRole('button', { name: 'Remove filter: Winter term' }).click()
+    await expect(page).not.toHaveURL(/season=/)
+  })
 })

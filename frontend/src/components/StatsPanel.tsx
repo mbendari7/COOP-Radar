@@ -21,7 +21,7 @@ export default function StatsPanel({ totalApplied, totalInterview, totalOffer }:
   ]
 
   return (
-    <dl className="mb-6 flex flex-wrap divide-x divide-gray-300 border-y-[1.5px] border-gray-900">
+    <dl className="mb-6 flex flex-wrap divide-x divide-gray-300 border-y border-gray-300">
       {stats.map((s) => (
         <div key={s.label} className="flex items-baseline gap-2 px-5 py-3 first:pl-0">
           <dt className="label-form">{s.label}</dt>

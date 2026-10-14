@@ -115,7 +115,7 @@ export default function AiKeyPage() {
       )}
 
       {/* Step 1. Pick a provider */}
-      <section aria-labelledby="step1" className="border-t-[1.5px] border-gray-900 pt-4">
+      <section aria-labelledby="step1" className="border-t border-gray-300 pt-4">
         <h2 id="step1" className="display text-2xl text-gray-900"><StepNumber n={1} />Choose your AI</h2>
         <div className="mt-4 grid border-[1.5px] border-gray-900 sm:grid-cols-3" role="radiogroup" aria-label="AI provider">
           {PROVIDER_GUIDES.map((g) => (
@@ -137,7 +137,7 @@ export default function AiKeyPage() {
       </section>
 
       {/* Step 2. How to get a key */}
-      <section aria-labelledby="step2" className="border-t-[1.5px] border-gray-900 pt-4">
+      <section aria-labelledby="step2" className="border-t border-gray-300 pt-4">
         <h2 id="step2" className="display text-2xl text-gray-900"><StepNumber n={2} />Get a {guide.name} API key</h2>
         <ol className="mt-3 list-decimal space-y-1 pl-5 text-gray-800 marker:font-bold marker:text-post-600">
           {guide.steps.map((step) => <li key={step}>{step}</li>)}
@@ -154,7 +154,7 @@ export default function AiKeyPage() {
       </section>
 
       {/* Step 3. Paste it and check it */}
-      <section aria-labelledby="step3" className="border-t-[1.5px] border-gray-900 pt-4">
+      <section aria-labelledby="step3" className="border-t border-gray-300 pt-4">
         <h2 id="step3" className="display text-2xl text-gray-900"><StepNumber n={3} />Paste it and check it</h2>
         <form onSubmit={handleCheck} className="mt-4 flex flex-col gap-2 sm:flex-row">
           <label htmlFor="ai-key" className="sr-only">{guide.name} API key</label>

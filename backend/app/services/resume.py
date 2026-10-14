@@ -2,17 +2,17 @@
 Resume upload, reading the text, matching and delete.
 
 How matching works
-  0. We only look at open jobs that fit what the student wants, like job type, place, country,
-     work mode, level and grad year. Program and grad year come from what they picked or, if
-     blank, from the education part of the resume. With no job types picked we use the ones
-     their program leads to, so Mechanical Engineering gives Hardware and engineering.
-     Keywords like "data analyst", jobs that name their field or grad year, and the term they
-     want all rank higher.
-  1. Shortlist about 40 of them. By default by how many of each job's skills show up in the
+  0. We only look at open jobs that fit the hard choices the student made, like job types they
+     picked, place, country, work mode and level. Everything else is lenient, since students
+     apply to lots of co-ops. Jobs that suit their program, name their grad year, or are for
+     the term or length they want rank higher, but jobs that do not still show up lower down.
+     Program and grad year come from what they picked or, if blank, from the resume.
+  1. Shortlist about 120 of them. By default by how many of each job's skills show up in the
      resume, which is plain SQL with no AI key. If the owner set OPENAI_API_KEY we use
      embedding closeness instead.
   2. The visitor's own AI, Claude or ChatGPT or Gemini (see app/ai.py), scores the shortlist
-     from 0 to 100 with a one line reason and we keep the top 20. If the AI reply is no good
+     from 0 to 100 with a one line reason. The rest of the shortlist follows in step 1 order,
+     so up to 60 jobs come back. If the AI reply is no good
      we keep the order from step 1 so uploads never fail. A rejected key gets reported though.
 """
 
@@ -51,7 +51,6 @@ from app.services.education import FIELD_LABELS, PROGRAMS, detect_education
 from app.services.postings import (
     SENIOR_TITLE_PATTERN,
     STUDENT_TITLE_PATTERN,
-    grad_year_clause,
     has_grad_year,
 )
 
@@ -102,8 +101,9 @@ def extract_text(filename: str, data: bytes) -> str:
 
 _RESUME_CHARS = 8000          # about 2000 tokens of resume text sent to the model
 _POSTING_CHARS = 1500         # how much of each job description goes in the ranking prompt
-_CANDIDATES = 40
-_TOP_N = 20
+_CANDIDATES = 120
+_TOP_N = 60
+_AI_RANKED = 40  # how many the visitor's AI scores, to keep the prompt and their bill small
 
 _RERANK_PROMPT = (
     "You are a co-op matching assistant. Given a student's resume and a list of job "
@@ -121,7 +121,7 @@ _RERANK_PROMPT = (
 _CANDIDATE_COLUMNS = (
     Posting.id, Posting.title, Posting.company, Posting.city, Posting.province, Posting.term,
     Posting.deadline, Posting.description, Posting.skills, Posting.work_mode, Posting.country,
-    Posting.grad_years, Posting.fields_of_study,
+    Posting.grad_years, Posting.fields_of_study, Posting.duration_months, Posting.season,
 )
 _MIN_SKILLS = 3  # a job that lists 1 skill should not score 100 off one match
 _OPEN = (Posting.closed_at.is_(None), Posting.deadline >= func.current_date())
@@ -153,22 +153,20 @@ def detected_education(resume_text: str) -> DetectedEducation:
     )
 
 
-def _job_types(prefs: JobPreferences) -> list[str]:
-    """The job types they picked or the ones their program leads to."""
-    if prefs.categories:
-        return list(prefs.categories)
-    if prefs.program:
-        return list(PROGRAMS[prefs.program].categories)
-    return []
+def _program_types(prefs: JobPreferences) -> list[str]:
+    """The job types their program usually leads to. These rank higher but never filter."""
+    return list(PROGRAMS[prefs.program].categories) if prefs.program else []
 
 
 # How much each part of a match counts out of 1. Skills carry most of it and the rest rewards
 # what makes a job right for this student. Only a job that fits on every count reaches 100
 _W_SKILLS = 0.65      # share of the job's skills on the resume. Senior titles count half
 _W_STUDENT = 0.15     # a co-op, intern, student or new grad title
-_W_PROGRAM = 0.10     # the description names the student's program
-_W_GRAD_YEAR = 0.05   # or their grad year
-_W_TERM = 0.05        # the co-op term they want
+_W_PROGRAM = 0.10     # the description names the student's program or the title suits it
+_W_GRAD_YEAR = 0.05   # the job names their grad year
+_W_OTHER_YEAR = 0.10  # taken off when the job names other grad years. Still shown, just lower
+_W_TERM = 0.05        # the co-op term or season they want
+_W_LENGTH = 0.05      # the co-op length they want
 _W_KEYWORDS = 0.20    # matches the keywords they typed like "data analyst"
 
 
@@ -186,12 +184,24 @@ def _student_fit(similarity: Any, prefs: JobPreferences | None = None) -> Any:
         adjusted = adjusted + case((Posting.search_vector.op("@@")(query), _W_KEYWORDS), else_=0.0)
     if prefs is not None and prefs.program:
         fields = list(PROGRAMS[prefs.program].fields)
-        adjusted = adjusted + case((Posting.fields_of_study.overlap(fields), _W_PROGRAM), else_=0.0)
+        suits = or_(Posting.fields_of_study.overlap(fields), any_category(_program_types(prefs)))
+        adjusted = adjusted + case((suits, _W_PROGRAM), else_=0.0)
     if prefs is not None and prefs.grad_year:
-        adjusted = adjusted + case((has_grad_year(prefs.grad_year), _W_GRAD_YEAR), else_=0.0)
+        adjusted = adjusted + case(
+            (has_grad_year(prefs.grad_year), _W_GRAD_YEAR),
+            (func.cardinality(Posting.grad_years) > 0, -_W_OTHER_YEAR),
+            else_=0.0,
+        )
     if prefs is not None and prefs.term.strip():
-        adjusted = adjusted + case((Posting.term.ilike(prefs.term.strip()), _W_TERM), else_=0.0)
-    return func.least(adjusted, 1.0)
+        term = prefs.term.strip()
+        # The exact term, or the same season when the job gives no year
+        same = or_(Posting.term.ilike(term), Posting.term.ilike(term.split(" ", 1)[0]))
+        adjusted = adjusted + case((same, _W_TERM), else_=0.0)
+    if prefs is not None and prefs.durations:
+        adjusted = adjusted + case(
+            (Posting.duration_months.in_(prefs.durations), _W_LENGTH), else_=0.0
+        )
+    return func.greatest(func.least(adjusted, 1.0), 0.0)
 
 
 def preference_filters(prefs: JobPreferences | None) -> list[Any]:
@@ -200,14 +210,11 @@ def preference_filters(prefs: JobPreferences | None) -> list[Any]:
         return []
     remote = Posting.work_mode == WorkMode.remote
     clauses: list[Any] = []
-    job_types = _job_types(prefs)
-    if job_types:
-        clauses.append(any_category(job_types))
+    if prefs.categories:
+        clauses.append(any_category(prefs.categories))
     if prefs.countries:
         clauses.append(Posting.country.in_(prefs.countries))
-    if prefs.grad_year:
-        # Jobs asking for other grad years are left out. Most do not say and those stay in
-        clauses.append(grad_year_clause(prefs.grad_year))
+    # Grad year and program never filter, they only move jobs up or down (see _student_fit)
     # Remote jobs can be done from anywhere so they always count as being in a location
     if prefs.province:
         clauses.append(or_(Posting.province.ilike(prefs.province), remote))
@@ -403,15 +410,28 @@ def fit_notes(
     years = list(row.get("grad_years") or [])
     if years and prefs is not None and prefs.grad_year in years:
         notes.append(f"For students graduating in {prefs.grad_year}, like you")
+    elif years and prefs is not None and prefs.grad_year:
+        asked = " or ".join(str(y) for y in years)
+        notes.append(
+            f"Asks for {asked} grads. You finish in {prefs.grad_year}, so check before you apply"
+        )
     elif years:
         notes.append("For students graduating in " + " or ".join(str(y) for y in years))
 
     term = str(row.get("term") or "")
     if term and term != "Open":
-        if prefs is not None and prefs.term and term.lower() == prefs.term.strip().lower():
+        wanted = prefs.term.strip().lower() if prefs is not None else ""
+        if wanted and (term.lower() == wanted or term.lower() == wanted.split(" ", 1)[0]):
             notes.append(f"{term} term, the one you want")
         else:
             notes.append(f"{term} term")
+
+    months = row.get("duration_months")
+    if months:
+        if prefs is not None and months in prefs.durations:
+            notes.append(f"{months} months long, the length you want")
+        else:
+            notes.append(f"{months} months long")
 
     if _IN_SCHOOL.search(str(row.get("description") or "")):
         notes.append("For students still in school")
@@ -427,7 +447,7 @@ async def embed_and_rank(
     prefs: JobPreferences | None = None,
 ) -> list[MatchResultOut]:
     """
-    Run both steps and give back up to 20 results, best first. Without AI credentials
+    Run both steps and give back up to 60 results, best first. Without AI credentials
     we use the free skill overlap ranking, which is step 1 only.
     """
     prefs = effective_preferences(prefs, extracted_text)
@@ -438,8 +458,12 @@ async def embed_and_rank(
     if creds is None:
         rankings = _shortlist_rankings(rows, extracted_text)
     else:
-        ai_rankings = await rank_with_ai(creds, extracted_text[:_RESUME_CHARS], rows)
-        rankings = ai_rankings or _shortlist_rankings(rows, extracted_text, ai_failed=True)
+        ai_rankings = await rank_with_ai(creds, extracted_text[:_RESUME_CHARS], rows[:_AI_RANKED])
+        if ai_rankings:
+            # The AI scored the top of the shortlist. The rest keep their shortlist score
+            rankings = ai_rankings + _shortlist_rankings(rows[_AI_RANKED:], extracted_text)
+        else:
+            rankings = _shortlist_rankings(rows, extracted_text, ai_failed=True)
 
     posting_by_id = {str(r["id"]): r for r in rows}
     results: list[MatchResultOut] = []
@@ -451,10 +475,7 @@ async def embed_and_rank(
             continue
         seen.add(pid)
         row = posting_by_id[pid]
-        try:
-            score = int(item.get("score", 0))
-        except (TypeError, ValueError):
-            score = 0
+        score = _int_score(item.get("score"))
         reason = str(item.get("reason") or "").strip() or "Matched on resume content."
         posting_skills = list(row.get("skills") or [])
         have = skills_in_text(posting_skills, extracted_text)
@@ -473,12 +494,20 @@ async def embed_and_rank(
                 matched_skills=have,
                 missing_skills=[s for s in posting_skills if s not in have],
                 country=str(row.get("country") or "CA"),
+                duration_months=row.get("duration_months"),
                 fit_notes=fit_notes(row, prefs, have, len(posting_skills)),
             )
         )
 
     results.sort(key=lambda r: r.score, reverse=True)
     return results[:_TOP_N]
+
+
+def _int_score(value: Any) -> int:
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
 
 
 # Upload, fetch and delete
@@ -641,12 +670,12 @@ async def get_matches(db: AsyncSession, user_id: UUID) -> MatchesResponse:
         SELECT mr.posting_id, mr.score, mr.reason,
                p.title, p.company, p.city, p.province, p.term, p.deadline::text,
                p.work_mode::text AS work_mode, p.skills, p.country, p.grad_years,
-               p.fields_of_study, p.description
+               p.fields_of_study, p.description, p.duration_months, p.season
         FROM match_results mr
         JOIN postings p ON p.id = mr.posting_id
         WHERE mr.resume_id = :resume_id
         ORDER BY mr.score DESC
-        LIMIT 20
+        LIMIT 60
         """
     )
     rows = (await db.execute(sql, {"resume_id": str(resume.id)})).mappings().all()
@@ -671,6 +700,7 @@ async def get_matches(db: AsyncSession, user_id: UUID) -> MatchesResponse:
                 matched_skills=have,
                 missing_skills=[s for s in posting_skills if s not in have],
                 country=row["country"] or "CA",
+                duration_months=row["duration_months"],
                 fit_notes=fit_notes(row, prefs, have, len(posting_skills)),
             )
         )

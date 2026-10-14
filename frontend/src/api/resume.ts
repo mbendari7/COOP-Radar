@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { aiHeaders } from './aiKey'
 import { API_BASE, apiFetch, toApiError } from './client'
 import type { CategoryKey, CountryCode, ProgramKey, WorkMode } from './postings'
+import type { components } from './types.gen'
 
 // Types
 
@@ -31,9 +32,15 @@ export interface MatchResultOut {
   matched_skills: string[]
   missing_skills: string[]
   country: string
+  /** 4, 8, 12 or 16, or null when the job does not say */
+  duration_months?: number | null
   /** Why the job fits, read from its description. Role, program, grad year, term and skills */
   fit_notes: string[]
 }
+
+/** How to make the resume fit one job. Checks, words to use and edits to make. Free, no AI */
+export type ResumeAlignment = components['schemas']['ResumeAlignment']
+export type AlignCheck = components['schemas']['AlignCheck']
 
 export type Degree = '' | 'diploma' | 'bachelors' | 'masters' | 'phd'
 
@@ -60,12 +67,14 @@ export interface JobPreferences {
   grad_year: number | null
   /** The co-op term they want, like Summer 2027 */
   term: string
+  /** Co-op lengths they want in months. Those jobs rank higher */
+  durations: (4 | 8 | 12 | 16)[]
   countries: CountryCode[]
 }
 
 export const DEFAULT_PREFERENCES: JobPreferences = {
   categories: [], keywords: '', province: '', city: '', work_modes: [], level: 'students',
-  program: '', degree: '', grad_year: null, term: '', countries: ['CA'],
+  program: '', degree: '', grad_year: null, term: '', durations: [], countries: ['CA'],
 }
 
 export interface UploadResponse {
@@ -131,6 +140,19 @@ export function useMatches(enabled = true) {
   })
 }
 
+/**
+ * How to make the saved resume fit one job. Only asked for when there is a resume and the
+ * panel is open. A new resume or new matches make it fetch again.
+ */
+export function useAlignment(postingId: string | undefined, enabled = true) {
+  return useQuery({
+    queryKey: ['align', postingId],
+    queryFn: () => apiFetch<ResumeAlignment>(`/api/resume/align/${postingId}`),
+    enabled: enabled && Boolean(postingId),
+    staleTime: 5 * 60_000,
+  })
+}
+
 /** Upload a resume file. When it works the resume and matches get fetched again. */
 export function useUploadResume() {
   const queryClient = useQueryClient()
@@ -140,6 +162,7 @@ export function useUploadResume() {
       void queryClient.invalidateQueries({ queryKey: ['resume'] })
       void queryClient.invalidateQueries({ queryKey: ['matches'] })
       void queryClient.invalidateQueries({ queryKey: ['insights'] })
+      void queryClient.invalidateQueries({ queryKey: ['align'] })
     },
   })
 }
@@ -196,6 +219,7 @@ export function useDeleteResume() {
       void queryClient.invalidateQueries({ queryKey: ['resume'] })
       void queryClient.invalidateQueries({ queryKey: ['matches'] })
       void queryClient.invalidateQueries({ queryKey: ['insights'] })
+      void queryClient.invalidateQueries({ queryKey: ['align'] })
     },
   })
 }

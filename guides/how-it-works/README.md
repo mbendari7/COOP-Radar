@@ -22,8 +22,8 @@ step by step when someone uses the site, and how to talk about it with an employ
 
 ## 1. The short version
 
-CoopRadar is a full-stack job site for co-op students. A background importer pulls real jobs from about 120
-employers' public career-board APIs (Greenhouse, Lever, Ashby, SmartRecruiters) into PostgreSQL: every job in
+CoopRadar is a full-stack job site for co-op students. A background importer pulls real jobs from about 170
+employers' public career-board APIs (Greenhouse, Lever, Ashby, SmartRecruiters, Workday) into PostgreSQL: every job in
 Canada, plus US internships. While importing, it reads each job description for the programs of study and
 graduation years it asks for. A student uploads a resume (no sign-up); the app reads their program, degree and
 graduation year from it, then ranks open jobs in SQL by skills, student fit, program, graduation year and co-op
@@ -85,7 +85,7 @@ are in `PRODUCT.md` and the finished design system is written down in `DESIGN.md
 | **Pydantic v2** | Data validation | Every request and response has a schema; bad input becomes a clean 422 error | `backend/app/schemas/` |
 | **SQLAlchemy 2.0** (async) | The database toolkit / ORM | Typed models and safe, composable SQL queries (every filter is a bound parameter, never string-built SQL) | `backend/app/models/`, `services/` |
 | **asyncpg** | Postgres driver | Fast async connection to the database | used by SQLAlchemy |
-| **Alembic** | Database migrations | Every schema change is a numbered, reversible script (0001 to 0010) | `backend/alembic/versions/` |
+| **Alembic** | Database migrations | Every schema change is a numbered, reversible script (0001 to 0011) | `backend/alembic/versions/` |
 | **httpx** | Async HTTP client | Calls the employers' career-board APIs | `backend/app/ingest/boards.py` |
 | **asyncio background jobs** | Python's built-in concurrency | Runs the importer every 6 hours inside the web server, so there's no separate worker to host | `backend/app/jobs.py` |
 | **argon2** | Password hashing | The current recommended way to store passwords | `backend/app/services/auth.py` |
@@ -130,7 +130,7 @@ flowchart LR
     end
     API --> DB[("PostgreSQL<br/>jobs · users · resumes · sessions")]
     JOBS --> DB
-    JOBS -->|"public JSON APIs"| BOARDS["~120 employer career boards<br/>Greenhouse · Lever · Ashby · SmartRecruiters"]
+    JOBS -->|"public JSON APIs"| BOARDS["~170 employer career boards<br/>Greenhouse · Lever · Ashby · SmartRecruiters · Workday"]
     API -->|"only with the visitor's own key"| AI["Claude · ChatGPT · Gemini"]
 ```
 
@@ -222,7 +222,7 @@ cite their sources. Tailoring and cover letters stream word by word (Server-Sent
 | Table | Holds |
 |---|---|
 | `postings` | every job: title, company, location, country, work mode, term, skills, `fields_of_study`, `grad_years`, a weighted full-text index |
-| `ingest_sources` / `ingest_runs` | the ~120 career boards and a log of each import |
+| `ingest_sources` / `ingest_runs` | the ~170 career boards and a log of each import |
 | `skills` | the skill list and aliases |
 | `users` | accounts (argon2 hash, admin and temporary flags) |
 | `resumes` | resume text, the student's preferences (JSON), the cached AI review |
@@ -279,7 +279,7 @@ gets a web page back instead of job data, and the site says the jobs didn't load
 
 ### 30 seconds (to an engineer or employer)
 > "It's a full-stack app: React and TypeScript on FastAPI and PostgreSQL. A background importer pulls jobs from
-> about 120 employers' public job-board APIs every six hours and extracts structured data from the descriptions,
+> about 170 employers' public job-board APIs every six hours and extracts structured data from the descriptions,
 > like the programs and graduation years each job wants. Matching runs entirely in SQL: one query filters and scores
 > every open job by skill coverage, student fit, program, graduation year and term, and the app explains each
 > match. There's an optional bring-your-own-key AI layer. It's one command to run locally, hosted free on Render and
@@ -311,9 +311,11 @@ gets a web page back instead of job data, and the site says the jobs didn't load
 
 | Question | Answer |
 |---|---|
-| *Where do the jobs come from? Is it scraping?* | No. Greenhouse, Lever, Ashby and SmartRecruiters publish public JSON APIs so companies' jobs can be shown elsewhere. No logins, no HTML scraping, and every job links to the employer to apply. |
+| *Where do the jobs come from? Is it scraping?* | No. Greenhouse, Lever, Ashby, SmartRecruiters and Workday publish public JSON APIs so companies' jobs can be shown elsewhere. No logins, no HTML scraping, and every job links to the employer to apply. |
 | *How do you know a job wants Computer Science students?* | At import, the description is split into sentences; only sentences mentioning a degree ("pursuing a Bachelor's in...") are checked for fields of study, so "our engineering team" doesn't count but "a degree in Engineering" does. Stored as an array and matched with Postgres array overlap. |
-| *How is the graduation year used?* | Read from the resume, or set by the student. Jobs naming a different graduation year are filtered out; jobs naming theirs get points and a "like you" note. Jobs that don't say are kept. |
+| *How is the graduation year used?* | Read from the resume, or set by the student. Jobs naming their year get points and a "like you" note. Jobs naming a different year stay in but rank lower with a "check before you apply" note, since students apply widely. Jobs that don't say are kept. |
+| *Why not LinkedIn, Indeed or Glassdoor?* | Their terms forbid automated collection and most of their listings are reposts of jobs on employers' own career sites. CoopRadar reads those career sites directly (Greenhouse, Lever, Ashby, SmartRecruiters and Workday cover most big employers in every field), and an optional Adzuna key adds an aggregator that allows reuse through its API. |
+| *How do you know the term and length?* | `app/ingest/terms.py` reads them with plain rules: "Summer 2027", "Fall '27", "S27", "(January 2027)" in a title, "May to August", "4 month co-op", "12 week internship", "one year contract". Lengths round to the usual co-op lengths. Months next to "experience" or "graduation" are ignored. Postgres turns the term into a season and a start date with generated columns so filters and sorts stay in SQL. |
 | *Why match in SQL before AI?* | SQL scores every open job in one query, instantly and for free, and works for users without a key. AI is slower and costs money, so it only re-ranks a 40-job shortlist when the user asks. |
 | *Why are the weights 65 / 15 / 10 / 5 / 5?* | Skills matter most, but a student should see co-op roles and roles for their program above a senior job they happen to match. Earlier versions added bonuses on top and too many jobs hit 100, which made scores meaningless; now only a job that fits on every count reaches 100. There are tests pinning the numbers. |
 | *Why include US jobs?* | Many Canadian co-op students do a US term. Only student roles are imported from the US (configurable), so the database stays small and focused. |

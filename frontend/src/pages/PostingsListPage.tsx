@@ -16,7 +16,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   useFilterMeta, usePostings,
-  type CategoryKey, type PageSize, type ProgramKey, type SearchMode, type SortField,
+  type CategoryKey, type PageSize, type ProgramKey, type SearchMode, type Season, type SortField,
   type SortOrder, type WorkMode,
 } from '../api/postings'
 import { useMe } from '../api/auth'
@@ -32,11 +32,12 @@ import { ArrowRightIcon, FilterIcon, ListIcon, PinIcon, SearchIcon, TableIcon } 
 import { PostingDetailPane } from '../components/PostingDetailView'
 import PostingsTable from '../components/PostingsTable'
 import { SearchModeToggle } from '../components/SearchModeToggle'
+import { SEASONS } from '../components/terms'
 import { isProvince, provinceName, workModeLabel } from '../utils/format'
 
 // URL param names live in one place so nobody makes a typo
 const P = {
-  q: 'q', city: 'city', province: 'province', term: 'term',
+  q: 'q', city: 'city', province: 'province', term: 'term', season: 'season',
   work_mode: 'work_mode', duration: 'duration', skills: 'skills',
   category: 'category', company: 'company', posted_within: 'posted_within',
   show_expired: 'show_expired', search_mode: 'search_mode', level: 'level',
@@ -48,8 +49,9 @@ const P = {
 const PAGE_SIZES: PageSize[] = [10, 25, 50]
 const CATEGORY_KEYS: CategoryKey[] = [
   'software', 'data', 'design', 'product', 'hardware', 'it_security', 'business',
-  'sales_marketing', 'customer',
+  'sales_marketing', 'customer', 'health', 'public', 'trades',
 ]
+const SEASON_KEYS: Season[] = ['winter', 'spring', 'summer', 'fall']
 
 // One menu for the sort field and direction like most job boards
 const SORTS: { value: string; label: string; sort: SortField; order: SortOrder }[] = [
@@ -57,6 +59,9 @@ const SORTS: { value: string; label: string; sort: SortField; order: SortOrder }
   { value: 'deadline:asc', label: 'Deadline soonest', sort: 'deadline', order: 'asc' },
   { value: 'company:asc', label: 'Company A to Z', sort: 'company', order: 'asc' },
   { value: 'title:asc', label: 'Job title A to Z', sort: 'title', order: 'asc' },
+  { value: 'term_start:asc', label: 'Term starting soonest', sort: 'term_start', order: 'asc' },
+  { value: 'duration_months:asc', label: 'Shortest term first', sort: 'duration_months', order: 'asc' },
+  { value: 'duration_months:desc', label: 'Longest term first', sort: 'duration_months', order: 'desc' },
 ]
 
 function readLevel(sp: URLSearchParams): Level {
@@ -83,6 +88,7 @@ export default function PostingsListPage() {
   const city         = sp.get(P.city) ?? ''
   const province     = sp.get(P.province) ?? ''
   const term         = sp.get(P.term) ?? ''
+  const season       = sp.getAll(P.season).filter((x): x is Season => SEASON_KEYS.includes(x as Season))
   const work_mode    = (sp.get(P.work_mode) ?? '') as WorkMode | ''
   const duration     = sp.getAll(P.duration).map(Number).filter((d) => [4, 8, 12, 16].includes(d))
   const skills       = sp.getAll(P.skills).filter(Boolean)
@@ -106,7 +112,7 @@ export default function PostingsListPage() {
 
   const filters: Filters = {
     category, level, country, program, grad_year, province, city, work_mode, posted_within,
-    term, duration, company, skills, show_expired,
+    term, season, duration, company, skills, show_expired,
   }
 
   // Get the jobs
@@ -115,6 +121,7 @@ export default function PostingsListPage() {
     city: city || undefined,
     province: province || undefined,
     term: term || undefined,
+    season: season.length ? season : undefined,
     work_mode: work_mode || undefined,
     duration: duration.length ? duration : undefined,
     skills: skills.length ? skills : undefined,
@@ -177,6 +184,7 @@ export default function PostingsListPage() {
     if ('work_mode' in patch) url[P.work_mode] = patch.work_mode || null
     if ('posted_within' in patch) url[P.posted_within] = patch.posted_within ? String(patch.posted_within) : null
     if ('term' in patch) url[P.term] = patch.term || null
+    if ('season' in patch) url[P.season] = patch.season ?? null
     if ('duration' in patch) url[P.duration] = patch.duration?.map(String) ?? null
     if ('company' in patch) url[P.company] = patch.company ?? null
     if ('skills' in patch) url[P.skills] = patch.skills ?? null
@@ -203,7 +211,7 @@ export default function PostingsListPage() {
   return (
     <div>
       {/* The search strip */}
-      <div className="border-b-[1.5px] border-gray-900 bg-gray-100">
+      <div className="border-b border-gray-300 bg-gray-100">
         <div className="mx-auto max-w-7xl px-4 pb-3 pt-3 md:pb-4 md:pt-5">
           <JobSearchForm
             q={q}
@@ -238,6 +246,32 @@ export default function PostingsListPage() {
               className="chip shrink-0 py-1 pl-3 pr-8 focus:border-air-700 focus:outline-none focus:ring-0"
             >
               {COUNTRY_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
+            </select>
+            <select
+              aria-label="Term season"
+              value={season.length > 1 ? 'several' : season[0] ?? ''}
+              onChange={(e) => changeFilters({ season: e.target.value ? [e.target.value as Season] : [] })}
+              className={`chip shrink-0 py-1 pl-3 pr-8 focus:border-air-700 focus:outline-none focus:ring-0 ${season.length ? 'chip-on' : ''}`}
+            >
+              <option value="">Any term</option>
+              {season.length > 1 && <option value="several" disabled>{season.length} seasons</option>}
+              {SEASONS.map((s) => {
+                const n = meta?.seasons?.find((x) => x.key === s.value)?.count
+                return <option key={s.value} value={s.value}>{s.label}{n !== undefined ? ` (${n})` : ''}</option>
+              })}
+            </select>
+            <select
+              aria-label="Term length"
+              value={duration.length > 1 ? 'several' : duration[0] ? String(duration[0]) : ''}
+              onChange={(e) => changeFilters({ duration: e.target.value ? [Number(e.target.value)] : [] })}
+              className={`chip shrink-0 py-1 pl-3 pr-8 focus:border-air-700 focus:outline-none focus:ring-0 ${duration.length ? 'chip-on' : ''}`}
+            >
+              <option value="">Any length</option>
+              {duration.length > 1 && <option value="several" disabled>{duration.length} lengths</option>}
+              {[4, 8, 12, 16].map((d) => {
+                const n = meta?.durations?.find((x) => x.months === d)?.count
+                return <option key={d} value={d}>{d} months{n !== undefined ? ` (${n})` : ''}</option>
+              })}
             </select>
             <span className="mx-1 h-5 w-px shrink-0 bg-gray-400" aria-hidden="true" />
             {WORK_MODES.map((m) => (
@@ -415,7 +449,7 @@ export default function PostingsListPage() {
           {view === 'cards' && items.length > 0 && (
             <aside
               aria-label="Job details"
-              className="hidden border-t-[1.5px] border-gray-900 bg-white lg:sticky lg:top-14 lg:block lg:max-h-[calc(100vh-3.5rem)] lg:overflow-y-auto"
+              className="hidden border-t border-gray-300 bg-white lg:sticky lg:top-14 lg:block lg:max-h-[calc(100vh-3.5rem)] lg:overflow-y-auto"
             >
               <PostingDetailPane id={selectedId} />
             </aside>

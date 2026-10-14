@@ -23,6 +23,7 @@ import BookmarkButton from './BookmarkButton'
 import PostingCard from './PostingCard'
 import LiveBadge from './LiveBadge'
 import { ArrowDownIcon, ArrowUpIcon } from './Icons'
+import { lengthLabel, termLabel } from './terms'
 import { formatDate, formatLocation, workModeLabel } from '../utils/format'
 
 const col = createColumnHelper<PostingListItem>()
@@ -56,15 +57,15 @@ const columns = [
     enableSorting: false,
   }),
   col.accessor('term', {
-    id: 'term',
+    // Sorting by term means by the day it starts, so Winter 2027 comes before Summer 2027
+    id: 'term_start',
     header: 'Term',
-    enableSorting: false,
+    cell: (info) => termLabel(info.getValue()) || <span className="text-gray-500">Not stated</span>,
   }),
   col.accessor('duration_months', {
     id: 'duration_months',
     header: 'Length',
-    cell: (info) => `${info.getValue()} mo`,
-    enableSorting: false,
+    cell: (info) => lengthLabel(info.getValue()) || <span className="text-gray-500">Not stated</span>,
   }),
   col.accessor('deadline', {
     id: 'deadline',
@@ -79,7 +80,9 @@ const columns = [
 ]
 
 // Only these columns can be sorted
-const SORTABLE: Set<string> = new Set(['title', 'company', 'deadline', 'posted_at'])
+const SORTABLE: Set<string> = new Set([
+  'title', 'company', 'deadline', 'posted_at', 'term_start', 'duration_months',
+])
 
 interface Props {
   data: PostingListItem[]
@@ -169,7 +172,7 @@ export default function PostingsTable({
   return (
     <>
       {/* The list. Always on phones and at every width in list view */}
-      <div className={`${view === 'cards' ? '' : 'md:hidden'} border-t-[1.5px] border-gray-900`}>
+      <div className={`${view === 'cards' ? '' : 'md:hidden'} border-t border-gray-300`}>
         {isLoading
           ? Array.from({ length: 5 }).map((_, i) => <SkeletonCard key={i} />)
           : data.map((posting) => (
@@ -186,7 +189,7 @@ export default function PostingsTable({
 
       {/* The table on wide screens */}
       {view === 'table' && (
-      <div className="hidden overflow-x-auto border-t-[1.5px] border-gray-900 bg-white md:block">
+      <div className="hidden overflow-x-auto border-t border-gray-300 bg-white md:block">
         <table className="w-full text-sm" role="table" aria-label="Co-op postings">
           <thead className="border-b border-gray-300">
             {table.getHeaderGroups().map((headerGroup) => (

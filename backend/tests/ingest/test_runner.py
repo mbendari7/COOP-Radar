@@ -272,3 +272,57 @@ async def test_rerun_refreshes_the_employer_name(db_session: AsyncSession):
         await db_session.execute(select(Posting).where(Posting.source_ref == "co-1"))
     ).scalar_one()
     assert posting.company == "Astera Labs"
+
+
+@pytest.mark.asyncio
+async def test_term_and_length_are_read_and_refreshed(db_session: AsyncSession):
+    """
+    Board jobs come with no term. The runner reads the term and length from the text, and on
+    later runs reads them again so edits and better rules reach jobs we already have.
+    """
+    source = await _create_source(db_session)
+    first = RawPosting(
+        title="Audit Co-op (Fall 2027)", company="Maple", city="Toronto", term="",
+        description="A 4 month co-op term.", source_ref="job-1", skills=["Excel"],
+        work_mode="onsite",
+    )
+    later = RawPosting(
+        title="Audit Co-op (Fall 2027)", company="Maple", city="Toronto", term="",
+        description="An 8 month co-op term.", source_ref="job-1", skills=["Excel"],
+        work_mode="onsite",
+    )
+
+    for raw in (first, later):
+        with patch("app.ingest.runner.adapter_for") as mock_af:
+            mock_a = AsyncMock()
+            mock_a.fetch = AsyncMock(return_value=[raw])
+            mock_af.return_value = mock_a
+            await _execute_run(db_session, source.id)
+
+        posting = (
+            await db_session.execute(select(Posting).where(Posting.source_ref == "job-1"))
+        ).scalar_one()
+        await db_session.refresh(posting)
+        assert posting.term == "Fall 2027"
+        assert posting.season == "fall"
+        assert posting.duration_months == (4 if raw is first else 8)
+
+
+@pytest.mark.asyncio
+async def test_length_stays_unknown_when_the_job_does_not_say(db_session: AsyncSession):
+    source = await _create_source(db_session)
+    raw = RawPosting(
+        title="Analyst", company="Maple", city="Toronto", term="", description="A role.",
+        source_ref="job-2", skills=["Excel"], work_mode="onsite",
+    )
+    with patch("app.ingest.runner.adapter_for") as mock_af:
+        mock_a = AsyncMock()
+        mock_a.fetch = AsyncMock(return_value=[raw])
+        mock_af.return_value = mock_a
+        await _execute_run(db_session, source.id)
+
+    posting = (
+        await db_session.execute(select(Posting).where(Posting.source_ref == "job-2"))
+    ).scalar_one()
+    assert posting.duration_months is None
+    assert posting.term == "Open"

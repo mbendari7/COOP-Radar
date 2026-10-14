@@ -13,7 +13,7 @@ export interface paths {
         };
         /**
          * Get Sources
-         * @description List all ingest sources with their latest run stats.
+         * @description List every source with how its last run went.
          */
         get: operations["get_sources_api_admin_sources_get"];
         put?: never;
@@ -39,7 +39,7 @@ export interface paths {
         head?: never;
         /**
          * Patch Source Endpoint
-         * @description Enable, disable, or un-pause a source.
+         * @description Turn a source on or off, or unpause it.
          */
         patch: operations["patch_source_endpoint_api_admin_sources__source_id__patch"];
         trace?: never;
@@ -55,7 +55,7 @@ export interface paths {
         put?: never;
         /**
          * Trigger Source Run
-         * @description Trigger an immediate run for a source (409 if one is already running).
+         * @description Run a source right now. Answers 409 if it is already running.
          */
         post: operations["trigger_source_run_api_admin_sources__source_id__run_post"];
         delete?: never;
@@ -73,7 +73,7 @@ export interface paths {
         };
         /**
          * Get Source Runs
-         * @description Paginated run history for a source.
+         * @description Run history for one source, a page at a time.
          */
         get: operations["get_source_runs_api_admin_sources__source_id__runs_get"];
         put?: never;
@@ -95,7 +95,7 @@ export interface paths {
         put?: never;
         /**
          * Check Key
-         * @description Verify the key with its provider. 400 AI_KEY_INVALID if rejected; 429 when over the limit.
+         * @description Ask the provider if the key works. 400 AI_KEY_INVALID if not and 429 when over the limit.
          */
         post: operations["check_key_api_ai_check_post"];
         delete?: never;
@@ -115,8 +115,8 @@ export interface paths {
         put?: never;
         /**
          * Demo Login
-         * @description "Try the demo": create a private, pre-filled demo account and log into it.
-         *     Returns 404 DEMO_DISABLED when DEMO_ENABLED=false; 429 after 10 per IP per hour.
+         * @description Try the demo makes a private demo account with sample data and signs into it.
+         *     Answers 404 DEMO_DISABLED when DEMO_ENABLED is false and 429 after 10 per IP an hour.
          */
         post: operations["demo_login_api_auth_demo_post"];
         delete?: never;
@@ -136,8 +136,8 @@ export interface paths {
         put?: never;
         /**
          * Guest Login
-         * @description Start using CoopRadar without signing up: an empty temporary account (kept 7 days).
-         *     Save it permanently later with POST /api/me/claim.
+         * @description Use CoopRadar without signing up. Makes an empty temporary account that lasts 7 days.
+         *     You can keep it for good later with POST /api/me/claim.
          */
         post: operations["guest_login_api_auth_guest_post"];
         delete?: never;
@@ -157,8 +157,8 @@ export interface paths {
         put?: never;
         /**
          * Login
-         * @description Authenticate and start a session.
-         *     Returns 401 with the same message for unknown email or wrong password (FR-014).
+         * @description Check the email and password and sign in.
+         *     Wrong email and wrong password get the exact same 401 message on purpose.
          */
         post: operations["login_api_auth_login_post"];
         delete?: never;
@@ -178,7 +178,7 @@ export interface paths {
         put?: never;
         /**
          * Logout
-         * @description Invalidate the session immediately and clear the browser cookie.
+         * @description End the session right away and clear the cookie.
          */
         post: operations["logout_api_auth_logout_post"];
         delete?: never;
@@ -198,8 +198,8 @@ export interface paths {
         put?: never;
         /**
          * Register
-         * @description Create a new account and start a session.
-         *     Returns 409 if the email is already registered.
+         * @description Make a new account and sign in.
+         *     Answers 409 if the email is already taken.
          */
         post: operations["register_api_auth_register_post"];
         delete?: never;
@@ -217,7 +217,7 @@ export interface paths {
         };
         /**
          * Public Config
-         * @description Feature flags for the UI. Never includes secrets — only whether features are on.
+         * @description Feature switches for the site. Never any secrets, just whether things are on.
          */
         get: operations["public_config_api_config_get"];
         put?: never;
@@ -237,7 +237,7 @@ export interface paths {
         };
         /**
          * Health
-         * @description Liveness probe used by the host and CI — no database calls.
+         * @description Health check for the host and CI. It never touches the database.
          */
         get: operations["health_api_health_get"];
         put?: never;
@@ -257,15 +257,15 @@ export interface paths {
         };
         /**
          * Get Me
-         * @description Return the currently authenticated user's profile.
+         * @description Give back the signed in person's profile.
          */
         get: operations["get_me_api_me_get"];
         put?: never;
         post?: never;
         /**
          * Delete Account
-         * @description Permanently delete the account and all associated data (saved postings, statuses).
-         *     CASCADE delete in the DB handles the cascade.  Returns 401 if password is wrong.
+         * @description Delete the account and everything tied to it for good, like saved jobs and statuses.
+         *     The database cascade does the cleanup. Answers 401 if the password is wrong.
          */
         delete: operations["delete_account_api_me_delete"];
         options?: never;
@@ -284,8 +284,8 @@ export interface paths {
         put?: never;
         /**
          * Claim
-         * @description Keep a temporary (guest/demo) account: add an email + password. All saved jobs, the resume,
-         *     and matches stay. 400 ALREADY_CLAIMED for normal accounts, 409 EMAIL_TAKEN if in use.
+         * @description Keep a temporary or demo account by adding an email and password. Saved jobs, the resume
+         *     and matches all stay. 400 ALREADY_CLAIMED for normal accounts and 409 EMAIL_TAKEN if in use.
          */
         post: operations["claim_api_me_claim_post"];
         delete?: never;
@@ -309,8 +309,8 @@ export interface paths {
         head?: never;
         /**
          * Change Password
-         * @description Change the user's password.
-         *     Returns 401 if current_password is wrong, 422 if new_password < 10 chars.
+         * @description Change your password.
+         *     Answers 401 if the current password is wrong and 422 if the new one is under 10 characters.
          */
         patch: operations["change_password_api_me_password_patch"];
         trace?: never;
@@ -324,16 +324,16 @@ export interface paths {
         };
         /**
          * Get Postings
-         * @description List postings with optional keyword/semantic search, filters, sort, and pagination.
-         *     FastAPI validates every query param against PostingListParams, so an unknown
-         *     sort column or page size is a 422 before the service runs.
-         *     Authenticated users also get is_saved on each item.
+         * @description List jobs with search, filters, sorting and pages.
+         *     FastAPI checks every query param against PostingListParams so a sort column or
+         *     page size we do not allow is a 422 before the service even runs.
+         *     Signed in people also get is_saved on each job.
          */
         get: operations["get_postings_api_postings_get"];
         put?: never;
         /**
          * Create Manual Posting
-         * @description Add a single posting manually. Returns 409 if a duplicate already exists.
+         * @description Add one job by hand. Answers 409 if it is already there.
          */
         post: operations["create_manual_posting_api_postings_post"];
         delete?: never;
@@ -351,8 +351,8 @@ export interface paths {
         };
         /**
          * Postings Filter Meta
-         * @description Return distinct values for filter dropdowns (cities, provinces, terms, skills).
-         *     Cached by the frontend for 5 minutes — values change only when new postings arrive.
+         * @description The choices for the filter menus like cities, provinces, terms and skills.
+         *     The site caches this for 5 minutes since it only changes when new jobs come in.
          */
         get: operations["postings_filter_meta_api_postings_meta_filters_get"];
         put?: never;
@@ -374,8 +374,8 @@ export interface paths {
         put?: never;
         /**
          * Upload Csv Endpoint
-         * @description Bulk-import postings from a CSV file.
-         *     Rate-limited to 3 uploads per user per hour.
+         * @description Import a bunch of jobs from a CSV file.
+         *     Limited to 3 uploads per person per hour.
          */
         post: operations["upload_csv_endpoint_api_postings_upload_post"];
         delete?: never;
@@ -393,7 +393,7 @@ export interface paths {
         };
         /**
          * Get Posting Detail
-         * @description Full detail for a single posting. Returns 404 if the ID doesn't exist.
+         * @description Everything about one job. Answers 404 if the id is not there.
          */
         get: operations["get_posting_detail_api_postings__posting_id__get"];
         put?: never;
@@ -413,7 +413,7 @@ export interface paths {
         };
         /**
          * Get Similar Postings
-         * @description Return up to 5 postings most similar by embedding cosine similarity.
+         * @description Up to 5 jobs that are most alike by embedding.
          */
         get: operations["get_similar_postings_api_postings__posting_id__similar_get"];
         put?: never;
@@ -433,24 +433,45 @@ export interface paths {
         };
         /**
          * Get Resume Endpoint
-         * @description Return stored resume metadata for the authenticated user.
+         * @description Details about the saved resume for the signed in person.
          */
         get: operations["get_resume_endpoint_api_resume_get"];
         put?: never;
         /**
          * Upload Resume Endpoint
-         * @description Upload a resume (PDF/DOCX, ≤5 MB), extract text, run match pipeline,
-         *     store results, and return ranked matches. With the visitor's AI key (X-AI-* headers) the
-         *     AI ranks and explains matches; without any key, matches are ranked by skill overlap for
-         *     free. Only the site owner's fallback key counts toward the daily AI limit.
-         *     `preferences` (optional) is a JobPreferences JSON object: what the student is looking for.
+         * @description Upload a resume as PDF or DOCX up to 5 MB, read the text, match it and save
+         *     and return the ranked matches. With the visitor's own AI key the AI ranks and
+         *     explains the matches. With no key at all we rank by skill overlap for free.
+         *     Only the owner's backup key counts toward the daily AI limit.
+         *     `preferences` is optional JSON for what the student is looking for.
          */
         post: operations["upload_resume_endpoint_api_resume_post"];
         /**
          * Delete Resume Endpoint
-         * @description Permanently delete the resume and all match results.
+         * @description Delete the resume and every match for good.
          */
         delete: operations["delete_resume_endpoint_api_resume_delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/resume/align/{posting_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Align Endpoint
+         * @description How to make the saved resume fit one job. Skills and words it has or lacks, plain checks
+         *     and the edits to make. No AI, so it is free and instant. 404 with no resume or job.
+         */
+        get: operations["align_endpoint_api_resume_align__posting_id__get"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -465,13 +486,13 @@ export interface paths {
         };
         /**
          * Resume Insights
-         * @description Skills found + in-demand skills you're missing (free), plus the cached AI review if any.
+         * @description Skills we found and popular skills you are missing for free, plus the saved AI review.
          */
         get: operations["resume_insights_api_resume_insights_get"];
         put?: never;
         /**
          * Generate Resume Insights
-         * @description Run the AI resume review on the visitor's key (strengths, tips, roles) and cache it.
+         * @description Run the AI resume review on the visitor's key and save it.
          */
         post: operations["generate_resume_insights_api_resume_insights_post"];
         delete?: never;
@@ -489,7 +510,7 @@ export interface paths {
         };
         /**
          * Get Matches Endpoint
-         * @description Return stored ranked match results. Empty list if no resume on file.
+         * @description Saved ranked matches. An empty list if there is no resume yet.
          */
         get: operations["get_matches_endpoint_api_resume_matches_get"];
         put?: never;
@@ -511,8 +532,8 @@ export interface paths {
         put?: never;
         /**
          * Ask About Posting
-         * @description Stream a cited Q&A response about a matched posting.
-         *     Response is text/event-stream with delta chunks ending in [DONE].
+         * @description Stream an answer with sources about one matched job.
+         *     It is a text/event-stream of small pieces that ends with [DONE].
          */
         post: operations["ask_about_posting_api_resume_matches__posting_id__ask_post"];
         delete?: never;
@@ -531,9 +552,9 @@ export interface paths {
         get?: never;
         /**
          * Update Preferences Endpoint
-         * @description Save what the student is looking for (job types, location, work mode, level, keywords)
-         *     and re-match the stored resume against it. Uses the visitor's own AI key if they set one;
-         *     otherwise the free ranking, so changing filters never spends the site owner's AI quota.
+         * @description Save what the student wants like job type, place, work mode, level and keywords
+         *     and match the saved resume again. Uses their own AI key if they set one
+         *     and the free ranking if not, so changing filters never spends the owner's AI quota.
          */
         put: operations["update_preferences_endpoint_api_resume_preferences_put"];
         post?: never;
@@ -554,7 +575,7 @@ export interface paths {
         put?: never;
         /**
          * Rematch Endpoint
-         * @description Re-rank the stored resume against today's postings with the visitor's AI.
+         * @description Rank the saved resume against today's jobs again with the visitor's AI.
          */
         post: operations["rematch_endpoint_api_resume_rematch_post"];
         delete?: never;
@@ -572,15 +593,15 @@ export interface paths {
         };
         /**
          * List Saved
-         * @description Return the current user's saved postings with status counts, deadlines, and stats.
-         *     Optionally filter by status.  Ordered by most recently saved.
+         * @description Your saved jobs plus status counts, deadlines and stats.
+         *     You can filter by status. Newest saves come first.
          */
         get: operations["list_saved_api_saved_get"];
         put?: never;
         /**
          * Save Posting
-         * @description Bookmark a posting.  Idempotent — returns 201 on first save, 200 if already saved.
-         *     Returns 404 if the posting_id doesn't exist.
+         * @description Save a job. Safe to repeat. Answers 201 the first time and 200 after that.
+         *     Answers 404 if the job does not exist.
          */
         post: operations["save_posting_api_saved_post"];
         delete?: never;
@@ -598,8 +619,8 @@ export interface paths {
         };
         /**
          * Export Csv
-         * @description Download the current user's full tracker as a CSV file.
-         *     Generated server-side with pandas; streamed directly to the browser.
+         * @description Download your whole tracker as a CSV file.
+         *     Built on the server with pandas and sent straight to the browser.
          */
         get: operations["export_csv_api_saved_export_csv_get"];
         put?: never;
@@ -622,7 +643,7 @@ export interface paths {
         post?: never;
         /**
          * Unsave Posting
-         * @description Remove a saved posting. Returns 404 if not found or owned by another user.
+         * @description Unsave a job. Answers 404 if it is not there or belongs to someone else.
          */
         delete: operations["unsave_posting_api_saved__saved_posting_id__delete"];
         options?: never;
@@ -641,8 +662,8 @@ export interface paths {
         put?: never;
         /**
          * Add Event
-         * @description Manually add a status event (e.g. note an interview date retroactively).
-         *     Also updates the current status on the saved posting.
+         * @description Add a status event by hand, like noting an interview date after the fact.
+         *     This also changes the current status on the saved job.
          */
         post: operations["add_event_api_saved__saved_posting_id__events_post"];
         delete?: never;
@@ -666,8 +687,8 @@ export interface paths {
         head?: never;
         /**
          * Update Status
-         * @description Update the application status on a saved posting and record the change as an event.
-         *     Pass null status to clear. Returns 404 if not found or owned by another user.
+         * @description Change the application status on a saved job and log the change.
+         *     Send null to clear it. Answers 404 if it is not there or belongs to someone else.
          */
         patch: operations["update_status_api_saved__saved_posting_id__status_patch"];
         trace?: never;
@@ -678,7 +699,7 @@ export interface components {
     schemas: {
         /**
          * AIInsights
-         * @description The AI's resume review (generated with the visitor's own key, cached on the resume).
+         * @description The AI resume review, made with the visitor's own key and saved on the resume.
          */
         AIInsights: {
             /**
@@ -714,7 +735,7 @@ export interface components {
         };
         /**
          * AIKeyCheckIn
-         * @description A visitor's provider + key to verify. The key is used once and never stored.
+         * @description A visitor's provider and key to check. The key is used once and never saved.
          */
         AIKeyCheckIn: {
             /** Api Key */
@@ -727,7 +748,7 @@ export interface components {
         };
         /**
          * AIKeyCheckOut
-         * @description The chat models this key can use, plus the one we suggest pre-selecting.
+         * @description The chat models this key can use plus the one we suggest picking.
          */
         AIKeyCheckOut: {
             /** Models */
@@ -748,8 +769,18 @@ export interface components {
             label: string;
         };
         /**
+         * AlignCheck
+         * @description One yes or no check, like "Your program is one it asks for".
+         */
+        AlignCheck: {
+            /** Ok */
+            ok: boolean;
+            /** Text */
+            text: string;
+        };
+        /**
          * ApplicationEventOut
-         * @description A single entry in a saved posting's status-change history.
+         * @description One entry in a saved job's status history.
          */
         ApplicationEventOut: {
             /**
@@ -770,17 +801,17 @@ export interface components {
         };
         /**
          * ApplicationStatus
-         * @description Seven stages of a co-op application lifecycle.
-         *     str mixin lets FastAPI serialise these as plain strings automatically.
-         *     NULL in the database means "no status set" — distinct from any value here.
+         * @description The stages a co-op application goes through.
+         *     The str mixin lets FastAPI send these as plain strings.
+         *     NULL in the database means no status yet, which is not the same as any value here.
          * @enum {string}
          */
         ApplicationStatus: "saved" | "applying" | "applied" | "interview" | "offer" | "rejected" | "withdrawn";
         /**
          * AskRequest
-         * @description mode "question": answer `question` with citations (question required)
-         *     mode "tailor":   how to tailor this resume for the posting (question optional)
-         *     mode "cover_letter": a short cover-letter opening for the posting (question optional)
+         * @description mode "question"      answers `question` with sources and needs a question
+         *     mode "tailor"        says how to tailor this resume for the job
+         *     mode "cover_letter"  writes a short cover letter opening for the job
          */
         AskRequest: {
             /**
@@ -809,7 +840,7 @@ export interface components {
         };
         /**
          * CategoryCount
-         * @description A job type for the filter list, with how many open postings it has.
+         * @description A job type for the filter list with how many open jobs it has.
          */
         CategoryCount: {
             /** Count */
@@ -818,13 +849,13 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer";
+            key: "software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades";
             /** Label */
             label: string;
         };
         /**
          * ChangePasswordIn
-         * @description Password change payload — new password must meet the same rules as registration.
+         * @description Change password body. The new one follows the same rules as sign up.
          */
         ChangePasswordIn: {
             /** Current Password */
@@ -846,7 +877,7 @@ export interface components {
         };
         /**
          * CsvUploadResult
-         * @description Response from POST /api/postings/upload.
+         * @description What POST /api/postings/upload sends back.
          */
         CsvUploadResult: {
             /** Added */
@@ -861,7 +892,7 @@ export interface components {
         };
         /**
          * DeleteAccountIn
-         * @description Account deletion — requires password confirmation to prevent accidental deletion.
+         * @description Delete account body. Asks for the password so nobody deletes by accident.
          */
         DeleteAccountIn: {
             /** Password */
@@ -869,7 +900,7 @@ export interface components {
         };
         /**
          * DemandSkill
-         * @description A skill employers ask for, and how many open postings ask for it.
+         * @description A skill employers ask for and how many open jobs ask for it.
          */
         DemandSkill: {
             /** Postings */
@@ -879,7 +910,7 @@ export interface components {
         };
         /**
          * DetectedEducation
-         * @description What was read from the resume's education section (blank when not found).
+         * @description What we read from the education part of the resume. Blank when we could not find it.
          */
         DetectedEducation: {
             /**
@@ -894,16 +925,23 @@ export interface components {
              * Program
              * @default
              */
-            program: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science") | "";
+            program: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology") | "";
             /**
              * Program Label
              * @default
              */
             program_label: string;
         };
+        /** DurationCount */
+        DurationCount: {
+            /** Count */
+            count: number;
+            /** Months */
+            months: number;
+        };
         /**
          * EventCreateIn
-         * @description Body for POST /api/saved/{id}/events — record a status change with optional note.
+         * @description Body for POST /api/saved/{id}/events. Logs a status change with an optional note.
          */
         EventCreateIn: {
             /** Event Date */
@@ -914,9 +952,9 @@ export interface components {
         };
         /**
          * FilterMeta
-         * @description Distinct values available for each filter dropdown.
-         *     Populated from the postings table so the frontend never shows a city
-         *     that has zero postings.
+         * @description The choices for each filter menu.
+         *     They come from the jobs table so the site never offers a city
+         *     that has no jobs.
          */
         FilterMeta: {
             /**
@@ -937,6 +975,11 @@ export interface components {
              */
             countries: components["schemas"]["CountryCount"][];
             /**
+             * Durations
+             * @default []
+             */
+            durations: components["schemas"]["DurationCount"][];
+            /**
              * Open Jobs
              * @default 0
              */
@@ -948,6 +991,11 @@ export interface components {
             programs: components["schemas"]["ProgramOption"][];
             /** Provinces */
             provinces: string[];
+            /**
+             * Seasons
+             * @default []
+             */
+            seasons: components["schemas"]["SeasonCount"][];
             /** Skills */
             skills: string[];
             /** Terms */
@@ -965,7 +1013,7 @@ export interface components {
         };
         /**
          * IngestRunOut
-         * @description Public representation of an IngestRun.
+         * @description One import run as we send it out.
          */
         IngestRunOut: {
             /** Added */
@@ -995,7 +1043,7 @@ export interface components {
         };
         /**
          * IngestSourceOut
-         * @description Public representation of an IngestSource.
+         * @description An import source as we send it out.
          */
         IngestSourceOut: {
             /** Adapter Type */
@@ -1026,15 +1074,15 @@ export interface components {
         };
         /**
          * JobPreferences
-         * @description What the student is looking for, set before or after uploading. Matching only considers
-         *     open postings that fit these; keywords (e.g. "data analyst") rank fitting postings higher.
+         * @description What the student is looking for, set before or after uploading. Matching only looks at
+         *     open jobs that fit these. Keywords like "data analyst" push fitting jobs higher.
          */
         JobPreferences: {
             /**
              * Categories
              * @default []
              */
-            categories: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer")[];
+            categories: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades")[];
             /**
              * City
              * @default
@@ -1053,6 +1101,11 @@ export interface components {
              * @enum {string}
              */
             degree: "" | "diploma" | "bachelors" | "masters" | "phd";
+            /**
+             * Durations
+             * @default []
+             */
+            durations: (4 | 8 | 12 | 16)[];
             /** Grad Year */
             grad_year?: number | null;
             /**
@@ -1070,7 +1123,7 @@ export interface components {
              * Program
              * @default
              */
-            program: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science") | "";
+            program: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology") | "";
             /**
              * Province
              * @default
@@ -1089,7 +1142,7 @@ export interface components {
         };
         /**
          * LoginIn
-         * @description Login payload — password has no min length here (wrong pw → 401, not 422).
+         * @description Sign in body. No length rule here so a wrong password gets 401 and not 422.
          */
         LoginIn: {
             /**
@@ -1102,7 +1155,7 @@ export interface components {
         };
         /**
          * ManualPostingIn
-         * @description Schema for manually submitted postings via POST /api/postings.
+         * @description A job someone adds by hand through POST /api/postings.
          */
         ManualPostingIn: {
             /** City */
@@ -1146,6 +1199,8 @@ export interface components {
             country: string;
             /** Deadline */
             deadline: string;
+            /** Duration Months */
+            duration_months?: number | null;
             /**
              * Fit Notes
              * @default []
@@ -1203,7 +1258,7 @@ export interface components {
         };
         /**
          * PostingDetail
-         * @description Full posting detail — includes description for the detail page.
+         * @description Everything about one job, description included.
          */
         PostingDetail: {
             /** City */
@@ -1225,7 +1280,7 @@ export interface components {
             /** Description */
             description: string;
             /** Duration Months */
-            duration_months: number;
+            duration_months?: number | null;
             /**
              * Fields Of Study
              * @default []
@@ -1259,6 +1314,8 @@ export interface components {
              * @enum {string}
              */
             readonly role: "coop" | "internship" | "new_grad" | "job";
+            /** Season */
+            season?: ("winter" | "spring" | "summer" | "fall") | null;
             /** Skills */
             skills: string[];
             /** Source Id */
@@ -1267,14 +1324,16 @@ export interface components {
             source_url: string | null;
             /** Term */
             term: string;
+            /** Term Start */
+            term_start?: string | null;
             /** Title */
             title: string;
             work_mode: components["schemas"]["WorkMode"];
         };
         /**
          * PostingListItem
-         * @description One row in the postings table.
-         *     Omits description to keep list payloads small (see contracts/api.md note).
+         * @description One job in the list.
+         *     Leaves out the description to keep lists small.
          */
         PostingListItem: {
             /** City */
@@ -1294,7 +1353,7 @@ export interface components {
              */
             deadline: string;
             /** Duration Months */
-            duration_months: number;
+            duration_months?: number | null;
             /**
              * Fields Of Study
              * @default []
@@ -1324,6 +1383,8 @@ export interface components {
              * @enum {string}
              */
             readonly role: "coop" | "internship" | "new_grad" | "job";
+            /** Season */
+            season?: ("winter" | "spring" | "summer" | "fall") | null;
             /** Skills */
             skills: string[];
             /** Source Id */
@@ -1332,6 +1393,8 @@ export interface components {
             source_url: string | null;
             /** Term */
             term: string;
+            /** Term Start */
+            term_start?: string | null;
             /** Title */
             title: string;
             work_mode: components["schemas"]["WorkMode"];
@@ -1342,13 +1405,13 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science";
+            key: "computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology";
             /** Label */
             label: string;
         };
         /**
          * PublicConfig
-         * @description What the UI should show. Never includes secrets — only which features are on.
+         * @description What the site should show. Never any secrets, just which features are on.
          */
         PublicConfig: {
             /** Ai Daily Limit */
@@ -1362,7 +1425,7 @@ export interface components {
         };
         /**
          * RegisterIn
-         * @description Registration payload — email must be valid format, password ≥ 10 chars.
+         * @description Sign up body. The email has to look real and the password needs 10 or more characters.
          */
         RegisterIn: {
             /**
@@ -1374,8 +1437,53 @@ export interface components {
             password: string;
         };
         /**
+         * ResumeAlignment
+         * @description How to make the saved resume fit one job. Free and with no AI.
+         */
+        ResumeAlignment: {
+            /**
+             * Checks
+             * @default []
+             */
+            checks: components["schemas"]["AlignCheck"][];
+            /** Company */
+            company: string;
+            /**
+             * Keywords Found
+             * @default []
+             */
+            keywords_found: string[];
+            /**
+             * Keywords Missing
+             * @default []
+             */
+            keywords_missing: string[];
+            /**
+             * Matched Skills
+             * @default []
+             */
+            matched_skills: string[];
+            /**
+             * Missing Skills
+             * @default []
+             */
+            missing_skills: string[];
+            /**
+             * Posting Id
+             * Format: uuid
+             */
+            posting_id: string;
+            /**
+             * Tips
+             * @default []
+             */
+            tips: string[];
+            /** Title */
+            title: string;
+        };
+        /**
          * ResumeInsights
-         * @description Free insights (always present) plus the AI review (None until requested).
+         * @description Free insights that are always there plus the AI review, which is None until asked for.
          */
         ResumeInsights: {
             ai?: components["schemas"]["AIInsights"] | null;
@@ -1403,7 +1511,7 @@ export interface components {
         };
         /**
          * RowError
-         * @description A single per-row validation error from a CSV upload.
+         * @description One problem with one row of a CSV upload.
          */
         RowError: {
             /** Column */
@@ -1415,7 +1523,7 @@ export interface components {
         };
         /**
          * RunsPage
-         * @description Paginated list of IngestRun objects.
+         * @description A page of import runs.
          */
         RunsPage: {
             /** Items */
@@ -1429,7 +1537,7 @@ export interface components {
         };
         /**
          * SaveIn
-         * @description Body for POST /api/saved — just the posting ID to bookmark.
+         * @description Body for POST /api/saved. Just the id of the job to save.
          */
         SaveIn: {
             /**
@@ -1440,8 +1548,8 @@ export interface components {
         };
         /**
          * SavedPostingOut
-         * @description A saved posting record with the full posting embedded.
-         *     Returned by GET /api/saved items and POST/PATCH operations.
+         * @description A saved job with the whole posting inside it.
+         *     GET /api/saved items and the POST and PATCH calls send this back.
          */
         SavedPostingOut: {
             /**
@@ -1466,7 +1574,7 @@ export interface components {
         };
         /**
          * SavedPostingsPage
-         * @description Paginated list of saved postings with per-status counts.
+         * @description A page of saved jobs with a count for each status.
          */
         SavedPostingsPage: {
             /** Deadlines This Week */
@@ -1492,9 +1600,19 @@ export interface components {
             /** Total Offer */
             total_offer: number;
         };
+        /** SeasonCount */
+        SeasonCount: {
+            /** Count */
+            count: number;
+            /**
+             * Key
+             * @enum {string}
+             */
+            key: "winter" | "spring" | "summer" | "fall";
+        };
         /**
          * SimilarPostingOut
-         * @description One item in the similar postings response.
+         * @description One job in the similar jobs list.
          */
         SimilarPostingOut: {
             /** City */
@@ -1520,7 +1638,7 @@ export interface components {
         };
         /**
          * SimilarPostingsResponse
-         * @description Response from GET /api/postings/{id}/similar.
+         * @description What GET /api/postings/{id}/similar sends back.
          */
         SimilarPostingsResponse: {
             /** Items */
@@ -1528,7 +1646,7 @@ export interface components {
         };
         /**
          * SourcePatchIn
-         * @description Fields that can be patched on an IngestSource (all optional).
+         * @description What you can change on a source. Everything is optional.
          */
         SourcePatchIn: {
             /** Auto Paused */
@@ -1538,7 +1656,7 @@ export interface components {
         };
         /**
          * StatusUpdateIn
-         * @description Body for PATCH /api/saved/{id}/status — pass null to clear the status.
+         * @description Body for PATCH /api/saved/{id}/status. Send null to clear the status.
          */
         StatusUpdateIn: {
             /** Event Date */
@@ -1549,7 +1667,7 @@ export interface components {
         };
         /**
          * TriggerRunOut
-         * @description Response from POST /api/admin/sources/{id}/run.
+         * @description What POST /api/admin/sources/{id}/run sends back.
          */
         TriggerRunOut: {
             /** Message */
@@ -1570,7 +1688,7 @@ export interface components {
         };
         /**
          * UserOut
-         * @description Public user representation — never includes hashed_password.
+         * @description The user we send back. Never has hashed_password in it.
          */
         UserOut: {
             /**
@@ -1611,9 +1729,9 @@ export interface components {
         };
         /**
          * WorkMode
-         * @description Stored as a PostgreSQL ENUM type (work_mode_enum) so the DB enforces
-         *     valid values without needing an application-layer check.
-         *     str mixin means FastAPI can serialise it as a plain string.
+         * @description Saved as a Postgres ENUM called work_mode_enum so the database
+         *     itself rejects bad values.
+         *     The str mixin lets FastAPI send it as a plain string.
          * @enum {string}
          */
         WorkMode: "onsite" | "hybrid" | "remote";
@@ -2142,21 +2260,22 @@ export interface operations {
                 city?: string | null;
                 province?: string | null;
                 term?: string | null;
+                season?: ("winter" | "spring" | "summer" | "fall")[] | null;
                 work_mode?: components["schemas"]["WorkMode"] | null;
                 duration?: number[] | null;
                 skills?: string[] | null;
-                category?: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer")[] | null;
+                category?: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades")[] | null;
                 company?: string[] | null;
                 posted_within?: number | null;
                 country?: ("CA" | "US")[] | null;
-                program?: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science") | null;
+                program?: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology") | null;
                 grad_year?: number | null;
                 show_expired?: boolean;
                 show_closed?: boolean;
                 students_only?: boolean;
                 hide_senior?: boolean;
                 search_mode?: "keyword" | "semantic";
-                sort?: "posted_at" | "deadline" | "company" | "title";
+                sort?: "posted_at" | "deadline" | "company" | "title" | "duration_months" | "term_start";
                 order?: "asc" | "desc";
                 page?: number;
                 page_size?: number;
@@ -2430,6 +2549,39 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    align_endpoint_api_resume_align__posting_id__get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                posting_id: string;
+            };
+            cookie?: {
+                session?: string | null;
+            };
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ResumeAlignment"];
+                };
             };
             /** @description Validation Error */
             422: {

@@ -48,10 +48,8 @@ typography:
     lineHeight: 1.625
   label:
     fontFamily: "Archivo, ui-sans-serif, system-ui, sans-serif"
-    fontSize: "11px"
-    fontWeight: 700
-    letterSpacing: "0.08em"
-    fontVariation: "'wdth' 78"
+    fontSize: "13px"
+    fontWeight: 600
   wordmark:
     fontFamily: "Archivo, ui-sans-serif, system-ui, sans-serif"
     fontSize: "22px"
@@ -147,7 +145,17 @@ components:
 
 ## Overview
 
-**Creative North Star: "Registered Mail"**
+**Creative North Star: "Registered Mail", toned down for reading (2026-10-13)**
+
+The user asked for the theme to stay but be easier to read. So: labels are plain 13px sentence case instead of tiny
+narrow capitals, page titles are wider (94%) and bold instead of extra bold, section rules are thin grey lines instead
+of 1.5px ink, list rows are 17px titles with 15px lines, and the postmark lives on the job details only, not on every
+row. Rows now lead with the term and length ("Summer 2027 · 4 months") with a small season dot: Winter sky, Spring
+emerald, Summer amber, Fall dark orange. These dots are the only new colours and they are never used for actions,
+links or selection, so the Two Stamps Rule still holds. Where the text below says uppercase labels, 1.5px ink
+section rules or a postmark on every row, this paragraph wins.
+
+**Original direction:**
 
 Every application is a letter you send and every job wears a postmark. The site looks like a Canadian post office counter. A postal red bar runs across the top. Airmail blue marks links, fit notes and anything you picked. The ground is plain white letter paper, and the filter strip and picked rows take the pale blue grey of an envelope security tint. Headings and form labels are set in narrow capitals like the print on a customs slip.
 
@@ -297,5 +305,5 @@ A 10px bar drawn to scale from the posted day to the deadline. The part already 
 
 ## Open Items
 
-- The postmark shows the posted day, so when many jobs import on the same day the list repeats the same date. A better mark for those rows is still open.
+- Closed 2026-10-13: list rows no longer carry a postmark, so the repeated date problem is gone. The postmark stays on the job details.
 - Archivo loads from Google Fonts. Self hosting the font is still to do.

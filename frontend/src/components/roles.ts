@@ -27,4 +27,9 @@ export const FIELD_LABELS: Record<string, string> = {
   design: 'Design',
   it: 'IT / Information Systems',
   science: 'Science',
+  health: 'Health Sciences / Nursing',
+  social: 'Social Sciences / Humanities',
+  environment: 'Environment / Geography',
+  education: 'Education',
+  trades: 'Technology / Skilled Trades',
 }

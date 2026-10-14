@@ -82,7 +82,7 @@ function BoardColumn({
       ref={setNodeRef}
       className={`flex min-h-[260px] flex-col border-r border-gray-200 px-2 last:border-r-0 ${isOver ? 'bg-air-50' : ''}`}
     >
-      <div className="flex flex-col items-center border-b-[1.5px] border-gray-900 pb-3 pt-1">
+      <div className="flex flex-col items-center border-b border-gray-300 pb-3 pt-1">
         <h3 className="sr-only">{STATUS_LABELS[status]}</h3>
         <StageStamp status={status} count={cards.length} />
       </div>
@@ -158,7 +158,7 @@ export default function TrackerBoard({ items }: Props) {
       onDragEnd={handleDragEnd}
     >
       <div className="overflow-x-auto pb-4" role="region" aria-label="Application tracker board">
-        <div className="grid min-w-[1000px] grid-cols-7 border-t-[1.5px] border-gray-900 pt-4">
+        <div className="grid min-w-[1000px] grid-cols-7 border-t border-gray-300 pt-4">
           {ALL_STATUSES.map((col) => (
             <BoardColumn key={col} status={col} cards={byStatus[col]} />
           ))}

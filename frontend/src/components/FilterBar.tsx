@@ -18,6 +18,7 @@ import {
   type CountryChoice, type Filters,
 } from './filters'
 import { XIcon } from './Icons'
+import { SEASONS, SEASON_DOT, seasonLabel } from './terms'
 
 interface Props {
   filters: Filters
@@ -33,6 +34,8 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
   )
   const countryCount = (code: string) => meta?.countries?.find((c) => c.code === code)?.count
   const modeCount = (key: string) => meta?.work_modes?.find((m) => m.key === key)?.count
+  const seasonCount = (key: string) => meta?.seasons?.find((s) => s.key === key)?.count
+  const durationCount = (months: number) => meta?.durations?.find((d) => d.months === months)?.count
   // Provinces for Canada, states for the US and both for Canada and US
   const regions = (meta?.provinces ?? []).filter((p) =>
     filters.country === 'all' ? true : filters.country === 'US' ? !isProvince(p) : isProvince(p),
@@ -159,38 +162,69 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
       </Section>
 
       <Section title="Term and length">
-        <div className="space-y-3">
+        <div className="space-y-4">
+          <fieldset>
+            <legend className="label-form mb-1.5">Season</legend>
+            <ul className="space-y-1.5">
+              {SEASONS.map((s) => (
+                <li key={s.value}>
+                  <label className="flex cursor-pointer items-center gap-2.5 text-sm text-gray-800">
+                    <input
+                      type="checkbox"
+                      className="h-4 w-4"
+                      checked={filters.season.includes(s.value)}
+                      onChange={(e) =>
+                        onChange({
+                          season: e.target.checked
+                            ? [...filters.season, s.value]
+                            : filters.season.filter((x) => x !== s.value),
+                        })
+                      }
+                    />
+                    <span className={`h-2 w-2 shrink-0 rounded-full ${SEASON_DOT[s.value]}`} aria-hidden="true" />
+                    <span className="flex-1">
+                      {s.label} <span className="text-gray-600">({s.months})</span>
+                    </span>
+                    <Count n={seasonCount(s.value)} />
+                  </label>
+                </li>
+              ))}
+            </ul>
+          </fieldset>
+          <fieldset>
+            <legend className="label-form mb-1.5">Length</legend>
+            <div className="flex flex-wrap gap-2">
+              {DURATIONS.map((d) => (
+                <Pill
+                  key={d}
+                  on={filters.duration.includes(d)}
+                  count={durationCount(d)}
+                  onClick={() =>
+                    onChange({
+                      duration: filters.duration.includes(d)
+                        ? filters.duration.filter((x) => x !== d)
+                        : [...filters.duration, d],
+                    })
+                  }
+                >
+                  {d} months
+                </Pill>
+              ))}
+            </div>
+          </fieldset>
           <Select
             id="filter-term"
-            label="Term"
+            label="Exact term"
             value={filters.term}
             loading={metaLoading}
             options={(meta?.terms ?? []).filter((t) => t !== 'Open').map((t) => ({ value: t, label: t }))}
             onChange={(term) => onChange({ term })}
             placeholder="Any term"
           />
-          <fieldset>
-            <legend className="label-form mb-1.5">Length</legend>
-            <div className="flex flex-wrap gap-x-5 gap-y-1.5">
-              {DURATIONS.map((d) => (
-                <label key={d} className="flex cursor-pointer items-center gap-2 text-sm text-gray-800">
-                  <input
-                    type="checkbox"
-                    className="h-4 w-4"
-                    checked={filters.duration.includes(d)}
-                    onChange={(e) =>
-                      onChange({
-                        duration: e.target.checked
-                          ? [...filters.duration, d]
-                          : filters.duration.filter((x) => x !== d),
-                      })
-                    }
-                  />
-                  {d} months
-                </label>
-              ))}
-            </div>
-          </fieldset>
+          <p className="text-xs text-gray-600">
+            Read from each job's title and description. Jobs that do not say their term or length
+            are left out when you pick one.
+          </p>
         </div>
       </Section>
 
@@ -280,7 +314,7 @@ export function FilterDrawer({
         className="relative flex h-full w-full max-w-lg flex-col bg-white shadow-xl"
       >
         <div className="flex items-center justify-between bg-post-600 px-5 py-3.5 text-white">
-          <h2 id="filters-title" className="stretch-condensed text-xl font-extrabold uppercase tracking-[0.03em]">All filters</h2>
+          <h2 id="filters-title" className="text-xl font-bold">All filters</h2>
           <button
             ref={closeRef}
             type="button"
@@ -294,7 +328,7 @@ export function FilterDrawer({
         <div className="flex-1 overflow-y-auto px-5">
           <FilterBar {...props} />
         </div>
-        <div className="flex items-center justify-between gap-3 border-t-[1.5px] border-gray-900 px-5 py-3">
+        <div className="flex items-center justify-between gap-3 border-t border-gray-300 px-5 py-3">
           <button type="button" onClick={props.onClearAll} className="text-sm font-semibold text-gray-800 hover:underline">
             Reset all
           </button>
@@ -335,6 +369,9 @@ export function ActiveFilterChips({
     ...(filters.city ? [{ key: 'city', text: `City: ${filters.city}`, patch: { city: '' } }] : []),
     ...(filters.posted_within ? [{ key: 'posted', text: POSTED_WITHIN.find((p) => p.value === filters.posted_within)?.label ?? '', patch: { posted_within: 0 } }] : []),
     ...(filters.term ? [{ key: 'term', text: `Term: ${filters.term}`, patch: { term: '' } }] : []),
+    ...filters.season.map((s) => ({
+      key: `season-${s}`, text: `${seasonLabel(s)} term`, patch: { season: filters.season.filter((x) => x !== s) },
+    })),
     ...filters.duration.map((d) => ({
       key: `dur-${d}`, text: `${d} months`, patch: { duration: filters.duration.filter((x) => x !== d) },
     })),
@@ -393,6 +430,10 @@ export function Pill({
       )}
     </button>
   )
+}
+
+function Count({ n }: { n: number | undefined }) {
+  return n === undefined ? null : <span className="text-xs tabular-nums text-gray-600">{n.toLocaleString()}</span>
 }
 
 function RadioList<T extends string | number>({

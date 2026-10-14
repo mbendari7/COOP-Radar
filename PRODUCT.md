@@ -10,7 +10,7 @@ web
 Canadian university and college students looking for co-op terms and internships. They usually sit at a laptop between classes, scan a lot of postings at once, and want to know quickly which ones they actually qualify for. The site is also a portfolio piece, so recruiters and interviewers looking at the builder's work are a second audience and need to get it within half a minute.
 
 ## Product Purpose
-CoopRadar pulls real open jobs from about 120 employers' public career boards (Greenhouse, Lever, Ashby, SmartRecruiters) across Canada, plus US student roles. It reads each description for the programs and graduation years it asks for. A student drops in a resume with no sign up, the site reads their program, degree and grad year, and shows matching jobs with plain notes on why each one fits. Success means a student finds roles they qualify for faster than on a general job board, and applies on the employer's own site.
+CoopRadar pulls real open jobs from about 170 employers' public career boards (Greenhouse, Lever, Ashby, SmartRecruiters, Workday) across Canada, plus US student roles. It reads each description for the programs and graduation years it asks for. A student drops in a resume with no sign up, the site reads their program, degree and grad year, and shows matching jobs with plain notes on why each one fits. Success means a student finds roles they qualify for faster than on a general job board, and applies on the employer's own site.
 
 ## Positioning
 Matching runs in SQL against the student's real program, grad year and term, so it works with no AI at all. AI is optional and uses the visitor's own key. Jobs come straight from employer boards, not from a reposting aggregator.

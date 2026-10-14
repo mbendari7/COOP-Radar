@@ -24,7 +24,7 @@ class JobPreferences(BaseModel):
     open jobs that fit these. Keywords like "data analyst" push fitting jobs higher.
     """
 
-    categories: list[CategoryKey] = Field(default=[], max_length=9)
+    categories: list[CategoryKey] = Field(default=[], max_length=12)
     keywords: str = Field(default="", max_length=100)
     province: str = Field(default="", max_length=2)
     city: str = Field(default="", max_length=100)
@@ -37,6 +37,8 @@ class JobPreferences(BaseModel):
     grad_year: int | None = Field(default=None, ge=2000, le=2100)
     # The co-op term they want like "Summer 2027". Jobs for that term rank higher
     term: str = Field(default="", max_length=20)
+    # Co-op lengths they want in months, any of 4, 8, 12 and 16. Those jobs rank higher
+    durations: list[Literal[4, 8, 12, 16]] = Field(default=[], max_length=4)
     # Countries to include. Most students want Canada and some also do a US term
     countries: list[Literal["CA", "US"]] = Field(default=["CA"], max_length=2)
 
@@ -65,6 +67,8 @@ class MatchResultOut(BaseModel):
     matched_skills: list[str] = []
     missing_skills: list[str] = []
     country: str = "CA"
+    # 4, 8, 12 or 16, or None when the job does not say
+    duration_months: int | None = None
     # Why this job fits the student based on its description. Program, grad year, term and role
     fit_notes: list[str] = []
 

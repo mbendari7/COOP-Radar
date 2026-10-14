@@ -21,6 +21,7 @@ from app.schemas.posting import (
     CategoryCount,
     CountryCount,
     CsvUploadResult,
+    DurationCount,
     FilterMeta,
     ManualPostingIn,
     PostingDetail,
@@ -29,6 +30,8 @@ from app.schemas.posting import (
     PostingsPage,
     ProgramOption,
     RowError,
+    Season,
+    SeasonCount,
     SimilarPostingOut,
     SimilarPostingsResponse,
     WorkModeCount,
@@ -55,7 +58,13 @@ _SORT_MAP = {
     "deadline": Posting.deadline,
     "company": Posting.company,
     "title": Posting.title,
+    "duration_months": Posting.duration_months,
+    "term_start": Posting.term_start,
 }
+# Columns that can be empty. Empty ones go last in both directions
+_NULLABLE_SORTS = {"duration_months", "term_start"}
+_SEASON_ORDER: tuple[Season, ...] = ("winter", "spring", "summer", "fall")
+_DURATIONS = (4, 8, 12, 16)
 
 
 async def list_postings(
@@ -133,6 +142,9 @@ async def list_postings(
     if params.term:
         stmt = stmt.where(Posting.term == params.term)
 
+    if params.season:
+        stmt = stmt.where(Posting.season.in_(params.season))
+
     if params.work_mode:
         stmt = stmt.where(Posting.work_mode == params.work_mode)
 
@@ -174,10 +186,13 @@ async def list_postings(
     # Posting.id breaks ties so pages stay steady when sort values repeat
     if params.search_mode != "semantic" or not params.q:
         sort_col = _SORT_MAP[params.sort]
-        if params.order == "desc":
-            stmt = stmt.order_by(sort_col.desc(), Posting.id)
+        ordered = sort_col.desc() if params.order == "desc" else sort_col.asc()
+        if params.sort in _NULLABLE_SORTS:
+            ordered = ordered.nulls_last()
+            # Same length or start, newest first, so the list still feels fresh
+            stmt = stmt.order_by(ordered, Posting.posted_at.desc(), Posting.id)
         else:
-            stmt = stmt.order_by(sort_col.asc(), Posting.id)
+            stmt = stmt.order_by(ordered, Posting.id)
 
     # Paging
     offset = (params.page - 1) * params.page_size
@@ -287,6 +302,7 @@ async def get_filter_meta(db: AsyncSession) -> FilterMeta:
         cities=cities, provinces=provinces, terms=terms, skills=skills,
         companies=companies, categories=counts.categories, open_jobs=counts.open_jobs,
         countries=counts.countries, work_modes=counts.work_modes,
+        seasons=counts.seasons, durations=counts.durations,
         programs=[ProgramOption(key=key, label=p.label) for key, p in PROGRAMS.items()],
     )
 
@@ -297,6 +313,8 @@ class _OpenCounts:
     categories: list[CategoryCount]
     countries: list[CountryCount]
     work_modes: list[WorkModeCount]
+    seasons: list[SeasonCount]
+    durations: list[DurationCount]
 
 
 # Job type counts run nine title regexes over every open job, about 250 ms at 10k rows, and
@@ -331,6 +349,14 @@ async def _open_counts(db: AsyncSession) -> _OpenCounts:
                     func.count().filter(Posting.work_mode == mode).label(f"mode_{mode.value}")
                     for mode in WorkMode
                 ),
+                *(
+                    func.count().filter(Posting.season == season).label(f"season_{season}")
+                    for season in _SEASON_ORDER
+                ),
+                *(
+                    func.count().filter(Posting.duration_months == months).label(f"months_{months}")
+                    for months in _DURATIONS
+                ),
             ).where(Posting.closed_at.is_(None), Posting.deadline >= date.today())
         )
     ).one()
@@ -347,6 +373,14 @@ async def _open_counts(db: AsyncSession) -> _OpenCounts:
         work_modes=[
             WorkModeCount(key=mode, count=int(getattr(counts, f"mode_{mode.value}")))
             for mode in WorkMode
+        ],
+        seasons=[
+            SeasonCount(key=season, count=int(getattr(counts, f"season_{season}")))
+            for season in _SEASON_ORDER
+        ],
+        durations=[
+            DurationCount(months=months, count=int(getattr(counts, f"months_{months}")))
+            for months in _DURATIONS
         ],
     )
     _counts_cache = (time.monotonic(), result)
@@ -435,7 +469,7 @@ async def upload_csv(
             province=_clean(row.get("province")) or "ON",
             work_mode=work_mode or WorkMode.onsite,
             term=_clean(row["term"]),
-            duration_months=int(duration_val) if duration_val in {"4", "8", "12", "16"} else 4,
+            duration_months=int(duration_val) if duration_val in {"4", "8", "12", "16"} else None,
             deadline=date.fromisoformat(_clean(row["deadline"])),
             description=_clean(row.get("description")),
             source_url=_clean(row.get("source_url")) or None,
@@ -479,7 +513,7 @@ async def create_manual(
         province=data.province or "ON",
         work_mode=data.work_mode or WorkMode.onsite,
         term=data.term,
-        duration_months=data.duration_months or 4,
+        duration_months=data.duration_months or None,
         deadline=data.deadline,
         description=data.description or "",
         source_url=data.source_url,

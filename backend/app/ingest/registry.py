@@ -1,5 +1,6 @@
 """Maps each adapter_type name to its adapter class."""
 
+from app.ingest.adzuna import AdzunaAdapter
 from app.ingest.base import BaseAdapter
 from app.ingest.boards import (
     AshbyAdapter,
@@ -9,6 +10,7 @@ from app.ingest.boards import (
 )
 from app.ingest.json_api import JsonApiAdapter
 from app.ingest.rss import RssAdapter
+from app.ingest.workday import WorkdayAdapter
 
 _ADAPTERS: dict[str, type[BaseAdapter]] = {
     "json_api": JsonApiAdapter,
@@ -17,6 +19,8 @@ _ADAPTERS: dict[str, type[BaseAdapter]] = {
     "lever": LeverAdapter,
     "ashby": AshbyAdapter,
     "smartrecruiters": SmartRecruitersAdapter,
+    "workday": WorkdayAdapter,
+    "adzuna": AdzunaAdapter,
 }
 
 

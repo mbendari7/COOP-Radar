@@ -3,20 +3,24 @@
  *   the panel next to the results on the jobs page (variant "pane")
  *   the job's own page at /postings/:id (variant "page"), which phones always use
  *
- * Under the title sits a ruled row of facts and a bar showing the days left to apply,
- * drawn to scale. Then who the job is for, read from the description, so a student can
- * tell at a glance if it is meant for them.
+ * Under the title sits a row of facts with the term and its length first, and a bar showing
+ * the days left to apply, drawn to scale. Then who the job is for, read from the description,
+ * and for visitors with a resume, how to make it fit this job.
  */
 
 import { Link } from 'react-router-dom'
+import { useMe } from '../api/auth'
 import { usePosting, type PostingDetail } from '../api/postings'
+import { useMatches } from '../api/resume'
 import BookmarkButton from './BookmarkButton'
 import { ExternalIcon } from './Icons'
 import Postmark from './Postmark'
 import { postmarkPlace } from './postal'
 import { Tag } from './PostingCard'
+import ResumeFitPanel from './ResumeFitPanel'
 import RichText from './RichText'
 import { FIELD_LABELS, ROLE_LABELS } from './roles'
+import { SEASONS, SEASON_DOT, lengthLabel, termLabel } from './terms'
 import { formatDate, formatLocation, parseDay, timeAgo, workModeLabel } from '../utils/format'
 
 const DAY = 86_400_000
@@ -28,6 +32,11 @@ export default function PostingDetailView({
   const estimatedDeadline = posting.low_confidence_fields?.deadline !== undefined
   const asksFor = posting.fields_of_study.map((f) => FIELD_LABELS[f] ?? f)
   const { place, region } = postmarkPlace(posting)
+  const { data: me } = useMe()
+  const { data: matches } = useMatches(Boolean(me))
+  const hasResume = Boolean(matches?.resume)
+  const term = termLabel(posting.term)
+  const seasonMonths = SEASONS.find((x) => x.value === posting.season)?.months
 
   return (
     <article aria-label={`${posting.title} at ${posting.company}`}>
@@ -71,10 +80,15 @@ export default function PostingDetailView({
         </div>
       </header>
 
-      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-y-[1.5px] border-gray-900 py-4 sm:grid-cols-3">
+      <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-y border-gray-300 py-4 sm:grid-cols-3">
+        <Fact
+          label="Term"
+          value={term || 'Not stated'}
+          note={term && seasonMonths && posting.season !== 'spring' ? seasonMonths : undefined}
+          dot={posting.season ? SEASON_DOT[posting.season] : undefined}
+        />
+        <Fact label="Length" value={lengthLabel(posting.duration_months) || 'Not stated'} />
         <Fact label="Type" value={ROLE_LABELS[posting.role]} />
-        <Fact label="Term" value={posting.term && posting.term !== 'Open' ? posting.term : 'Not stated'} />
-        <Fact label="Length" value={`${posting.duration_months} months`} />
         <Fact label="Posted" value={timeAgo(posting.posted_at)} />
         <Fact label="Country" value={posting.country === 'US' ? 'United States' : 'Canada'} />
         <Fact label={estimatedDeadline ? 'Apply by, our guess' : 'Apply by'} value={formatDate(posting.deadline)} />
@@ -93,16 +107,27 @@ export default function PostingDetailView({
         </section>
       )}
 
-      {posting.skills.length > 0 && (
+      <section aria-labelledby={`fit-${posting.id}`} className="border-t border-gray-200 py-5">
+        <h3 id={`fit-${posting.id}`} className="text-lg font-bold text-gray-900">Make your resume fit this job</h3>
+        {hasResume ? (
+          <div className="mt-3">
+            <ResumeFitPanel postingId={posting.id} />
+          </div>
+        ) : (
+          <p className="mt-1.5 text-[15px] text-gray-700">
+            <Link to="/resume" className="link">Add your resume</Link>{' '}
+            and we will show what to change for this job: the skills and words it wants, your
+            availability line, and more. Free, no sign up.
+          </p>
+        )}
+      </section>
+
+      {posting.skills.length > 0 && !hasResume && (
         <section aria-labelledby={`skills-${posting.id}`} className="border-t border-gray-200 py-5">
           <h3 id={`skills-${posting.id}`} className="label-form !text-gray-900">Skills it mentions</h3>
           <div className="mt-2.5 flex flex-wrap gap-1.5 text-sm">
             {posting.skills.map((s) => <Tag key={s}>{s}</Tag>)}
           </div>
-          <p className="mt-3 text-sm text-gray-700">
-            <Link to="/resume" className="link">Match your resume</Link>{' '}
-            to see which of these you already have.
-          </p>
         </section>
       )}
 
@@ -118,11 +143,15 @@ export default function PostingDetailView({
   )
 }
 
-function Fact({ label, value }: { label: string; value: string }) {
+function Fact({ label, value, note, dot }: { label: string; value: string; note?: string; dot?: string }) {
   return (
     <div>
       <dt className="label-form">{label}</dt>
-      <dd className="mt-0.5 text-[15px] font-semibold text-gray-900">{value}</dd>
+      <dd className="mt-0.5 flex items-center gap-1.5 text-[15px] font-semibold text-gray-900">
+        {dot && <span className={`h-2 w-2 shrink-0 rounded-full ${dot}`} aria-hidden="true" />}
+        {value}
+      </dd>
+      {note && <dd className="text-xs text-gray-600">{note}</dd>}
     </div>
   )
 }

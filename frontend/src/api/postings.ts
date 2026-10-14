@@ -34,8 +34,11 @@ export type CountryCode = 'CA' | 'US'
 /** Co-op, internship, new grad or regular job, judged by the title */
 export type RoleType = PostingListItem['role']
 export type SearchMode = 'keyword' | 'semantic'
+/** winter, spring, summer or fall, read from the job's term */
+export type Season = NonNullable<PostingListItem['season']>
 
-export type SortField = 'posted_at' | 'deadline' | 'company' | 'title'
+export type SortField =
+  | 'posted_at' | 'deadline' | 'company' | 'title' | 'duration_months' | 'term_start'
 export type SortOrder = 'asc' | 'desc'
 export type PageSize = 10 | 25 | 50
 
@@ -44,6 +47,8 @@ export interface PostingListParams {
   city?: string
   province?: string
   term?: string
+  /** Term seasons, any of them */
+  season?: Season[]
   work_mode?: WorkMode
   duration?: number[]
   skills?: string[]
@@ -79,6 +84,7 @@ function buildQueryString(params: PostingListParams): string {
   if (params.city) sp.set('city', params.city)
   if (params.province) sp.set('province', params.province)
   if (params.term) sp.set('term', params.term)
+  params.season?.forEach((s) => sp.append('season', s))
   if (params.work_mode) sp.set('work_mode', params.work_mode)
   if (params.duration?.length) {
     params.duration.forEach((d) => sp.append('duration', String(d)))

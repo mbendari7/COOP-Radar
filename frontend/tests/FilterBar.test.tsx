@@ -33,6 +33,18 @@ const META: FilterMeta = {
     { key: 'computer_science', label: 'Computer Science' },
     { key: 'business', label: 'Business / Commerce' },
   ],
+  seasons: [
+    { key: 'winter', count: 4 },
+    { key: 'spring', count: 0 },
+    { key: 'summer', count: 9 },
+    { key: 'fall', count: 2 },
+  ],
+  durations: [
+    { months: 4, count: 7 },
+    { months: 8, count: 3 },
+    { months: 12, count: 1 },
+    { months: 16, count: 0 },
+  ],
 }
 
 function renderBar(filters: Filters = EMPTY_FILTERS, onChange = vi.fn(), onClearAll = vi.fn()) {
@@ -50,7 +62,7 @@ describe('FilterBar', () => {
     renderBar()
     expect(screen.getByLabelText('Province')).toBeInTheDocument()
     expect(screen.getByLabelText('City')).toBeInTheDocument()
-    expect(screen.getByLabelText('Term')).toBeInTheDocument()
+    expect(screen.getByLabelText('Exact term')).toBeInTheDocument()
     expect(screen.getByLabelText(/add a company/i)).toBeInTheDocument()
     expect(screen.getByLabelText(/add a skill/i)).toBeInTheDocument()
   })
@@ -88,9 +100,9 @@ describe('FilterBar', () => {
     expect(screen.getByRole('checkbox', { name: /remote/i })).toBeInTheDocument()
   })
 
-  it('renders length checkboxes for 4, 8, 12, 16 months', () => {
+  it('renders length toggles for 4, 8, 12, 16 months', () => {
     renderBar()
-    for (const d of [4, 8, 12, 16]) expect(screen.getByLabelText(`${d} months`)).toBeInTheDocument()
+    for (const d of [4, 8, 12, 16]) expect(screen.getByRole('checkbox', { name: new RegExp(`^${d} months`) })).toBeInTheDocument()
   })
 
   it('lists provinces for Canada and states only once the US is chosen', () => {
@@ -175,5 +187,38 @@ describe('ActiveFilterChips', () => {
     await waitFor(() =>
       expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Remove filter: SQL' })),
     )
+  })
+})
+
+describe('Term season and length', () => {
+  it('shows each season with its months and count, and toggles it', () => {
+    const onChange = vi.fn()
+    renderBar(EMPTY_FILTERS, onChange)
+
+    const summer = screen.getByRole('checkbox', { name: /^Summer/ })
+    expect(summer.closest('label')).toHaveTextContent('9')
+    fireEvent.click(summer)
+    expect(onChange).toHaveBeenCalledWith({ season: ['summer'] })
+  })
+
+  it('toggles a length and shows its count', () => {
+    const onChange = vi.fn()
+    renderBar({ ...EMPTY_FILTERS, duration: [4] }, onChange)
+
+    const eight = screen.getByRole('checkbox', { name: /8 months/ })
+    expect(eight).toHaveTextContent('3')
+    fireEvent.click(eight)
+    expect(onChange).toHaveBeenCalledWith({ duration: [4, 8] })
+    fireEvent.click(screen.getByRole('checkbox', { name: /4 months/ }))
+    expect(onChange).toHaveBeenCalledWith({ duration: [] })
+  })
+
+  it('shows a removable chip for a picked season', () => {
+    const onChange = vi.fn()
+    render(
+      <ActiveFilterChips filters={{ ...EMPTY_FILTERS, season: ['fall'] }} meta={META} onChange={onChange} onClearAll={vi.fn()} />,
+    )
+    fireEvent.click(screen.getByRole('button', { name: 'Remove filter: Fall term' }))
+    expect(onChange).toHaveBeenCalledWith({ season: [] })
   })
 })

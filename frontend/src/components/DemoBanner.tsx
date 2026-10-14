@@ -13,7 +13,7 @@ export default function DemoBanner() {
   if (!me?.is_demo) return null
 
   return (
-    <div role="status" className="border-b-[1.5px] border-gray-900 bg-air-50 text-sm text-gray-900">
+    <div role="status" className="border-b border-gray-300 bg-air-50 text-sm text-gray-900">
       <div className="mx-auto max-w-7xl space-y-2 px-4 py-2">
         <p>
           <strong className="font-bold">You're using a temporary account.</strong>{' '}

@@ -1,5 +1,5 @@
 """
-The list of skills we look for, about 110 of them. Edit it right here.
+The list of skills we look for, about 190 of them across every field. Edit it right here.
 
 Running it again updates the aliases and categories of skills already there, so edits
 reach a live database on the next start. Keep aliases specific. A broad alias like
@@ -131,6 +131,81 @@ SKILLS = [
     ("Solidworks", ["solid works"], "Tool"),
     ("LabVIEW", ["national instruments", "labview"], "Tool"),
     ("OpenCV", ["open cv"], "Tool"),
+    # Office and business, used in nearly every field
+    ("Microsoft Office", ["ms office", "microsoft 365", "office 365", "ms word", "microsoft word"], "Tool"),
+    ("PowerPoint", ["microsoft powerpoint", "ms powerpoint"], "Tool"),
+    ("Google Workspace", ["g suite", "google sheets", "google docs"], "Tool"),
+    ("SAP", ["sap erp", "sap s/4hana", "s/4hana"], "Tool"),
+    ("Salesforce", ["salesforce crm", "sfdc"], "Tool"),
+    ("CRM", ["customer relationship management"], "Domain"),
+    ("Project Management", ["project coordination", "pmp", "capm"], "Domain"),
+    ("Data Entry", ["data input"], "Domain"),
+    ("Customer Service", ["client service", "customer support"], "Domain"),
+    ("Public Speaking", ["presentation skills"], "Domain"),
+    ("Technical Writing", ["documentation writing", "report writing"], "Domain"),
+    ("French", ["bilingual french", "bilingual (english/french)", "fluent in french", "francais"], "Language"),
+    ("Mandarin", ["chinese mandarin"], "Language"),
+    ("Spanish", ["fluent in spanish"], "Language"),
+    # Accounting and finance
+    ("Accounting", ["bookkeeping", "accounts payable", "accounts receivable", "general ledger"], "Domain"),
+    ("Financial Modelling", ["financial modeling", "dcf", "valuation modelling"], "Domain"),
+    ("Financial Analysis", ["financial statements", "variance analysis"], "Domain"),
+    ("Auditing", ["audit procedures", "internal audit", "external audit"], "Domain"),
+    ("Tax Accounting", ["tax preparation", "tax returns", "taxation", "corporate tax"], "Domain"),
+    ("IFRS", ["international financial reporting standards"], "Domain"),
+    ("GAAP", ["us gaap", "aspe"], "Domain"),
+    ("QuickBooks", ["quickbooks online"], "Tool"),
+    ("Bloomberg", ["bloomberg terminal"], "Tool"),
+    ("Risk Management", ["risk assessment", "enterprise risk"], "Domain"),
+    ("Actuarial", ["actuarial exams", "soa exam", "cas exam"], "Domain"),
+    ("Underwriting", ["insurance underwriting"], "Domain"),
+    # Marketing and communications
+    ("Digital Marketing", ["online marketing", "performance marketing"], "Domain"),
+    ("Social Media Marketing", ["social media management", "social media content"], "Domain"),
+    ("SEO", ["search engine optimization", "search engine marketing"], "Domain"),
+    ("Google Analytics", ["ga4", "google analytics 4"], "Tool"),
+    ("Copywriting", ["content writing", "copy editing", "copyediting"], "Domain"),
+    ("Adobe Creative Suite", ["adobe creative cloud", "creative cloud"], "Tool"),
+    ("Photoshop", ["adobe photoshop"], "Tool"),
+    ("Illustrator", ["adobe illustrator"], "Tool"),
+    ("InDesign", ["adobe indesign"], "Tool"),
+    ("Premiere Pro", ["adobe premiere", "video editing"], "Tool"),
+    ("Canva", ["canva design"], "Tool"),
+    ("HubSpot", ["hubspot crm"], "Tool"),
+    ("Market Research", ["consumer research", "competitive analysis"], "Domain"),
+    # Human resources and operations
+    ("Recruiting", ["talent acquisition", "full cycle recruiting"], "Domain"),
+    ("HRIS", ["workday hcm", "human resources information system"], "Tool"),
+    ("Supply Chain", ["procurement", "purchasing", "inventory management"], "Domain"),
+    ("Logistics", ["shipping and receiving", "transportation planning"], "Domain"),
+    ("Lean Six Sigma", ["six sigma", "lean manufacturing", "kaizen"], "Process"),
+    # Engineering tools outside software
+    ("AutoCAD", ["autocad civil 3d", "civil 3d", "autodesk autocad"], "Tool"),
+    ("Revit", ["autodesk revit", "bim"], "Tool"),
+    ("CATIA", ["catia v5"], "Tool"),
+    ("ANSYS", ["finite element analysis", "fea"], "Tool"),
+    ("GIS", ["arcgis", "qgis", "geographic information systems"], "Tool"),
+    ("PLC", ["plc programming", "ladder logic", "allen bradley"], "Tool"),
+    ("GD&T", ["geometric dimensioning", "gd&t"], "Domain"),
+    ("Surveying", ["land surveying", "total station"], "Domain"),
+    ("Project Estimating", ["cost estimating", "quantity takeoff"], "Domain"),
+    # Health and lab science
+    ("Patient Care", ["direct patient care", "bedside care"], "Domain"),
+    ("CPR", ["first aid", "bls", "basic life support"], "Domain"),
+    ("Electronic Medical Records", ["emr", "ehr", "epic emr", "electronic health records"], "Tool"),
+    ("Medical Terminology", ["medical terms"], "Domain"),
+    ("Lab Techniques", ["laboratory techniques", "pipetting", "aseptic technique", "wet lab"], "Domain"),
+    ("PCR", ["qpcr", "rt-pcr", "polymerase chain reaction"], "Domain"),
+    ("Cell Culture", ["tissue culture", "mammalian cell culture"], "Domain"),
+    ("HPLC", ["high performance liquid chromatography", "chromatography"], "Domain"),
+    ("GMP", ["good manufacturing practice", "cgmp", "glp", "good laboratory practice"], "Domain"),
+    ("Clinical Research", ["clinical trials", "gcp", "good clinical practice"], "Domain"),
+    ("SPSS", ["ibm spss"], "Tool"),
+    # Safety and trades
+    ("WHMIS", ["whmis 2015"], "Domain"),
+    ("Health and Safety", ["occupational health and safety", "ohs", "hse", "ehs"], "Domain"),
+    ("Forklift", ["forklift certification", "forklift licence", "forklift license"], "Domain"),
+    ("Driver's Licence", ["valid driver's license", "valid drivers licence", "g licence", "class 5"], "Domain"),
 ]
 
 

@@ -17,7 +17,7 @@ from app.models.posting import Posting
 
 CategoryKey = Literal[
     "software", "data", "design", "product", "hardware", "it_security", "business",
-    "sales_marketing", "customer",
+    "sales_marketing", "customer", "health", "public", "trades",
 ]
 
 # key maps to the label people see and the title pattern
@@ -48,10 +48,15 @@ CATEGORIES: dict[str, tuple[str, str]] = {
         r"|gestionnaire de (produits|programme)|programs?)\M",
     ),
     "hardware": (
-        "Hardware & engineering",
+        "Engineering & hardware",
         r"\m(hardware|electrical|electronics?|embedded|firmware|mechanical|mechatronics"
         r"|robotics|manufacturing|civil|chemical|industrial|industriali[sz]ation|asic|fpga"
-        r"|ing[eé]nierie|micrologiciel|mat[eé]riel|maintenance)\M",
+        r"|ing[eé]nierie|micrologiciel|mat[eé]riel|maintenance|structural|geotechnical"
+        r"|environmental engineer\w*|process engineer\w*|project engineer\w*|field engineer\w*"
+        r"|engineer in training|eit|construction|estimat\w+|drafting|cad|surveying|mining"
+        r"|metallurg\w*|petroleum|reservoir|pipeline|energy|power systems?|utilities|aerospace"
+        r"|avionics|quality engineer\w*|reliability engineer\w*|engineering (co-?op|intern\w*"
+        r"|student))\M",
     ),
     "it_security": (
         "IT & security",
@@ -76,7 +81,32 @@ CATEGORIES: dict[str, tuple[str, str]] = {
     ),
     "customer": (
         "Customer & support",
-        r"\m(customer|client|support|success|experience associate|agent)\M",
+        r"\m(customer|client|support|success|experience associate|agent|retail|store"
+        r"|sales associate"
+        r"|teller|banking advisor|service representative|front desk|reception\w*)\M",
+    ),
+    "health": (
+        "Health & science",
+        r"\m(nurs\w+|clinical|clinic|patient|health|healthcare|medical|pharmac\w+|lab|laboratory"
+        r"|research assistant|biolog\w*|chemist\w*|biochem\w*|microbiolog\w*|scientist"
+        r"|regulatory affairs"
+        r"|quality control|qc|qa associate|biotech\w*|kinesiolog\w*|physiotherap\w*|dietitian"
+        r"|therap\w+|epidemiolog\w*|public health|veterinar\w*|environmental|sant[eé]"
+        r"|infirmi\w+)\M",
+    ),
+    "public": (
+        "Government, education & nonprofit",
+        r"\m(policy|government|public service|municipal|city of|federal|provincial|teach\w*"
+        r"|tutor|education\w*|instructor|librar\w+|museum|curat\w+|archiv\w+|social work\w*"
+        r"|community|youth|counsell?or|nonprofit|non-profit|charity|program assistant"
+        r"|student affairs|academic|research associate|urban planning|planner|elections?)\M",
+    ),
+    "trades": (
+        "Trades & technicians",
+        r"\m(technician|technologist|electrician|millwright|mechanic|welder|plumb\w+|carpent\w+"
+        r"|apprentice|operator|machinist|hvac|tradesperson|trades|labou?rer|installer"
+        r"|lineman|power line|instrumentation|warehouse|driver|logistics associate"
+        r"|technicien\w*)\M",
     ),
 }
 

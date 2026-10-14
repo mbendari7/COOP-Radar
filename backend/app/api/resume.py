@@ -6,6 +6,7 @@ The routes
   GET    /api/resume                           details about the file
   DELETE /api/resume                           delete it
   GET    /api/resume/matches                   saved match results
+  GET    /api/resume/align/{posting_id}        how to make the resume fit one job, free
   PUT    /api/resume/preferences               save what you want and match again
   POST   /api/resume/matches/{posting_id}/ask  streamed answers about one job
 """
@@ -23,6 +24,7 @@ from app.db import get_db
 from app.deps import get_current_user
 from app.models.resume import Resume
 from app.models.user import User
+from app.schemas.align import ResumeAlignment
 from app.schemas.insights import ResumeInsights
 from app.schemas.resume import (
     AskRequest,
@@ -31,6 +33,7 @@ from app.schemas.resume import (
     ResumeOut,
     UploadResponse,
 )
+from app.services.align import align_resume
 from app.services.insights import generate_ai_insights, get_insights
 from app.services.resume import (
     delete_resume,
@@ -114,6 +117,21 @@ async def get_matches_endpoint(
 ) -> MatchesResponse:
     """Saved ranked matches. An empty list if there is no resume yet."""
     return await get_matches(db, current_user.id)
+
+
+@router.get(
+    "/align/{posting_id}", response_model=ResumeAlignment, status_code=status.HTTP_200_OK
+)
+async def align_endpoint(
+    posting_id: UUID,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> ResumeAlignment:
+    """
+    How to make the saved resume fit one job. Skills and words it has or lacks, plain checks
+    and the edits to make. No AI, so it is free and instant. 404 with no resume or job.
+    """
+    return await align_resume(db, current_user.id, posting_id)
 
 
 @router.post("/matches/{posting_id}/ask", status_code=status.HTTP_200_OK)

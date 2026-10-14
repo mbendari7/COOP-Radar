@@ -31,6 +31,8 @@ function makePosting(overrides: Partial<PostingListItem> = {}): PostingListItem 
     grad_years: [],
     fields_of_study: [],
     role: 'job',
+    season: 'summer',
+    term_start: '2027-05-01',
     ...overrides,
   }
 }
@@ -67,8 +69,25 @@ describe('PostingCard', () => {
       data: [makePosting({ title: 'Data Co-op', role: 'coop', city: 'Austin', province: 'TX', country: 'US' })],
     })
     expect(screen.getByText('Co-op')).toBeInTheDocument()
-    expect(screen.getByText('Summer 2027')).toBeInTheDocument()
+    // The term and its length read together, like "Summer 2027 · 4 months"
+    expect(screen.getByText('Summer 2027 · 4 months')).toBeInTheDocument()
     expect(screen.getAllByText(/Austin, TX, US/).length).toBeGreaterThan(0)
+  })
+
+  it('leaves the term out when the job does not say, and shows a length on its own', () => {
+    renderTable({
+      view: 'cards',
+      data: [makePosting({ title: 'No term', term: 'Open', season: null, duration_months: 8 })],
+    })
+    expect(screen.queryByText(/Open/)).not.toBeInTheDocument()
+    expect(screen.getByText('8 months')).toBeInTheDocument()
+  })
+
+  it('sorts the table by term length when the Length header is clicked', () => {
+    const onSortChange = vi.fn()
+    renderTable({ view: 'table', data: [makePosting()], onSortChange })
+    fireEvent.click(screen.getByRole('columnheader', { name: /Length/ }))
+    expect(onSortChange).toHaveBeenCalledWith('duration_months', expect.stringMatching(/asc|desc/))
   })
 
   it('marks the selected job for the details panel', () => {

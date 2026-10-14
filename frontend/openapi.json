@@ -2,7 +2,7 @@
   "components": {
     "schemas": {
       "AIInsights": {
-        "description": "The AI's resume review (generated with the visitor's own key, cached on the resume).",
+        "description": "The AI resume review, made with the visitor's own key and saved on the resume.",
         "properties": {
           "improvements": {
             "default": [],
@@ -54,7 +54,7 @@
         "type": "object"
       },
       "AIKeyCheckIn": {
-        "description": "A visitor's provider + key to verify. The key is used once and never stored.",
+        "description": "A visitor's provider and key to check. The key is used once and never saved.",
         "properties": {
           "api_key": {
             "maxLength": 512,
@@ -80,7 +80,7 @@
         "type": "object"
       },
       "AIKeyCheckOut": {
-        "description": "The chat models this key can use, plus the one we suggest pre-selecting.",
+        "description": "The chat models this key can use plus the one we suggest picking.",
         "properties": {
           "models": {
             "items": {
@@ -136,8 +136,27 @@
         "title": "AIModelOption",
         "type": "object"
       },
+      "AlignCheck": {
+        "description": "One yes or no check, like \"Your program is one it asks for\".",
+        "properties": {
+          "ok": {
+            "title": "Ok",
+            "type": "boolean"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "ok",
+          "text"
+        ],
+        "title": "AlignCheck",
+        "type": "object"
+      },
       "ApplicationEventOut": {
-        "description": "A single entry in a saved posting's status-change history.",
+        "description": "One entry in a saved job's status history.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -187,7 +206,7 @@
         "type": "object"
       },
       "ApplicationStatus": {
-        "description": "Seven stages of a co-op application lifecycle.\nstr mixin lets FastAPI serialise these as plain strings automatically.\nNULL in the database means \"no status set\" — distinct from any value here.",
+        "description": "The stages a co-op application goes through.\nThe str mixin lets FastAPI send these as plain strings.\nNULL in the database means no status yet, which is not the same as any value here.",
         "enum": [
           "saved",
           "applying",
@@ -201,7 +220,7 @@
         "type": "string"
       },
       "AskRequest": {
-        "description": "mode \"question\": answer `question` with citations (question required)\nmode \"tailor\":   how to tailor this resume for the posting (question optional)\nmode \"cover_letter\": a short cover-letter opening for the posting (question optional)",
+        "description": "mode \"question\"      answers `question` with sources and needs a question\nmode \"tailor\"        says how to tailor this resume for the job\nmode \"cover_letter\"  writes a short cover letter opening for the job",
         "properties": {
           "mode": {
             "default": "question",
@@ -264,7 +283,7 @@
         "type": "object"
       },
       "CategoryCount": {
-        "description": "A job type for the filter list, with how many open postings it has.",
+        "description": "A job type for the filter list with how many open jobs it has.",
         "properties": {
           "count": {
             "title": "Count",
@@ -280,7 +299,10 @@
               "it_security",
               "business",
               "sales_marketing",
-              "customer"
+              "customer",
+              "health",
+              "public",
+              "trades"
             ],
             "title": "Key",
             "type": "string"
@@ -299,7 +321,7 @@
         "type": "object"
       },
       "ChangePasswordIn": {
-        "description": "Password change payload — new password must meet the same rules as registration.",
+        "description": "Change password body. The new one follows the same rules as sign up.",
         "properties": {
           "current_password": {
             "title": "Current Password",
@@ -346,7 +368,7 @@
         "type": "object"
       },
       "CsvUploadResult": {
-        "description": "Response from POST /api/postings/upload.",
+        "description": "What POST /api/postings/upload sends back.",
         "properties": {
           "added": {
             "title": "Added",
@@ -373,7 +395,7 @@
         "type": "object"
       },
       "DeleteAccountIn": {
-        "description": "Account deletion — requires password confirmation to prevent accidental deletion.",
+        "description": "Delete account body. Asks for the password so nobody deletes by accident.",
         "properties": {
           "password": {
             "title": "Password",
@@ -387,7 +409,7 @@
         "type": "object"
       },
       "DemandSkill": {
-        "description": "A skill employers ask for, and how many open postings ask for it.",
+        "description": "A skill employers ask for and how many open jobs ask for it.",
         "properties": {
           "postings": {
             "title": "Postings",
@@ -406,7 +428,7 @@
         "type": "object"
       },
       "DetectedEducation": {
-        "description": "What was read from the resume's education section (blank when not found).",
+        "description": "What we read from the education part of the resume. Blank when we could not find it.",
         "properties": {
           "degree": {
             "default": "",
@@ -448,7 +470,12 @@
                   "finance_accounting",
                   "marketing",
                   "design",
-                  "science"
+                  "science",
+                  "health_sciences",
+                  "social_sciences",
+                  "environment",
+                  "education",
+                  "engineering_technology"
                 ],
                 "type": "string"
               },
@@ -469,8 +496,26 @@
         "title": "DetectedEducation",
         "type": "object"
       },
+      "DurationCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "months": {
+            "title": "Months",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "months",
+          "count"
+        ],
+        "title": "DurationCount",
+        "type": "object"
+      },
       "EventCreateIn": {
-        "description": "Body for POST /api/saved/{id}/events — record a status change with optional note.",
+        "description": "Body for POST /api/saved/{id}/events. Logs a status change with an optional note.",
         "properties": {
           "event_date": {
             "anyOf": [
@@ -506,7 +551,7 @@
         "type": "object"
       },
       "FilterMeta": {
-        "description": "Distinct values available for each filter dropdown.\nPopulated from the postings table so the frontend never shows a city\nthat has zero postings.",
+        "description": "The choices for each filter menu.\nThey come from the jobs table so the site never offers a city\nthat has no jobs.",
         "properties": {
           "categories": {
             "default": [],
@@ -539,6 +584,14 @@
             "title": "Countries",
             "type": "array"
           },
+          "durations": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/DurationCount"
+            },
+            "title": "Durations",
+            "type": "array"
+          },
           "open_jobs": {
             "default": 0,
             "title": "Open Jobs",
@@ -557,6 +610,14 @@
               "type": "string"
             },
             "title": "Provinces",
+            "type": "array"
+          },
+          "seasons": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/SeasonCount"
+            },
+            "title": "Seasons",
             "type": "array"
           },
           "skills": {
@@ -605,7 +666,7 @@
         "type": "object"
       },
       "IngestRunOut": {
-        "description": "Public representation of an IngestRun.",
+        "description": "One import run as we send it out.",
         "properties": {
           "added": {
             "title": "Added",
@@ -672,7 +733,7 @@
         "type": "object"
       },
       "IngestSourceOut": {
-        "description": "Public representation of an IngestSource.",
+        "description": "An import source as we send it out.",
         "properties": {
           "adapter_type": {
             "title": "Adapter Type",
@@ -780,7 +841,7 @@
         "type": "object"
       },
       "JobPreferences": {
-        "description": "What the student is looking for, set before or after uploading. Matching only considers\nopen postings that fit these; keywords (e.g. \"data analyst\") rank fitting postings higher.",
+        "description": "What the student is looking for, set before or after uploading. Matching only looks at\nopen jobs that fit these. Keywords like \"data analyst\" push fitting jobs higher.",
         "properties": {
           "categories": {
             "default": [],
@@ -794,11 +855,14 @@
                 "it_security",
                 "business",
                 "sales_marketing",
-                "customer"
+                "customer",
+                "health",
+                "public",
+                "trades"
               ],
               "type": "string"
             },
-            "maxItems": 9,
+            "maxItems": 12,
             "title": "Categories",
             "type": "array"
           },
@@ -834,6 +898,21 @@
             ],
             "title": "Degree",
             "type": "string"
+          },
+          "durations": {
+            "default": [],
+            "items": {
+              "enum": [
+                4,
+                8,
+                12,
+                16
+              ],
+              "type": "integer"
+            },
+            "maxItems": 4,
+            "title": "Durations",
+            "type": "array"
           },
           "grad_year": {
             "anyOf": [
@@ -881,7 +960,12 @@
                   "finance_accounting",
                   "marketing",
                   "design",
-                  "science"
+                  "science",
+                  "health_sciences",
+                  "social_sciences",
+                  "environment",
+                  "education",
+                  "engineering_technology"
                 ],
                 "type": "string"
               },
@@ -919,7 +1003,7 @@
         "type": "object"
       },
       "LoginIn": {
-        "description": "Login payload — password has no min length here (wrong pw → 401, not 422).",
+        "description": "Sign in body. No length rule here so a wrong password gets 401 and not 422.",
         "properties": {
           "email": {
             "format": "email",
@@ -939,7 +1023,7 @@
         "type": "object"
       },
       "ManualPostingIn": {
-        "description": "Schema for manually submitted postings via POST /api/postings.",
+        "description": "A job someone adds by hand through POST /api/postings.",
         "properties": {
           "city": {
             "title": "City",
@@ -1053,6 +1137,17 @@
           "deadline": {
             "title": "Deadline",
             "type": "string"
+          },
+          "duration_months": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Months"
           },
           "fit_notes": {
             "default": [],
@@ -1202,7 +1297,7 @@
         "type": "object"
       },
       "PostingDetail": {
-        "description": "Full posting detail — includes description for the detail page.",
+        "description": "Everything about one job, description included.",
         "properties": {
           "city": {
             "title": "City",
@@ -1239,8 +1334,15 @@
             "type": "string"
           },
           "duration_months": {
-            "title": "Duration Months",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Months"
           },
           "fields_of_study": {
             "default": [],
@@ -1308,6 +1410,23 @@
             "title": "Role",
             "type": "string"
           },
+          "season": {
+            "anyOf": [
+              {
+                "enum": [
+                  "winter",
+                  "spring",
+                  "summer",
+                  "fall"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season"
+          },
           "skills": {
             "items": {
               "type": "string"
@@ -1342,6 +1461,18 @@
             "title": "Term",
             "type": "string"
           },
+          "term_start": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term Start"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -1358,7 +1489,6 @@
           "province",
           "work_mode",
           "term",
-          "duration_months",
           "deadline",
           "posted_at",
           "skills",
@@ -1370,7 +1500,7 @@
         "type": "object"
       },
       "PostingListItem": {
-        "description": "One row in the postings table.\nOmits description to keep list payloads small (see contracts/api.md note).",
+        "description": "One job in the list.\nLeaves out the description to keep lists small.",
         "properties": {
           "city": {
             "title": "City",
@@ -1403,8 +1533,15 @@
             "type": "string"
           },
           "duration_months": {
-            "title": "Duration Months",
-            "type": "integer"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration Months"
           },
           "fields_of_study": {
             "default": [],
@@ -1458,6 +1595,23 @@
             "title": "Role",
             "type": "string"
           },
+          "season": {
+            "anyOf": [
+              {
+                "enum": [
+                  "winter",
+                  "spring",
+                  "summer",
+                  "fall"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Season"
+          },
           "skills": {
             "items": {
               "type": "string"
@@ -1492,6 +1646,18 @@
             "title": "Term",
             "type": "string"
           },
+          "term_start": {
+            "anyOf": [
+              {
+                "format": "date",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Term Start"
+          },
           "title": {
             "title": "Title",
             "type": "string"
@@ -1508,7 +1674,6 @@
           "province",
           "work_mode",
           "term",
-          "duration_months",
           "deadline",
           "posted_at",
           "skills",
@@ -1535,7 +1700,12 @@
               "finance_accounting",
               "marketing",
               "design",
-              "science"
+              "science",
+              "health_sciences",
+              "social_sciences",
+              "environment",
+              "education",
+              "engineering_technology"
             ],
             "title": "Key",
             "type": "string"
@@ -1553,7 +1723,7 @@
         "type": "object"
       },
       "PublicConfig": {
-        "description": "What the UI should show. Never includes secrets — only which features are on.",
+        "description": "What the site should show. Never any secrets, just which features are on.",
         "properties": {
           "ai_daily_limit": {
             "title": "Ai Daily Limit",
@@ -1582,7 +1752,7 @@
         "type": "object"
       },
       "RegisterIn": {
-        "description": "Registration payload — email must be valid format, password ≥ 10 chars.",
+        "description": "Sign up body. The email has to look real and the password needs 10 or more characters.",
         "properties": {
           "email": {
             "format": "email",
@@ -1602,8 +1772,81 @@
         "title": "RegisterIn",
         "type": "object"
       },
+      "ResumeAlignment": {
+        "description": "How to make the saved resume fit one job. Free and with no AI.",
+        "properties": {
+          "checks": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/AlignCheck"
+            },
+            "title": "Checks",
+            "type": "array"
+          },
+          "company": {
+            "title": "Company",
+            "type": "string"
+          },
+          "keywords_found": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Keywords Found",
+            "type": "array"
+          },
+          "keywords_missing": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Keywords Missing",
+            "type": "array"
+          },
+          "matched_skills": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Matched Skills",
+            "type": "array"
+          },
+          "missing_skills": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing Skills",
+            "type": "array"
+          },
+          "posting_id": {
+            "format": "uuid",
+            "title": "Posting Id",
+            "type": "string"
+          },
+          "tips": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Tips",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "posting_id",
+          "title",
+          "company"
+        ],
+        "title": "ResumeAlignment",
+        "type": "object"
+      },
       "ResumeInsights": {
-        "description": "Free insights (always present) plus the AI review (None until requested).",
+        "description": "Free insights that are always there plus the AI review, which is None until asked for.",
         "properties": {
           "ai": {
             "anyOf": [
@@ -1668,7 +1911,7 @@
         "type": "object"
       },
       "RowError": {
-        "description": "A single per-row validation error from a CSV upload.",
+        "description": "One problem with one row of a CSV upload.",
         "properties": {
           "column": {
             "title": "Column",
@@ -1692,7 +1935,7 @@
         "type": "object"
       },
       "RunsPage": {
-        "description": "Paginated list of IngestRun objects.",
+        "description": "A page of import runs.",
         "properties": {
           "items": {
             "items": {
@@ -1724,7 +1967,7 @@
         "type": "object"
       },
       "SaveIn": {
-        "description": "Body for POST /api/saved — just the posting ID to bookmark.",
+        "description": "Body for POST /api/saved. Just the id of the job to save.",
         "properties": {
           "posting_id": {
             "format": "uuid",
@@ -1739,7 +1982,7 @@
         "type": "object"
       },
       "SavedPostingOut": {
-        "description": "A saved posting record with the full posting embedded.\nReturned by GET /api/saved items and POST/PATCH operations.",
+        "description": "A saved job with the whole posting inside it.\nGET /api/saved items and the POST and PATCH calls send this back.",
         "properties": {
           "events": {
             "default": [],
@@ -1796,7 +2039,7 @@
         "type": "object"
       },
       "SavedPostingsPage": {
-        "description": "Paginated list of saved postings with per-status counts.",
+        "description": "A page of saved jobs with a count for each status.",
         "properties": {
           "deadlines_this_week": {
             "items": {
@@ -1861,8 +2104,32 @@
         "title": "SavedPostingsPage",
         "type": "object"
       },
+      "SeasonCount": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "key": {
+            "enum": [
+              "winter",
+              "spring",
+              "summer",
+              "fall"
+            ],
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "count"
+        ],
+        "title": "SeasonCount",
+        "type": "object"
+      },
       "SimilarPostingOut": {
-        "description": "One item in the similar postings response.",
+        "description": "One job in the similar jobs list.",
         "properties": {
           "city": {
             "title": "City",
@@ -1931,7 +2198,7 @@
         "type": "object"
       },
       "SimilarPostingsResponse": {
-        "description": "Response from GET /api/postings/{id}/similar.",
+        "description": "What GET /api/postings/{id}/similar sends back.",
         "properties": {
           "items": {
             "items": {
@@ -1948,7 +2215,7 @@
         "type": "object"
       },
       "SourcePatchIn": {
-        "description": "Fields that can be patched on an IngestSource (all optional).",
+        "description": "What you can change on a source. Everything is optional.",
         "properties": {
           "auto_paused": {
             "anyOf": [
@@ -1977,7 +2244,7 @@
         "type": "object"
       },
       "StatusUpdateIn": {
-        "description": "Body for PATCH /api/saved/{id}/status — pass null to clear the status.",
+        "description": "Body for PATCH /api/saved/{id}/status. Send null to clear the status.",
         "properties": {
           "event_date": {
             "anyOf": [
@@ -2020,7 +2287,7 @@
         "type": "object"
       },
       "TriggerRunOut": {
-        "description": "Response from POST /api/admin/sources/{id}/run.",
+        "description": "What POST /api/admin/sources/{id}/run sends back.",
         "properties": {
           "message": {
             "title": "Message",
@@ -2080,7 +2347,7 @@
         "type": "object"
       },
       "UserOut": {
-        "description": "Public user representation — never includes hashed_password.",
+        "description": "The user we send back. Never has hashed_password in it.",
         "properties": {
           "created_at": {
             "format": "date-time",
@@ -2156,7 +2423,7 @@
         "type": "object"
       },
       "WorkMode": {
-        "description": "Stored as a PostgreSQL ENUM type (work_mode_enum) so the DB enforces\nvalid values without needing an application-layer check.\nstr mixin means FastAPI can serialise it as a plain string.",
+        "description": "Saved as a Postgres ENUM called work_mode_enum so the database\nitself rejects bad values.\nThe str mixin lets FastAPI send it as a plain string.",
         "enum": [
           "onsite",
           "hybrid",
@@ -2185,7 +2452,7 @@
     }
   },
   "info": {
-    "description": "Co-op posting aggregator — browse, search, save, track, and match your resume.",
+    "description": "Co-op jobs from real employers. Browse, search, save, track and match your resume.",
     "title": "CoopRadar API",
     "version": "0.4.0"
   },
@@ -2193,7 +2460,7 @@
   "paths": {
     "/api/admin/sources": {
       "get": {
-        "description": "List all ingest sources with their latest run stats.",
+        "description": "List every source with how its last run went.",
         "operationId": "get_sources_api_admin_sources_get",
         "parameters": [
           {
@@ -2247,7 +2514,7 @@
     },
     "/api/admin/sources/{source_id}": {
       "patch": {
-        "description": "Enable, disable, or un-pause a source.",
+        "description": "Turn a source on or off, or unpause it.",
         "operationId": "patch_source_endpoint_api_admin_sources__source_id__patch",
         "parameters": [
           {
@@ -2317,7 +2584,7 @@
     },
     "/api/admin/sources/{source_id}/run": {
       "post": {
-        "description": "Trigger an immediate run for a source (409 if one is already running).",
+        "description": "Run a source right now. Answers 409 if it is already running.",
         "operationId": "trigger_source_run_api_admin_sources__source_id__run_post",
         "parameters": [
           {
@@ -2377,7 +2644,7 @@
     },
     "/api/admin/sources/{source_id}/runs": {
       "get": {
-        "description": "Paginated run history for a source.",
+        "description": "Run history for one source, a page at a time.",
         "operationId": "get_source_runs_api_admin_sources__source_id__runs_get",
         "parameters": [
           {
@@ -2460,7 +2727,7 @@
     },
     "/api/ai/check": {
       "post": {
-        "description": "Verify the key with its provider. 400 AI_KEY_INVALID if rejected; 429 when over the limit.",
+        "description": "Ask the provider if the key works. 400 AI_KEY_INVALID if not and 429 when over the limit.",
         "operationId": "check_key_api_ai_check_post",
         "parameters": [
           {
@@ -2520,7 +2787,7 @@
     },
     "/api/auth/demo": {
       "post": {
-        "description": "\"Try the demo\": create a private, pre-filled demo account and log into it.\nReturns 404 DEMO_DISABLED when DEMO_ENABLED=false; 429 after 10 per IP per hour.",
+        "description": "Try the demo makes a private demo account with sample data and signs into it.\nAnswers 404 DEMO_DISABLED when DEMO_ENABLED is false and 429 after 10 per IP an hour.",
         "operationId": "demo_login_api_auth_demo_post",
         "parameters": [
           {
@@ -2570,7 +2837,7 @@
     },
     "/api/auth/guest": {
       "post": {
-        "description": "Start using CoopRadar without signing up: an empty temporary account (kept 7 days).\nSave it permanently later with POST /api/me/claim.",
+        "description": "Use CoopRadar without signing up. Makes an empty temporary account that lasts 7 days.\nYou can keep it for good later with POST /api/me/claim.",
         "operationId": "guest_login_api_auth_guest_post",
         "parameters": [
           {
@@ -2620,7 +2887,7 @@
     },
     "/api/auth/login": {
       "post": {
-        "description": "Authenticate and start a session.\nReturns 401 with the same message for unknown email or wrong password (FR-014).",
+        "description": "Check the email and password and sign in.\nWrong email and wrong password get the exact same 401 message on purpose.",
         "operationId": "login_api_auth_login_post",
         "requestBody": {
           "content": {
@@ -2662,7 +2929,7 @@
     },
     "/api/auth/logout": {
       "post": {
-        "description": "Invalidate the session immediately and clear the browser cookie.",
+        "description": "End the session right away and clear the cookie.",
         "operationId": "logout_api_auth_logout_post",
         "parameters": [
           {
@@ -2705,7 +2972,7 @@
     },
     "/api/auth/register": {
       "post": {
-        "description": "Create a new account and start a session.\nReturns 409 if the email is already registered.",
+        "description": "Make a new account and sign in.\nAnswers 409 if the email is already taken.",
         "operationId": "register_api_auth_register_post",
         "requestBody": {
           "content": {
@@ -2747,7 +3014,7 @@
     },
     "/api/config": {
       "get": {
-        "description": "Feature flags for the UI. Never includes secrets — only whether features are on.",
+        "description": "Feature switches for the site. Never any secrets, just whether things are on.",
         "operationId": "public_config_api_config_get",
         "responses": {
           "200": {
@@ -2769,7 +3036,7 @@
     },
     "/api/health": {
       "get": {
-        "description": "Liveness probe used by the host and CI — no database calls.",
+        "description": "Health check for the host and CI. It never touches the database.",
         "operationId": "health_api_health_get",
         "responses": {
           "200": {
@@ -2795,7 +3062,7 @@
     },
     "/api/me": {
       "delete": {
-        "description": "Permanently delete the account and all associated data (saved postings, statuses).\nCASCADE delete in the DB handles the cascade.  Returns 401 if password is wrong.",
+        "description": "Delete the account and everything tied to it for good, like saved jobs and statuses.\nThe database cascade does the cleanup. Answers 401 if the password is wrong.",
         "operationId": "delete_account_api_me_delete",
         "parameters": [
           {
@@ -2846,7 +3113,7 @@
         ]
       },
       "get": {
-        "description": "Return the currently authenticated user's profile.",
+        "description": "Give back the signed in person's profile.",
         "operationId": "get_me_api_me_get",
         "parameters": [
           {
@@ -2896,7 +3163,7 @@
     },
     "/api/me/claim": {
       "post": {
-        "description": "Keep a temporary (guest/demo) account: add an email + password. All saved jobs, the resume,\nand matches stay. 400 ALREADY_CLAIMED for normal accounts, 409 EMAIL_TAKEN if in use.",
+        "description": "Keep a temporary or demo account by adding an email and password. Saved jobs, the resume\nand matches all stay. 400 ALREADY_CLAIMED for normal accounts and 409 EMAIL_TAKEN if in use.",
         "operationId": "claim_api_me_claim_post",
         "parameters": [
           {
@@ -2956,7 +3223,7 @@
     },
     "/api/me/password": {
       "patch": {
-        "description": "Change the user's password.\nReturns 401 if current_password is wrong, 422 if new_password < 10 chars.",
+        "description": "Change your password.\nAnswers 401 if the current password is wrong and 422 if the new one is under 10 characters.",
         "operationId": "change_password_api_me_password_patch",
         "parameters": [
           {
@@ -3009,7 +3276,7 @@
     },
     "/api/postings": {
       "get": {
-        "description": "List postings with optional keyword/semantic search, filters, sort, and pagination.\nFastAPI validates every query param against PostingListParams, so an unknown\nsort column or page size is a 422 before the service runs.\nAuthenticated users also get is_saved on each item.",
+        "description": "List jobs with search, filters, sorting and pages.\nFastAPI checks every query param against PostingListParams so a sort column or\npage size we do not allow is a 422 before the service even runs.\nSigned in people also get is_saved on each job.",
         "operationId": "get_postings_api_postings_get",
         "parameters": [
           {
@@ -3075,6 +3342,31 @@
                 }
               ],
               "title": "Term"
+            }
+          },
+          {
+            "in": "query",
+            "name": "season",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "winter",
+                      "spring",
+                      "summer",
+                      "fall"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Season"
             }
           },
           {
@@ -3148,7 +3440,10 @@
                       "it_security",
                       "business",
                       "sales_marketing",
-                      "customer"
+                      "customer",
+                      "health",
+                      "public",
+                      "trades"
                     ],
                     "type": "string"
                   },
@@ -3240,7 +3535,12 @@
                     "finance_accounting",
                     "marketing",
                     "design",
-                    "science"
+                    "science",
+                    "health_sciences",
+                    "social_sciences",
+                    "environment",
+                    "education",
+                    "engineering_technology"
                   ],
                   "type": "string"
                 },
@@ -3333,7 +3633,9 @@
                 "posted_at",
                 "deadline",
                 "company",
-                "title"
+                "title",
+                "duration_months",
+                "term_start"
               ],
               "title": "Sort",
               "type": "string"
@@ -3419,7 +3721,7 @@
         ]
       },
       "post": {
-        "description": "Add a single posting manually. Returns 409 if a duplicate already exists.",
+        "description": "Add one job by hand. Answers 409 if it is already there.",
         "operationId": "create_manual_posting_api_postings_post",
         "parameters": [
           {
@@ -3479,7 +3781,7 @@
     },
     "/api/postings/meta/filters": {
       "get": {
-        "description": "Return distinct values for filter dropdowns (cities, provinces, terms, skills).\nCached by the frontend for 5 minutes — values change only when new postings arrive.",
+        "description": "The choices for the filter menus like cities, provinces, terms and skills.\nThe site caches this for 5 minutes since it only changes when new jobs come in.",
         "operationId": "postings_filter_meta_api_postings_meta_filters_get",
         "responses": {
           "200": {
@@ -3501,7 +3803,7 @@
     },
     "/api/postings/upload": {
       "post": {
-        "description": "Bulk-import postings from a CSV file.\nRate-limited to 3 uploads per user per hour.",
+        "description": "Import a bunch of jobs from a CSV file.\nLimited to 3 uploads per person per hour.",
         "operationId": "upload_csv_endpoint_api_postings_upload_post",
         "parameters": [
           {
@@ -3561,7 +3863,7 @@
     },
     "/api/postings/{posting_id}": {
       "get": {
-        "description": "Full detail for a single posting. Returns 404 if the ID doesn't exist.",
+        "description": "Everything about one job. Answers 404 if the id is not there.",
         "operationId": "get_posting_detail_api_postings__posting_id__get",
         "parameters": [
           {
@@ -3621,7 +3923,7 @@
     },
     "/api/postings/{posting_id}/similar": {
       "get": {
-        "description": "Return up to 5 postings most similar by embedding cosine similarity.",
+        "description": "Up to 5 jobs that are most alike by embedding.",
         "operationId": "get_similar_postings_api_postings__posting_id__similar_get",
         "parameters": [
           {
@@ -3665,7 +3967,7 @@
     },
     "/api/resume": {
       "delete": {
-        "description": "Permanently delete the resume and all match results.",
+        "description": "Delete the resume and every match for good.",
         "operationId": "delete_resume_endpoint_api_resume_delete",
         "parameters": [
           {
@@ -3706,7 +4008,7 @@
         ]
       },
       "get": {
-        "description": "Return stored resume metadata for the authenticated user.",
+        "description": "Details about the saved resume for the signed in person.",
         "operationId": "get_resume_endpoint_api_resume_get",
         "parameters": [
           {
@@ -3754,7 +4056,7 @@
         ]
       },
       "post": {
-        "description": "Upload a resume (PDF/DOCX, ≤5 MB), extract text, run match pipeline,\nstore results, and return ranked matches. With the visitor's AI key (X-AI-* headers) the\nAI ranks and explains matches; without any key, matches are ranked by skill overlap for\nfree. Only the site owner's fallback key counts toward the daily AI limit.\n`preferences` (optional) is a JobPreferences JSON object: what the student is looking for.",
+        "description": "Upload a resume as PDF or DOCX up to 5 MB, read the text, match it and save\nand return the ranked matches. With the visitor's own AI key the AI ranks and\nexplains the matches. With no key at all we rank by skill overlap for free.\nOnly the owner's backup key counts toward the daily AI limit.\n`preferences` is optional JSON for what the student is looking for.",
         "operationId": "upload_resume_endpoint_api_resume_post",
         "parameters": [
           {
@@ -3860,9 +4162,69 @@
         ]
       }
     },
+    "/api/resume/align/{posting_id}": {
+      "get": {
+        "description": "How to make the saved resume fit one job. Skills and words it has or lacks, plain checks\nand the edits to make. No AI, so it is free and instant. 404 with no resume or job.",
+        "operationId": "align_endpoint_api_resume_align__posting_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "posting_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Posting Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "cookie",
+            "name": "session",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Session"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ResumeAlignment"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Align Endpoint",
+        "tags": [
+          "resume"
+        ]
+      }
+    },
     "/api/resume/insights": {
       "get": {
-        "description": "Skills found + in-demand skills you're missing (free), plus the cached AI review if any.",
+        "description": "Skills we found and popular skills you are missing for free, plus the saved AI review.",
         "operationId": "resume_insights_api_resume_insights_get",
         "parameters": [
           {
@@ -3910,7 +4272,7 @@
         ]
       },
       "post": {
-        "description": "Run the AI resume review on the visitor's key (strengths, tips, roles) and cache it.",
+        "description": "Run the AI resume review on the visitor's key and save it.",
         "operationId": "generate_resume_insights_api_resume_insights_post",
         "parameters": [
           {
@@ -4008,7 +4370,7 @@
     },
     "/api/resume/matches": {
       "get": {
-        "description": "Return stored ranked match results. Empty list if no resume on file.",
+        "description": "Saved ranked matches. An empty list if there is no resume yet.",
         "operationId": "get_matches_endpoint_api_resume_matches_get",
         "parameters": [
           {
@@ -4058,7 +4420,7 @@
     },
     "/api/resume/matches/{posting_id}/ask": {
       "post": {
-        "description": "Stream a cited Q&A response about a matched posting.\nResponse is text/event-stream with delta chunks ending in [DONE].",
+        "description": "Stream an answer with sources about one matched job.\nIt is a text/event-stream of small pieces that ends with [DONE].",
         "operationId": "ask_about_posting_api_resume_matches__posting_id__ask_post",
         "parameters": [
           {
@@ -4174,7 +4536,7 @@
     },
     "/api/resume/preferences": {
       "put": {
-        "description": "Save what the student is looking for (job types, location, work mode, level, keywords)\nand re-match the stored resume against it. Uses the visitor's own AI key if they set one;\notherwise the free ranking, so changing filters never spends the site owner's AI quota.",
+        "description": "Save what the student wants like job type, place, work mode, level and keywords\nand match the saved resume again. Uses their own AI key if they set one\nand the free ranking if not, so changing filters never spends the owner's AI quota.",
         "operationId": "update_preferences_endpoint_api_resume_preferences_put",
         "parameters": [
           {
@@ -4282,7 +4644,7 @@
     },
     "/api/resume/rematch": {
       "post": {
-        "description": "Re-rank the stored resume against today's postings with the visitor's AI.",
+        "description": "Rank the saved resume against today's jobs again with the visitor's AI.",
         "operationId": "rematch_endpoint_api_resume_rematch_post",
         "parameters": [
           {
@@ -4380,7 +4742,7 @@
     },
     "/api/saved": {
       "get": {
-        "description": "Return the current user's saved postings with status counts, deadlines, and stats.\nOptionally filter by status.  Ordered by most recently saved.",
+        "description": "Your saved jobs plus status counts, deadlines and stats.\nYou can filter by status. Newest saves come first.",
         "operationId": "list_saved_api_saved_get",
         "parameters": [
           {
@@ -4467,7 +4829,7 @@
         ]
       },
       "post": {
-        "description": "Bookmark a posting.  Idempotent — returns 201 on first save, 200 if already saved.\nReturns 404 if the posting_id doesn't exist.",
+        "description": "Save a job. Safe to repeat. Answers 201 the first time and 200 after that.\nAnswers 404 if the job does not exist.",
         "operationId": "save_posting_api_saved_post",
         "parameters": [
           {
@@ -4527,7 +4889,7 @@
     },
     "/api/saved/export/csv": {
       "get": {
-        "description": "Download the current user's full tracker as a CSV file.\nGenerated server-side with pandas; streamed directly to the browser.",
+        "description": "Download your whole tracker as a CSV file.\nBuilt on the server with pandas and sent straight to the browser.",
         "operationId": "export_csv_api_saved_export_csv_get",
         "parameters": [
           {
@@ -4575,7 +4937,7 @@
     },
     "/api/saved/{saved_posting_id}": {
       "delete": {
-        "description": "Remove a saved posting. Returns 404 if not found or owned by another user.",
+        "description": "Unsave a job. Answers 404 if it is not there or belongs to someone else.",
         "operationId": "unsave_posting_api_saved__saved_posting_id__delete",
         "parameters": [
           {
@@ -4628,7 +4990,7 @@
     },
     "/api/saved/{saved_posting_id}/events": {
       "post": {
-        "description": "Manually add a status event (e.g. note an interview date retroactively).\nAlso updates the current status on the saved posting.",
+        "description": "Add a status event by hand, like noting an interview date after the fact.\nThis also changes the current status on the saved job.",
         "operationId": "add_event_api_saved__saved_posting_id__events_post",
         "parameters": [
           {
@@ -4698,7 +5060,7 @@
     },
     "/api/saved/{saved_posting_id}/status": {
       "patch": {
-        "description": "Update the application status on a saved posting and record the change as an event.\nPass null status to clear. Returns 404 if not found or owned by another user.",
+        "description": "Change the application status on a saved job and log the change.\nSend null to clear it. Answers 404 if it is not there or belongs to someone else.",
         "operationId": "update_status_api_saved__saved_posting_id__status_patch",
         "parameters": [
           {

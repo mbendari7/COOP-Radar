@@ -31,7 +31,7 @@ export function SimilarPostings({ postingId }: SimilarPostingsProps) {
   }
 
   return (
-    <ul className="divide-y divide-gray-200 border-t-[1.5px] border-gray-900" aria-label="Similar postings">
+    <ul className="divide-y divide-gray-200 border-t border-gray-300" aria-label="Similar postings">
       {data.items.map((item) => (
         <li key={item.id} className="py-3">
           <Link to={`/postings/${item.id}`} className="group block">

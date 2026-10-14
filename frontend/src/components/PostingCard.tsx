@@ -1,6 +1,7 @@
 /**
- * One job in the results list. A plain row split from the next by a thin rule, with the
- * job's postmark on the right showing where it is and the day it was posted.
+ * One job in the results list. A plain row split from the next by a thin rule.
+ * Title, then employer and place, then the facts students scan for first: the term and
+ * its length, the kind of role and when it was posted. The postmark lives on the details panel.
  *
  * On wide screens clicking a row picks it for the details panel next to the list (onSelect).
  * On phones, or when there is no panel, it opens the job's own page.
@@ -10,9 +11,8 @@
 import { useNavigate } from 'react-router-dom'
 import type { PostingListItem } from '../api/postings'
 import BookmarkButton from './BookmarkButton'
-import Postmark from './Postmark'
-import { postmarkPlace } from './postal'
 import { ROLE_LABELS, splitViewVisible } from './roles'
+import { SEASON_DOT, lengthLabel, termLabel } from './terms'
 import { formatLocation, timeAgo, workModeLabel } from '../utils/format'
 
 interface Props {
@@ -31,7 +31,8 @@ export default function PostingCard({ posting, showBookmark = false, selected = 
     else navigate(`/postings/${posting.id}`)
   }
   const isNew = Date.now() - new Date(posting.posted_at).getTime() < 3 * 86_400_000
-  const { place, region } = postmarkPlace(posting)
+  const term = termLabel(posting.term)
+  const length = lengthLabel(posting.duration_months)
 
   return (
     <article
@@ -51,38 +52,40 @@ export default function PostingCard({ posting, showBookmark = false, selected = 
     >
       <div className="flex items-start gap-4">
         <div className="min-w-0 flex-1">
-          <h3 className={`text-[16px] font-bold leading-snug ${selected ? 'text-gray-900 lg:text-air-700' : 'text-gray-900 group-hover:text-air-700'}`}>
+          <h3 className={`text-[17px] font-bold leading-snug ${selected ? 'text-gray-900 lg:text-air-700' : 'text-gray-900 group-hover:text-air-700'}`}>
             {posting.title}
           </h3>
-          <p className="mt-0.5 text-sm text-gray-700">
+          <p className="mt-0.5 text-[15px] text-gray-700">
             <span className="font-semibold text-gray-900">{posting.company}</span>
             <span className="mx-1.5 text-gray-400" aria-hidden="true">·</span>
             {formatLocation(posting.city, posting.province, posting.country)}
             {posting.work_mode !== 'onsite' && posting.city !== 'Remote' && <> ({workModeLabel(posting.work_mode)})</>}
           </p>
 
-          <p className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[13px]">
-            {isNew && <span className="label-form !text-post-600">New</span>}
-            {posting.role !== 'job' && <span className="label-form !text-air-700">{ROLE_LABELS[posting.role]}</span>}
-            {posting.term && posting.term !== 'Open' && <span className="font-semibold text-gray-800">{posting.term}</span>}
-            {posting.grad_years.length > 0 && <span className="text-gray-700">Grads {posting.grad_years.join(', ')}</span>}
-            {posting.skills.length > 0 && <span className="text-gray-600">{posting.skills.slice(0, 3).join(' · ')}</span>}
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
+            {(term || length) && (
+              <span className="inline-flex items-center gap-1.5 border border-gray-300 bg-white px-2 py-0.5 font-semibold text-gray-900">
+                {posting.season && <span className={`h-2 w-2 rounded-full ${SEASON_DOT[posting.season]}`} aria-hidden="true" />}
+                {[term, length].filter(Boolean).join(' · ')}
+              </span>
+            )}
+            {posting.role !== 'job' && (
+              <span className="border border-air-200 bg-air-50 px-2 py-0.5 font-semibold text-air-800">{ROLE_LABELS[posting.role]}</span>
+            )}
+            {isNew && <span className="font-bold text-post-600">New</span>}
+            {posting.grad_years.length > 0 && <span className="text-gray-700">For {posting.grad_years.join(' or ')} grads</span>}
             <span className="text-gray-600">Posted {timeAgo(posting.posted_at)}</span>
           </p>
+          {posting.skills.length > 0 && (
+            <p className="mt-1 text-[13px] text-gray-600">{posting.skills.slice(0, 4).join(' · ')}</p>
+          )}
         </div>
 
-        <div className="flex shrink-0 items-start gap-1">
-          <Postmark
-            place={place}
-            region={region}
-            date={new Date(posting.posted_at)}
-            seed={posting.id}
-            tone={selected ? 'post' : 'air'}
-            size="sm"
-            stamp={selected}
-          />
-          {showBookmark && <BookmarkButton postingId={posting.id} isSaved={posting.is_saved === true} />}
-        </div>
+        {showBookmark && (
+          <div className="shrink-0">
+            <BookmarkButton postingId={posting.id} isSaved={posting.is_saved === true} />
+          </div>
+        )}
       </div>
     </article>
   )

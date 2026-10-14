@@ -304,3 +304,37 @@ proxied to the live Render API. Not run: the resume upload e2e test (it creates 
 redeploy, and a fresh import, so live employer names update only after the next deploy and import.
 
 **What I reviewed / changed**: _(fill in after reviewing the diff)_
+
+
+---
+
+## 2026-10-13. Term season and length, every field, lenient matching, resume fit, readable design
+
+**What the AI assistant did**:
+- Term and length. New `app/ingest/terms.py` reads the term ("Summer 2027", "Fall '27", "S27", "(January 2027)" in a
+  title, "May to August", "Work Term: Winter") and the length ("4 month co-op", "12 week internship", "one year
+  contract") from each job, on import and again on every re-import. Migration 0011 adds generated `season` and
+  `term_start` columns and makes `duration_months` nullable, since imported jobs had all been given a made up 4 months.
+  The jobs page got season and length menus, season and length filters with counts, and sorts by term start and by
+  length. Rows lead with "Summer 2027 · 4 months" and a season dot.
+- Every field. A Workday adapter (`app/ingest/workday.py`) reads the public JSON behind myworkdayjobs.com careers
+  pages (robots.txt allows them). About 50 employers were probed and checked live before being added: banks,
+  insurers, energy, mining, aerospace, pharma and health, accounting, food, retail and universities. An optional
+  Adzuna adapter runs only when the owner sets its keys. New job types (Health and science, Government education and
+  nonprofit, Trades and technicians), five new programs, and about 75 non tech skills.
+- Lenient matching. Program and grad year now rank jobs instead of hiding them, a job for other grad years shows with
+  a "check before you apply" note, a wanted length ranks higher, and up to 60 matches come back instead of 20.
+- Make your resume fit. `GET /api/resume/align/{id}` with no AI: checks, ordered edits and the job's words split into
+  ones the resume has and ones worth adding if true. Shown on job details and under each match.
+- Readability. Labels are sentence case at 13px instead of tiny narrow capitals, headings are wider, section rules
+  are thin grey lines, and the postmark moved off list rows to the details panel. DESIGN.md records it.
+- Did not add LinkedIn, Indeed or Glassdoor: their terms forbid automated collection and the project rules require
+  public APIs and feeds.
+
+**Results (actual runs)**: ruff and mypy clean; backend 363 passed; `alembic upgrade`, `check`, downgrade to 0010 and
+upgrade again clean; frontend lint, tsc, build clean, 52 passed; Playwright 8 of 8 against a local site on a scratch
+database. Live Workday check: the adapter pulled real jobs from every listed employer (for example Desjardins 201
+Canadian jobs, BDO 230, IKO 117, every big bank 9 to 33 student roles). Not run: a deploy, and a full import cycle
+finishing locally (38 of 174 sources had run with no failures when checked).
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_

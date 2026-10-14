@@ -1,6 +1,6 @@
 /** Job filter values shared by FilterBar, ActiveFilterChips and the jobs page. */
 
-import type { CategoryKey, CountryCode, ProgramKey, WorkMode } from '../api/postings'
+import type { CategoryKey, CountryCode, ProgramKey, Season, WorkMode } from '../api/postings'
 
 export const WORK_MODES: WorkMode[] = ['onsite', 'hybrid', 'remote']
 export const DURATIONS = [4, 8, 12, 16]
@@ -53,6 +53,7 @@ export interface Filters {
   work_mode: WorkMode | ''
   posted_within: number
   term: string
+  season: Season[]
   duration: number[]
   company: string[]
   skills: string[]
@@ -61,14 +62,14 @@ export interface Filters {
 
 export const EMPTY_FILTERS: Filters = {
   category: [], level: '', country: '', program: '', grad_year: 0, province: '', city: '',
-  work_mode: '', posted_within: 0, term: '', duration: [], company: [], skills: [],
+  work_mode: '', posted_within: 0, term: '', season: [], duration: [], company: [], skills: [],
   show_expired: false,
 }
 
 /** How many filters are changed from the defaults. Shown on the All filters button. */
 export function countActive(f: Filters): number {
   return (
-    f.category.length + f.duration.length + f.company.length + f.skills.length +
+    f.category.length + f.season.length + f.duration.length + f.company.length + f.skills.length +
     [f.level, f.country, f.program, f.province, f.city, f.work_mode, f.term].filter(Boolean).length +
     (f.grad_year ? 1 : 0) + (f.posted_within ? 1 : 0) + (f.show_expired ? 1 : 0)
   )

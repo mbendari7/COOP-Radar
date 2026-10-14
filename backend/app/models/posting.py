@@ -33,6 +33,18 @@ SKILLS_TO_TEXT_DDL = (
 )
 
 
+SEASON_SQL = (
+    "CASE WHEN term ~* '^winter' THEN 'winter' WHEN term ~* '^spring' THEN 'spring' "
+    "WHEN term ~* '^summer' THEN 'summer' WHEN term ~* '^fall' THEN 'fall' END"
+)
+TERM_START_SQL = (
+    "CASE WHEN term ~* '^(winter|spring|summer|fall) [0-9]{4}$' THEN make_date("
+    "CAST(right(term, 4) AS integer), "
+    "CASE WHEN term ~* '^winter' THEN 1 WHEN term ~* '^spring' THEN 3 "
+    "WHEN term ~* '^summer' THEN 5 ELSE 9 END, 1) END"
+)
+
+
 class WorkMode(enum.StrEnum):
     """
     Saved as a Postgres ENUM called work_mode_enum so the database
@@ -68,10 +80,20 @@ class Posting(Base):
     work_mode: Mapped[WorkMode] = mapped_column(
         Enum(WorkMode, name="work_mode_enum"), nullable=False
     )
+    # Like "Summer 2027", "Summer" or "Open" when the job does not say (app/ingest/terms.py)
     term: Mapped[str] = mapped_column(Text, nullable=False)
+    # Postgres works these two out from term on its own. season is winter, spring, summer or
+    # fall and term_start is the first day of the term, so jobs sort by when they start.
+    # The expressions match migration 0011 exactly
+    season: Mapped[str | None] = mapped_column(
+        Text, Computed(SEASON_SQL, persisted=True), nullable=True
+    )
+    term_start: Mapped[date | None] = mapped_column(
+        Date, Computed(TERM_START_SQL, persisted=True), nullable=True
+    )
 
-    # The check only allows the four normal co-op lengths
-    duration_months: Mapped[int] = mapped_column(SmallInteger, nullable=False)
+    # The check only allows the four normal co-op lengths. None means the job does not say
+    duration_months: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
 
     deadline: Mapped[date] = mapped_column(Date, nullable=False)
     posted_at: Mapped[datetime] = mapped_column(
@@ -141,6 +163,8 @@ class Posting(Base):
         Index("idx_postings_term", "term"),
         Index("idx_postings_work_mode", "work_mode"),
         Index("idx_postings_duration", "duration_months"),
+        Index("idx_postings_season", "season"),
+        Index("idx_postings_term_start", "term_start"),
         # Indexes for import tracking
         Index("idx_postings_closed_at", "closed_at"),
         Index(

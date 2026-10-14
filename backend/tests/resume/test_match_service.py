@@ -53,7 +53,7 @@ def test_extract_text_no_extension_raises() -> None:
 
 
 @pytest.mark.asyncio
-async def test_embed_and_rank_returns_top20(monkeypatch: pytest.MonkeyPatch) -> None:
+async def test_embed_and_rank_returns_top60(monkeypatch: pytest.MonkeyPatch) -> None:
     import json
 
     from app.services.resume import embed_and_rank
@@ -102,7 +102,7 @@ async def test_embed_and_rank_returns_top20(monkeypatch: pytest.MonkeyPatch) -> 
 
     results = await embed_and_rank(mock_db, "Python Django PostgreSQL developer", TEST_CREDS)
 
-    assert len(results) <= 20
+    assert len(results) <= 60
     # Results sorted by score, highest first
     scores = [r.score for r in results]
     assert scores == sorted(scores, reverse=True)

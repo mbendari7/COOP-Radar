@@ -110,12 +110,24 @@ def _province(token: str) -> str:
     return _PROVINCES.get(t.lower(), "")
 
 
+def tidy_place(name: str) -> str:
+    """
+    Clean up a place name. "OSHAWA" gives "Oshawa", "st. john's" gives "St. John's" and an
+    address like "6168 NO 3 RD:RICHMOND" gives "Richmond".
+    """
+    name = name.rsplit(":", 1)[-1].strip(" ,-")
+    if name.isupper() or name.islower():
+        name = re.sub(r"[A-Za-zÀ-ÿ]+('[a-z])?", lambda m: m.group(0).capitalize(), name.lower())
+    return name
+
+
 def _known_city(token: str) -> str | None:
     """The proper name if the text is a Canadian city we know. "Toronto Canada" gives "Toronto"."""
     name = re.sub(r"\bcanada\b", "", token, flags=re.IGNORECASE).strip(" ,").lower()
+    name = name.rsplit(":", 1)[-1].strip()
     if name.startswith("montr"):  # also catches a badly encoded "Montréal"
         return "Montréal"
-    return name.title() if name in _CITY_PROVINCE else None
+    return tidy_place(name) if name in _CITY_PROVINCE else None
 
 
 _MODE_WORDS = re.compile(r"(?i)^(remote|hybrid|on-?site|in[- ]office|in[- ]person|flexible)$")
@@ -307,6 +319,7 @@ class _BoardAdapter(BaseAdapter):
             city, province = parse_location(location)
         if work_mode == "remote" and not city:
             city = "Remote"
+        city = tidy_place(city) if city else city
         return RawPosting(
             title=title.strip(),
             company=company,

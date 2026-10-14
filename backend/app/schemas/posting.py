@@ -19,6 +19,7 @@ from app.services.categories import CategoryKey
 from app.services.education import ProgramKey
 
 CountryCode = Literal["CA", "US"]
+Season = Literal["winter", "spring", "summer", "fall"]
 RoleType = Literal["coop", "internship", "new_grad", "job"]
 
 # Python copies of the title patterns in app/services/postings.py, used for the role badge
@@ -63,7 +64,12 @@ class PostingListItem(BaseModel):
     country: str = "CA"
     work_mode: WorkMode
     term: str
-    duration_months: int
+    # winter, spring, summer or fall, worked out from term. None when the job does not say
+    season: Season | None = None
+    # The first day of the term like 2027-05-01. None when the term has no year
+    term_start: date | None = None
+    # 4, 8, 12 or 16. None when the job does not say how long it is
+    duration_months: int | None = None
     deadline: date
     posted_at: datetime
     skills: list[str]
@@ -124,6 +130,16 @@ class WorkModeCount(BaseModel):
     count: int
 
 
+class SeasonCount(BaseModel):
+    key: Season
+    count: int
+
+
+class DurationCount(BaseModel):
+    months: int
+    count: int
+
+
 class ProgramOption(BaseModel):
     key: ProgramKey
     label: str
@@ -147,6 +163,9 @@ class FilterMeta(BaseModel):
     work_modes: list[WorkModeCount] = []
     # Programs a student can pick (see app/services/education.py)
     programs: list[ProgramOption] = []
+    # Open jobs by term season and by length. Jobs that do not say are left out of both
+    seasons: list[SeasonCount] = []
+    durations: list[DurationCount] = []
 
 
 # Query params
@@ -222,6 +241,8 @@ class PostingListParams(BaseModel):
     city: str | None = None
     province: str | None = None
     term: str | None = None
+    # Term seasons, any of them, like ?season=summer&season=fall
+    season: list[Season] | None = None
     work_mode: WorkMode | None = None
     # duration takes a list so you can pick more than one, like 4 or 8 months
     duration: list[int] | None = None
@@ -247,7 +268,11 @@ class PostingListParams(BaseModel):
     search_mode: Literal["keyword", "semantic"] = "keyword"
 
     # The only sort columns we allow. Anything else is a 422 before the service runs
-    sort: Literal["posted_at", "deadline", "company", "title"] = "posted_at"
+    # duration_months sorts by length and term_start by when the term begins. Jobs that do not
+    # say go last either way
+    sort: Literal[
+        "posted_at", "deadline", "company", "title", "duration_months", "term_start"
+    ] = "posted_at"
     order: Literal["asc", "desc"] = "desc"
 
     page: int = Field(default=1, ge=1)

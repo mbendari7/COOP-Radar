@@ -1,7 +1,7 @@
 # CoopRadar
 
 **A job board for co-op students that knows who you are.** CoopRadar imports real co-op, internship and
-entry-level jobs from about 120 employers' own career pages, reads what each job description asks for (programs of
+entry-level jobs from about 170 employers' own career pages, reads what each job description asks for (programs of
 study, graduation years, skills), and matches them to a student's resume: their program, graduation year, wanted
 term and skills. Every match says why it fits. Matching runs in SQL, so it's free and instant; an optional
 bring-your-own-key AI layer (Claude, ChatGPT or Gemini) adds resume reviews, tailoring and cover letters.
@@ -28,11 +28,13 @@ python start.py      # sets everything up the first time, then opens http://loca
 
 | | |
 |---|---|
-| **Real jobs, refreshed** | About 2,800 open jobs from ~120 employers via the public Greenhouse, Lever, Ashby and SmartRecruiters job-board APIs, imported every 6 hours. Every job in Canada, plus US co-op, internship and new-grad roles. |
+| **Real jobs, every field** | Jobs from ~170 employers' own career sites via the public Greenhouse, Lever, Ashby, SmartRecruiters and Workday job-board APIs, imported every 6 hours: tech, banks, insurers, energy, health and pharma, aerospace, accounting, food, retail and universities. Every job in Canada, plus US co-op, internship and new-grad roles. Optional Adzuna key adds student jobs it gathers from employer sites in every field. |
+| **Term and length** | Each job's term season (Winter, Spring, Summer, Fall) and length (4, 8, 12 or 16 months) are read from its title and description. Filter by season and length, sort by term start or by length, and see both on every row. Jobs that don't say are marked "Not stated" instead of guessed. |
 | **Job-board search** | What / Where search, quick filters (level, country, on-site / hybrid / remote) and an *All filters* panel: job type, program or major, graduation year, province or state, city, date posted, term, length, company, skills. Results list beside a details panel; everything lives in the URL. |
 | **Reads the job description** | At import, each description is parsed for the programs of study it names ("Bachelor's in Computer Science, Engineering...") and the graduation years it wants ("graduating in December 2027 or 2028"). |
 | **Reads the resume** | Upload a PDF or Word file with no sign-up. CoopRadar finds the student's program, degree and graduation year in the education section; the student can correct them. |
-| **Co-op matching** | One SQL query filters out jobs for other graduation years and other fields (job types follow the student's program), then scores skills, student roles, program, graduation year and wanted term. Top 20, each with plain "why it fits" reasons and the skills they have or are missing. |
+| **Co-op matching, lenient** | Students apply to lots of co-ops, so matching only filters on hard choices (picked job types, place, country, level). Program, graduation year, term and length move jobs up or down instead of hiding them. Up to 60 matches, each with plain "why it fits" reasons, and a fair warning when a job asks for another graduation year. |
+| **Make your resume fit** | For any job, free and with no AI: yes or no checks (program, grad year, availability line, French, numbers in bullets), the edits to make in order, and the job's skills and words split into ones the resume has and ones worth adding if true. |
 | **Resume feedback** | Skills employers can see on the resume, and the most-requested skills it's missing. Free. |
 | **AI, bring your own key** | Resume review, AI re-ranking, per-job tailoring plans, cover letter openers and cited Q&A, streamed. The key stays in the visitor's browser. |
 | **Tracker** | Save jobs, move them through statuses with dated notes, deadlines this week, CSV export. List or drag and drop board. |
@@ -60,7 +62,7 @@ flowchart LR
     end
     API --> DB[("PostgreSQL 16<br/>full-text · arrays · JSONB · pgvector")]
     JOBS --> DB
-    JOBS -->|"public JSON APIs"| BOARDS["~120 career boards<br/>Greenhouse · Lever · Ashby · SmartRecruiters"]
+    JOBS -->|"public JSON APIs"| BOARDS["~170 career boards<br/>Greenhouse · Lever · Ashby · SmartRecruiters · Workday"]
     API -->|"visitor's own key, per request"| AI["Claude · ChatGPT · Gemini"]
 ```
 
@@ -112,7 +114,7 @@ python start.py          # first run takes a few minutes, then → http://localh
 The first run creates `backend/.venv`, installs packages (with [uv](https://docs.astral.sh/uv/) if you have it),
 builds the React site, and starts a private PostgreSQL 16 + pgvector in `~/.coopradar` using the
 [`pgserver`](https://pypi.org/project/pgserver/) package. Then it migrates, seeds, serves the site and API on one
-port, and imports real jobs in the background (a few minutes for all ~120 boards).
+port, and imports real jobs in the background (a few minutes for all ~170 boards).
 
 | Task | Command |
 |---|---|
@@ -214,10 +216,10 @@ COOP-Radar/
 │   ├── app/
 │   │   ├── api/                  Routers
 │   │   ├── services/             postings, resume (matching), education, categories, insights, auth, ...
-│   │   ├── ingest/               boards.py (Greenhouse/Lever/Ashby/SmartRecruiters), runner, dedup, skill_match
+│   │   ├── ingest/               boards.py (Greenhouse/Lever/Ashby/SmartRecruiters), workday.py, adzuna.py, terms.py (term and length), runner, dedup, skill_match
 │   │   ├── schemas/ · models/ · agent/ · ai.py · jobs.py · store.py
-│   ├── alembic/versions/         0001 to 0010
-│   ├── seed/                     skills · job_boards (~120 employers) · sample postings
+│   ├── alembic/versions/         0001 to 0011
+│   ├── seed/                     skills · job_boards (~170 employers) · sample postings
 │   └── tests/                    api/ · ingest/ · resume/ · eval/ · perf/
 └── frontend/
     ├── src/                      pages/ · components/ · api/ (client + TanStack Query hooks)
@@ -244,7 +246,7 @@ governed by `.specify/memory/constitution.md` (filter in SQL, every endpoint has
 
 - [x] Search and tracker · ingestion · resume matching · bring-your-own-key AI
 - [x] One command to run (`python start.py`), free hosting (Render + Neon + GitHub Actions), optional Vercel front
-- [x] Job-board redesign; co-op matching by program, graduation year and term; ~120 employers; US internships; Playwright
+- [x] Job-board redesign; co-op matching by program, graduation year and term; ~170 employers; US internships; Playwright
 - [x] Postal look (postmarks, no card boxes, Archivo), plain language comments across the code
 - [ ] Email alerts for new matches · school job boards with public feeds · learning from which jobs students save
 

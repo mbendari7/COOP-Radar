@@ -42,6 +42,7 @@ import {
 } from '../api/resume'
 import AuthModal from '../components/AuthModal'
 import ConversationPanel from '../components/ConversationPanel'
+import ResumeFitPanel from '../components/ResumeFitPanel'
 import {
   ArrowRightIcon, CheckIcon, ExternalIcon, FileIcon, PinIcon, TrendIcon, UploadIcon,
 } from '../components/Icons'
@@ -110,7 +111,7 @@ function StepCard({
   step, title, subtitle, done = false, children,
 }: { step: number; title: string; subtitle?: string; done?: boolean; children: React.ReactNode }) {
   return (
-    <section aria-labelledby={`step-${step}`} className="border-t-[1.5px] border-gray-900">
+    <section aria-labelledby={`step-${step}`} className="border-t border-gray-300">
       <div className="flex items-start justify-between gap-4 pb-4 pt-4">
         <div>
           <h2 id={`step-${step}`} className="display text-2xl leading-tight text-gray-900">{title}</h2>
@@ -253,6 +254,34 @@ function AboutYou({
           </select>
           <p className="mt-1 text-xs text-gray-600">Jobs for this term are ranked higher.</p>
         </div>
+        <fieldset>
+          <legend className={labelClass}>
+            Co-op length <span className="font-normal normal-case tracking-normal text-gray-600">optional</span>
+          </legend>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {([4, 8, 12, 16] as const).map((d) => {
+              const on = prefs.durations.includes(d)
+              return (
+                <button
+                  key={d}
+                  type="button"
+                  role="checkbox"
+                  aria-checked={on}
+                  onClick={() =>
+                    onChange({
+                      ...prefs,
+                      durations: on ? prefs.durations.filter((x) => x !== d) : [...prefs.durations, d],
+                    })
+                  }
+                  className={`chip ${on ? 'chip-on' : ''}`}
+                >
+                  {d} months
+                </button>
+              )
+            })}
+          </div>
+          <p className="mt-1 text-xs text-gray-600">Jobs of these lengths are ranked higher. Others still show.</p>
+        </fieldset>
         <fieldset>
           <legend className={labelClass}>Countries</legend>
           <div className="mt-2.5 flex flex-wrap gap-4">
@@ -541,10 +570,14 @@ function StoredResume({ resume }: { resume: ResumeOut }) {
 
 // Results. The matching jobs
 
+/**
+ * Plain words for the score. Students apply to lots of co-ops, so even lower scores read as
+ * worth a try rather than a no.
+ */
 function scoreTone(score: number): { ring: string; label: string } {
-  if (score >= 70) return { ring: 'text-post-600', label: 'Strong match' }
-  if (score >= 40) return { ring: 'text-air-700', label: 'Good match' }
-  return { ring: 'text-gray-600', label: 'Possible match' }
+  if (score >= 60) return { ring: 'text-post-600', label: 'Strong match' }
+  if (score >= 35) return { ring: 'text-air-700', label: 'Good match' }
+  return { ring: 'text-gray-600', label: 'Worth a try' }
 }
 
 function SkillList({ title, items, have }: { title: string; items: string[]; have: boolean }) {
@@ -578,7 +611,7 @@ function MatchCard({ match, rank }: { match: MatchResultOut; rank: number }) {
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
             <div className="min-w-0">
-              <Link to={`/postings/${match.posting_id}`} className="stretch-semi text-xl font-extrabold leading-snug text-gray-900 hover:text-air-700">
+              <Link to={`/postings/${match.posting_id}`} className="text-xl font-bold leading-snug text-gray-900 hover:text-air-700">
                 <span className="mr-2 tabular-nums text-gray-400">{rank}</span>
                 {match.title}
               </Link>
@@ -589,6 +622,7 @@ function MatchCard({ match, rank }: { match: MatchResultOut; rank: number }) {
                 {formatLocation(match.city, match.province, match.country)}
                 {match.work_mode && match.city !== 'Remote' ? ` · ${workModeLabel(match.work_mode)}` : ''}
                 {match.term && match.term !== 'Open' ? ` · ${match.term}` : ''}
+                {match.duration_months ? ` · ${match.duration_months} months` : ''}
               </p>
             </div>
             <div className="flex items-center gap-2.5" aria-label={`Match score ${match.score} out of 100`}>
@@ -629,6 +663,8 @@ function MatchCard({ match, rank }: { match: MatchResultOut; rank: number }) {
             </div>
           )}
 
+          <FitToggle postingId={match.posting_id} />
+
           <div className="mt-4 space-y-3 pt-1">
             <SaveAndApply postingId={match.posting_id} deadline={match.deadline} />
             <ConversationPanel postingId={match.posting_id} postingTitle={match.title} company={match.company} />
@@ -636,6 +672,21 @@ function MatchCard({ match, rank }: { match: MatchResultOut; rank: number }) {
         </div>
       </div>
     </article>
+  )
+}
+
+/** Make your resume fit this job. Asks the server only when opened */
+function FitToggle({ postingId }: { postingId: string }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <details className="mt-4 border-l-2 border-air-200 pl-4" onToggle={(e) => setOpen(e.currentTarget.open)}>
+      <summary className="cursor-pointer text-[15px] font-bold text-air-700 hover:underline">
+        Make your resume fit this job
+      </summary>
+      <div className="mt-3">
+        <ResumeFitPanel postingId={postingId} enabled={open} />
+      </div>
+    </details>
   )
 }
 
@@ -676,7 +727,7 @@ function MatchesTab({ items, prefs }: { items: MatchResultOut[]; prefs: JobPrefe
       <div className="flex flex-wrap items-end justify-between gap-3">
         <p className="text-sm text-gray-700">
           {items.length > 0
-            ? 'Best fits first. Scores weigh your skills, your program and graduation year, and the term you want.'
+            ? `${items.length} jobs, best fits first. Scores weigh your skills, program, graduation year, and the term and length you want. Apply widely: a lower score is still worth a try.`
             : null}
         </p>
         {canUseAi && items.length > 0 && (
@@ -693,7 +744,7 @@ function MatchesTab({ items, prefs }: { items: MatchResultOut[]; prefs: JobPrefe
       {rematch.isError && <p role="alert" className="text-sm font-semibold text-post-700">{rematch.error.message}</p>}
 
       {items.length === 0 ? (
-        <div className="border-y-[1.5px] border-gray-900 px-6 py-10 text-center">
+        <div className="border-y border-gray-300 px-6 py-10 text-center">
           <p className="display text-xl text-gray-900">No open jobs fit yet</p>
           <p className="mt-1 text-sm text-gray-700">
             {narrowed
@@ -703,7 +754,7 @@ function MatchesTab({ items, prefs }: { items: MatchResultOut[]; prefs: JobPrefe
           </p>
         </div>
       ) : (
-        <ol className="border-t-[1.5px] border-gray-900" aria-label="Matched jobs">
+        <ol className="border-t border-gray-300" aria-label="Matched jobs">
           {items.map((m, i) => <li key={m.posting_id}><MatchCard match={m} rank={i + 1} /></li>)}
         </ol>
       )}
@@ -785,7 +836,7 @@ function FeedbackTab() {
 
   return (
     <div className="space-y-8">
-      <div className="grid gap-8 border-t-[1.5px] border-gray-900 pt-5 md:grid-cols-2">
+      <div className="grid gap-8 border-t border-gray-300 pt-5 md:grid-cols-2">
         <div>
           <h3 className="flex items-center gap-2 text-lg font-extrabold text-gray-900">
             <CheckIcon className="h-5 w-5 text-air-700" /> Skills employers can see
@@ -822,7 +873,7 @@ function FeedbackTab() {
         </div>
       </div>
 
-      <div className="space-y-4 border-t-[1.5px] border-gray-900 pt-5">
+      <div className="space-y-4 border-t border-gray-300 pt-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-lg font-extrabold text-gray-900">Full resume review</h3>

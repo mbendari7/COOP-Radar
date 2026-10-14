@@ -71,6 +71,10 @@ class Settings(BaseSettings):
     # Jobs in the US. "students" keeps only co-op, intern, student and new grad roles since lots
     # of Canadian students do a US term. "all" keeps every US job and "none" skips them
     ingest_us_jobs: Literal["students", "all", "none"] = "students"
+    # Optional Adzuna job search API keys (app/ingest/adzuna.py). Free at developer.adzuna.com.
+    # With both set we also import student jobs Adzuna gathers from employer sites in every field
+    adzuna_app_id: str = ""
+    adzuna_app_key: str = ""
 
     @field_validator("ingest_location_filter")
     @classmethod

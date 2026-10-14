@@ -6,7 +6,6 @@ Two steps
   2. If we are less than 0.6 sure, ask Claude (FAST_MODEL) for the fields
 """
 
-import re
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -14,6 +13,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ingest.skill_match import match_skills
+from app.ingest.terms import duration_in_text, term_in_text
 
 
 @dataclass
@@ -62,17 +62,13 @@ async def extract_fields(db: AsyncSession, text: str) -> ExtractedFields:
     if matched_skills:
         simple_fields_found += 1
 
-    # Very rough term spotting
-    term: str | None = None
-    for season in ("summer", "fall", "winter", "spring"):
-        m = re.search(rf"\b{season}\s+(\d{{4}})\b", text_lower)
-        if m:
-            term = f"{season.capitalize()} {m.group(1)}"
-            simple_fields_found += 1
-            break
+    # The term and length, read with plain rules (app/ingest/terms.py)
+    term = term_in_text("", text)
+    if term:
+        simple_fields_found += 1
 
     confidence = simple_fields_found / total_simple_fields
-    duration_months: int | None = None
+    duration_months = duration_in_text("", text)
 
     if confidence < 0.6 and taxonomy:
         # Step 2 asks the model
@@ -80,11 +76,11 @@ async def extract_fields(db: AsyncSession, text: str) -> ExtractedFields:
         if llm_result:
             if llm_result.get("work_mode"):
                 work_mode = llm_result["work_mode"]
-            if llm_result.get("term"):
+            if llm_result.get("term") and not term:
                 term = llm_result["term"]
             if llm_result.get("skills"):
                 matched_skills = llm_result["skills"]
-            if llm_result.get("duration_months") in (4, 8, 12, 16):
+            if not duration_months and llm_result.get("duration_months") in (4, 8, 12, 16):
                 duration_months = int(llm_result["duration_months"])
 
     return ExtractedFields(

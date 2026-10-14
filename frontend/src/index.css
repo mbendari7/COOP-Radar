@@ -34,15 +34,14 @@
 }
 
 @layer components {
-  /* Form lettering. Narrow capitals like the labels on a customs slip */
+  /* Form labels and small headings. Plain sentence case at a size people can read at a glance */
   .label-form {
-    @apply text-[11px] font-bold uppercase text-gray-600;
-    font-stretch: 78%;
-    letter-spacing: 0.08em;
+    @apply text-[13px] font-semibold text-gray-700;
   }
+  /* Page titles. A little narrow and heavy for character, but wide enough to read easily */
   .display {
-    font-stretch: 82%;
-    @apply font-extrabold tracking-tight;
+    font-stretch: 94%;
+    @apply font-bold tracking-tight;
   }
 
   /* Buttons */
@@ -79,7 +78,7 @@
 
   /* Thin rule under section headings */
   .rule {
-    @apply border-t-[1.5px] border-gray-900;
+    @apply border-t border-gray-300;
   }
 }
 

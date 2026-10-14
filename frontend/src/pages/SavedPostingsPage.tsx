@@ -175,7 +175,7 @@ export default function SavedPostingsPage() {
           )}
 
           {!isLoading && !isError && data?.total === 0 && (
-            <div className="border-y-[1.5px] border-gray-900 px-6 py-12 text-center">
+            <div className="border-y border-gray-300 px-6 py-12 text-center">
               <p className="display text-2xl text-gray-900">Nothing saved yet</p>
               <p className="mt-1.5 text-gray-700">
                 <Link to="/" className="link">Browse jobs</Link> or <Link to="/resume" className="link">match your resume</Link> and save the ones you like.
@@ -185,7 +185,7 @@ export default function SavedPostingsPage() {
 
           {!isLoading && !isError && data && data.items.length > 0 && (
             <>
-              <div className="border-t-[1.5px] border-gray-900">
+              <div className="border-t border-gray-300">
                 {data.items.map((saved) => (
                   <div key={saved.id} className="border-b border-gray-300 py-4">
                     <div className="flex items-start gap-4">

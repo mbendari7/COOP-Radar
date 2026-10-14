@@ -25,6 +25,7 @@ from app.ingest.base import AdapterError, RawPosting
 from app.ingest.dedup import duplicate_exists
 from app.ingest.extract import extract_fields
 from app.ingest.registry import adapter_for
+from app.ingest.terms import duration_in_text, term_in_text
 from app.models.ingest_run import IngestRun
 from app.models.ingest_source import IngestSource
 from app.models.posting import Posting, WorkMode
@@ -174,6 +175,21 @@ def _apply_updates(existing: Posting, raw: RawPosting) -> None:
         existing.province = raw.province
     existing.country = raw.country
     _set_education(existing)
+    _refresh_term(existing, raw)
+
+
+def _refresh_term(posting: Posting, raw: RawPosting) -> None:
+    """
+    Read the term and length again on every run, since descriptions change and our reading
+    gets better. Keep what we had when the text says nothing.
+    """
+    text = posting.description or ""
+    term = raw.term or term_in_text(posting.title, text)
+    if term:
+        posting.term = term
+    duration = duration_in_text(posting.title, text)
+    if duration:
+        posting.duration_months = duration
 
 
 def _set_education(posting: Posting) -> None:
@@ -189,9 +205,10 @@ async def _raw_to_posting(db: AsyncSession, raw: RawPosting, source_id: UUID) ->
     Fields we had to guess go in low_confidence_fields so an admin can check them.
     """
     work_mode_str = (raw.work_mode or "").lower() or None
-    term = raw.term or None
+    text = raw.description or ""
+    term = raw.term or term_in_text(raw.title, text)
     skills = list(raw.skills)
-    duration = 4
+    duration = duration_in_text(raw.title, text)
     low_confidence: dict[str, float] = {}
 
     if not (work_mode_str and term and skills):
@@ -205,7 +222,7 @@ async def _raw_to_posting(db: AsyncSession, raw: RawPosting, source_id: UUID) ->
         if not skills and extracted.skills:
             skills = extracted.skills
             low_confidence["skills"] = extracted.confidence_map.get("skills", 0.0)
-        if extracted.duration_months in _VALID_DURATIONS:
+        if not duration and extracted.duration_months in _VALID_DURATIONS:
             duration = extracted.duration_months
 
     work_mode = WorkMode.onsite
