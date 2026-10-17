@@ -12,7 +12,7 @@ import { useNavigate } from 'react-router-dom'
 import type { PostingListItem } from '../api/postings'
 import BookmarkButton from './BookmarkButton'
 import { ROLE_LABELS, splitViewVisible } from './roles'
-import { SEASON_DOT, lengthLabel, termLabel } from './terms'
+import { SEASON_DOT, gradYearsLabel, lengthLabel, termDates, termLabel } from './terms'
 import { formatLocation, timeAgo, workModeLabel } from '../utils/format'
 
 interface Props {
@@ -33,6 +33,11 @@ export default function PostingCard({ posting, showBookmark = false, selected = 
   const isNew = Date.now() - new Date(posting.posted_at).getTime() < 3 * 86_400_000
   const term = termLabel(posting.term)
   const length = lengthLabel(posting.duration_months)
+  // The year is already in the term, so Summer 2027 reads May to Aug, not May to Aug 2027
+  const year = /\d{4}$/.exec(term)?.[0]
+  const rawDates = termDates(posting.season, posting.term, posting.duration_months)
+  const dates = year && rawDates.match(/\d{4}/g)?.length === 1 ? rawDates.replace(` ${year}`, '') : rawDates
+  const termExtras = [dates, length].filter(Boolean)
 
   return (
     <article
@@ -66,14 +71,21 @@ export default function PostingCard({ posting, showBookmark = false, selected = 
             {(term || length) && (
               <span className="inline-flex items-center gap-1.5 border border-gray-300 bg-white px-2 py-0.5 font-semibold text-gray-900">
                 {posting.season && <span className={`h-2 w-2 rounded-full ${SEASON_DOT[posting.season]}`} aria-hidden="true" />}
-                {[term, length].filter(Boolean).join(' · ')}
+                {term || 'Term not stated'}{' '}
+                {termExtras.length > 0 && (
+                  <span className="font-normal text-gray-700">· {termExtras.join(' · ')}</span>
+                )}
               </span>
             )}
             {posting.role !== 'job' && (
               <span className="border border-air-200 bg-air-50 px-2 py-0.5 font-semibold text-air-800">{ROLE_LABELS[posting.role]}</span>
             )}
             {isNew && <span className="font-bold text-post-600">New</span>}
-            {posting.grad_years.length > 0 && <span className="text-gray-700">For {posting.grad_years.join(' or ')} grads</span>}
+            {posting.grad_years.length > 0 && (
+              <span className="text-gray-700" title="The year you finish school, not the work term">
+                {gradYearsLabel(posting.grad_years)}
+              </span>
+            )}
             <span className="text-gray-600">Posted {timeAgo(posting.posted_at)}</span>
           </p>
           {posting.skills.length > 0 && (

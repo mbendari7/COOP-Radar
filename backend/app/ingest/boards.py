@@ -13,8 +13,10 @@ source.config
 Which jobs we keep
   Canada. Every job whose location matches settings.ingest_location_filter, which covers
   Canada, the provinces, Canadian cities and Remote Canada.
-  United States. Up to settings.ingest_us_jobs, which by default keeps only co-op, intern,
-  student and new grad roles since lots of Canadian students do a US term. Can be "all" or "none".
+  United States. Up to settings.ingest_us_jobs, which by default keeps the roles open to
+  students and recent grads (EARLY_CAREER_TITLE: co-op, intern, student, new grad, junior,
+  entry level, trainee, apprentice, fellow and the like) since lots of Canadian students do a
+  US term. Can be "all" or "none".
 Anywhere else, like Dublin or London UK, gets skipped.
 """
 
@@ -86,6 +88,14 @@ _US_STATE_SUFFIX = re.compile(r"(?-i:,\s*(?:" + "|".join(sorted(_US_CODES - {"CA
 # Python copy of STUDENT_TITLE_PATTERN in app/services/postings.py
 STUDENT_TITLE = re.compile(
     r"(?i)\b(intern|interns|internship|co-?op|student|new grad(uate)?|apprentice|stagiaire)\b"
+)
+
+# Roles open to students and people early in their career, any year of study. Used for US jobs
+EARLY_CAREER_TITLE = re.compile(
+    r"(?i)\b(intern|interns|internships?|co-?op|students?|new grad(uate)?s?|graduates?|grad"
+    r"|apprentice\w*|stagiaire|junior|jr|entry[- ]level|early career|early talent"
+    r"|campus|university|trainee|fellow(ship)?|rotational|residency|analyst i"
+    r"|engineer i|developer i|level i|summer|working student)\b"
 )
 
 _DETAIL_CONCURRENCY = 6
@@ -238,17 +248,22 @@ def _pick_location(*locations: str) -> str | None:
     return next((loc for loc in locations if _is_canadian(loc)), None)
 
 
-def choose_location(title: str, *locations: str) -> tuple[str, str] | None:
+def choose_location(
+    title: str, *locations: str, early_career: bool = False
+) -> tuple[str, str] | None:
     """
-    The location to show and the country for a job, or None to skip it. Canadian places win.
+    The location to show and the country for a job, or None to skip it. Canadian places win,
+    and every job in Canada is kept, whatever the level.
     A US place is only used when settings.ingest_us_jobs allows this job, where "students"
-    means the title is a co-op, intern, student or new grad role.
+    means the title is open to students or recent grads (EARLY_CAREER_TITLE), or early_career
+    says the whole source is, like Simplify's student lists.
     """
     canadian = _pick_location(*locations)
     if canadian is not None:
         return canadian, "CA"
     us_policy = get_settings().ingest_us_jobs
-    if us_policy == "none" or (us_policy == "students" and not STUDENT_TITLE.search(title or "")):
+    student_role = early_career or bool(EARLY_CAREER_TITLE.search(title or ""))
+    if us_policy == "none" or (us_policy == "students" and not student_role):
         return None
     us = next((loc for loc in locations if loc and _US_LOCATION.search(loc)), None)
     return (us, "US") if us is not None else None

@@ -4,7 +4,7 @@ from datetime import date
 
 import pytest
 
-from app.ingest.terms import duration_in_text, round_to_coop_length, season_of, term_in_text
+from app.ingest.terms import duration_in_text, length_bucket, season_of, term_in_text, whole_months
 
 TODAY = date(2026, 10, 13)
 
@@ -47,11 +47,13 @@ def test_years_far_away_are_ignored() -> None:
         ("This is a 4-month co-op term.", 4),
         ("an eight month internship", 8),
         ("We offer an 8 to 12 month internship.", 8),
-        ("12 week summer internship", 4),
+        ("12 week summer internship", 3),
         ("16-month internship (May 2027 - Aug 2028)", 16),
         ("This is a one-year contract position.", 12),
         ("Work term: January to August 2027", 8),
-        ("6 month co-op placement", 8),
+        # The real length, never rounded to a co-op length (regression: 6 showed as 8)
+        ("6 month co-op placement", 6),
+        ("a 10-week summer internship", 2),
         # Months that are not about the job's length
         ("Requires 3 months of experience with Excel.", None),
         ("Graduated within the last 12 months of the start date.", None),
@@ -67,11 +69,18 @@ def test_duration_in_title() -> None:
 
 
 @pytest.mark.parametrize(
-    ("months", "expected"),
-    [(3, 4), (4, 4), (6, 8), (8, 8), (12, 12), (16, 16), (1, None), (24, None)],
+    ("months", "expected"), [(2.8, 3), (6, 6), (16, 16), (1, None), (30, None)]
 )
-def test_round_to_coop_length(months: float, expected: int | None) -> None:
-    assert round_to_coop_length(months) == expected
+def test_whole_months(months: float, expected: int | None) -> None:
+    assert whole_months(months) == expected
+
+
+@pytest.mark.parametrize(
+    ("months", "bucket"),
+    [(3, 4), (4, 4), (6, 8), (8, 8), (12, 12), (16, 16), (20, 16), (None, None)],
+)
+def test_length_bucket(months: int | None, bucket: int | None) -> None:
+    assert length_bucket(months) == bucket
 
 
 def test_season_of() -> None:

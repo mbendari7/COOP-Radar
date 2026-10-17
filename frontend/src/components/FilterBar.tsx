@@ -18,7 +18,7 @@ import {
   type CountryChoice, type Filters,
 } from './filters'
 import { XIcon } from './Icons'
-import { SEASONS, SEASON_DOT, seasonLabel } from './terms'
+import { LENGTH_BUCKETS, SEASONS, SEASON_DOT, seasonLabel } from './terms'
 
 interface Props {
   filters: Filters
@@ -86,7 +86,7 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
           />
           <Select
             id="filter-grad-year"
-            label="Graduating in"
+            label="Graduation year"
             value={filters.grad_year ? String(filters.grad_year) : ''}
             loading={false}
             options={gradYears().map((y) => ({ value: String(y), label: String(y) }))}
@@ -95,7 +95,8 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
           />
         </div>
         <p className="mt-2 text-xs text-gray-600">
-          Program shows jobs that name it or fit it. Graduation year hides jobs that ask for a different one.
+          Program shows jobs that name it or fit it. Graduation year is when you finish school, not
+          your work term. It hides jobs that ask for a different one. Pick your work term under Term and length.
         </p>
       </Section>
 
@@ -207,10 +208,13 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
                     })
                   }
                 >
-                  {d} months
+                  {LENGTH_BUCKETS[d].label}
                 </Pill>
               ))}
             </div>
+            <p className="mt-1.5 text-xs text-gray-600">
+              Each one covers nearby lengths too, so About 8 months finds 6 to 9 month jobs.
+            </p>
           </fieldset>
           <Select
             id="filter-term"
@@ -364,7 +368,7 @@ export function ActiveFilterChips({
       key: `cat-${c}`, text: label(c), patch: { category: filters.category.filter((x) => x !== c) },
     })),
     ...(filters.program ? [{ key: 'program', text: `Program: ${programLabel}`, patch: { program: '' as const } }] : []),
-    ...(filters.grad_year ? [{ key: 'grad', text: `Graduating ${filters.grad_year}`, patch: { grad_year: 0 } }] : []),
+    ...(filters.grad_year ? [{ key: 'grad', text: `Grad year ${filters.grad_year}`, patch: { grad_year: 0 } }] : []),
     ...(filters.province ? [{ key: 'prov', text: provinceName(filters.province), patch: { province: '' } }] : []),
     ...(filters.city ? [{ key: 'city', text: `City: ${filters.city}`, patch: { city: '' } }] : []),
     ...(filters.posted_within ? [{ key: 'posted', text: POSTED_WITHIN.find((p) => p.value === filters.posted_within)?.label ?? '', patch: { posted_within: 0 } }] : []),
@@ -373,7 +377,7 @@ export function ActiveFilterChips({
       key: `season-${s}`, text: `${seasonLabel(s)} term`, patch: { season: filters.season.filter((x) => x !== s) },
     })),
     ...filters.duration.map((d) => ({
-      key: `dur-${d}`, text: `${d} months`, patch: { duration: filters.duration.filter((x) => x !== d) },
+      key: `dur-${d}`, text: LENGTH_BUCKETS[d].label, patch: { duration: filters.duration.filter((x) => x !== d) },
     })),
     ...filters.company.map((c) => ({
       key: `co-${c}`, text: c, patch: { company: filters.company.filter((x) => x !== c) },

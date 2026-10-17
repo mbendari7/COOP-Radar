@@ -23,7 +23,7 @@ import BookmarkButton from './BookmarkButton'
 import PostingCard from './PostingCard'
 import LiveBadge from './LiveBadge'
 import { ArrowDownIcon, ArrowUpIcon } from './Icons'
-import { lengthLabel, termLabel } from './terms'
+import { lengthLabel, termDates, termLabel } from './terms'
 import { formatDate, formatLocation, workModeLabel } from '../utils/format'
 
 const col = createColumnHelper<PostingListItem>()
@@ -59,8 +59,19 @@ const columns = [
   col.accessor('term', {
     // Sorting by term means by the day it starts, so Winter 2027 comes before Summer 2027
     id: 'term_start',
-    header: 'Term',
-    cell: (info) => termLabel(info.getValue()) || <span className="text-gray-500">Not stated</span>,
+    header: 'Work term',
+    cell: (info) => {
+      const term = termLabel(info.getValue())
+      if (!term) return <span className="text-gray-500">Not stated</span>
+      const row = info.row.original
+      const dates = termDates(row.season, row.term, row.duration_months)
+      return (
+        <>
+          {term}
+          {dates && <span className="block text-xs text-gray-600">{dates}</span>}
+        </>
+      )
+    },
   }),
   col.accessor('duration_months', {
     id: 'duration_months',

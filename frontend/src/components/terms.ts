@@ -26,7 +26,52 @@ export function seasonLabel(season: Season | null | undefined): string {
 
 /** "4 months", or '' when the job does not say */
 export function lengthLabel(months: number | null | undefined): string {
-  return months ? `${months} months` : ''
+  if (!months) return ''
+  return months === 1 ? '1 month' : `${months} months`
+}
+
+/**
+ * The length filter groups real lengths into the usual co-op ones, so "About 8 months" also
+ * finds 6 and 9 month jobs. Same ranges as LENGTH_BUCKETS in backend/app/ingest/terms.py
+ */
+export const LENGTH_BUCKETS: Record<number, { label: string; range: string }> = {
+  4: { label: 'About 4 months', range: '2 to 5 months' },
+  8: { label: 'About 8 months', range: '6 to 9 months' },
+  12: { label: 'About 12 months', range: '10 to 14 months' },
+  16: { label: '16 months or more', range: '15 months or more' },
+}
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+// The month each Canadian co-op term starts. Spring differs between schools so it has none
+const START_MONTH: Partial<Record<Season, number>> = { winter: 0, summer: 4, fall: 8 }
+
+/**
+ * When the work term runs, worked out from its season and length.
+ *   Summer 2027 and 4 months   "May to Aug 2027"
+ *   Fall 2027 and 8 months     "Sep 2027 to Apr 2028"
+ *   Winter 2027, no length     "Starts Jan 2027"
+ *   Summer with no year        "Starts in May"
+ * '' when we cannot tell, like Spring or no term at all.
+ */
+export function termDates(
+  season: Season | null | undefined, term: string | null | undefined, months: number | null | undefined,
+): string {
+  const start = season ? START_MONTH[season] : undefined
+  if (start === undefined) return ''
+  const year = Number(/(\d{4})$/.exec(term ?? '')?.[1]) || 0
+  if (!year) return `Starts in ${MONTHS[start]}`
+  if (!months) return `Starts ${MONTHS[start]} ${year}`
+  const endIndex = start + months - 1
+  const endYear = year + Math.floor(endIndex / 12)
+  const end = MONTHS[endIndex % 12]
+  return endYear === year
+    ? `${MONTHS[start]} to ${end} ${year}`
+    : `${MONTHS[start]} ${year} to ${end} ${endYear}`
+}
+
+/** "Grad year 2027" or "Grad year 2026 or 2027". When you finish school, not the work term */
+export function gradYearsLabel(years: number[]): string {
+  return years.length ? `Grad year ${years.join(' or ')}` : ''
 }
 
 /** The term as people say it, or '' when the job gives none. "Open" means it did not say */

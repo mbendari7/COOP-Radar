@@ -222,6 +222,13 @@ WORKABLE_SOURCES: list[tuple[str, dict[str, str]]] = [
     }),
 ]
 
+# Simplify's public lists of student and new grad roles, kept up to date by hand on GitHub.
+# Thousands of roles from big companies to startups, each with its term
+SIMPLIFY_SOURCES: list[tuple[str, dict[str, str]]] = [
+    ("Simplify internship and co-op list", {"repo": "SimplifyJobs/Summer{summer}-Internships"}),
+    ("Simplify new grad list", {"repo": "SimplifyJobs/New-Grad-Positions"}),
+]
+
 _DISCOVERED = Path(__file__).with_name("discovered_boards.json")
 
 
@@ -268,6 +275,7 @@ async def seed_job_boards() -> None:
         taken.add(name)
         entries.append((name, row["adapter_type"], {"board": row["board"], "company": row["company"]}))
     entries += [(name, "workable", config) for name, config in WORKABLE_SOURCES]
+    entries += [(name, "simplify", config) for name, config in SIMPLIFY_SOURCES]
     if adzuna_configured():
         entries += [(name, "adzuna", config) for name, config in ADZUNA_SOURCES]
 

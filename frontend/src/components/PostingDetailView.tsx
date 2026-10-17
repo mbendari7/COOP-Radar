@@ -20,7 +20,7 @@ import { Tag } from './PostingCard'
 import ResumeFitPanel from './ResumeFitPanel'
 import RichText from './RichText'
 import { FIELD_LABELS, ROLE_LABELS } from './roles'
-import { SEASONS, SEASON_DOT, lengthLabel, termLabel } from './terms'
+import { SEASONS, SEASON_DOT, lengthLabel, termDates, termLabel } from './terms'
 import { formatDate, formatLocation, isAdzuna, parseDay, timeAgo, workModeLabel } from '../utils/format'
 
 const DAY = 86_400_000
@@ -37,6 +37,7 @@ export default function PostingDetailView({
   const hasResume = Boolean(matches?.resume)
   const term = termLabel(posting.term)
   const seasonMonths = SEASONS.find((x) => x.value === posting.season)?.months
+  const dates = termDates(posting.season, posting.term, posting.duration_months)
   const viaAdzuna = isAdzuna(posting.source_url)
 
   return (
@@ -89,12 +90,16 @@ export default function PostingDetailView({
 
       <dl className="grid grid-cols-2 gap-x-6 gap-y-4 border-y border-gray-300 py-4 sm:grid-cols-3">
         <Fact
-          label="Term"
+          label="Work term"
           value={term || 'Not stated'}
-          note={term && seasonMonths && posting.season !== 'spring' ? seasonMonths : undefined}
+          note={term ? (dates || seasonMonths) : 'Check the posting for the start date'}
           dot={posting.season ? SEASON_DOT[posting.season] : undefined}
         />
-        <Fact label="Length" value={lengthLabel(posting.duration_months) || 'Not stated'} />
+        <Fact
+          label="Length"
+          value={lengthLabel(posting.duration_months) || 'Not stated'}
+          note={posting.duration_months ? undefined : 'Most co-op terms run 4 months'}
+        />
         <Fact label="Type" value={ROLE_LABELS[posting.role]} />
         <Fact label="Posted" value={timeAgo(posting.posted_at)} />
         <Fact label="Country" value={posting.country === 'US' ? 'United States' : 'Canada'} />
@@ -108,7 +113,12 @@ export default function PostingDetailView({
           <h3 id={`who-${posting.id}`} className="label-form !text-gray-900">Who it's for</h3>
           <ul className="mt-2 space-y-1.5 text-[15px] text-gray-900">
             {asksFor.length > 0 && <Bullet>Programs it names: {asksFor.join(', ')}</Bullet>}
-            {posting.grad_years.length > 0 && <Bullet>Graduating in {posting.grad_years.join(' or ')}</Bullet>}
+            {posting.grad_years.length > 0 && (
+              <Bullet>
+                Graduation year: {posting.grad_years.join(' or ')}{' '}
+                <span className="text-gray-600">(when you finish school, not when the work term runs)</span>
+              </Bullet>
+            )}
           </ul>
           <p className="mt-2 text-xs text-gray-600">Read from the job description. Always check the posting itself.</p>
         </section>

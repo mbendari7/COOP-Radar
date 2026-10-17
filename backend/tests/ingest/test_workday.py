@@ -121,9 +121,23 @@ async def test_adapter_lists_pages_and_keeps_canadian_and_us_student_jobs() -> N
         ("Audit Co-op", "CA"), ("Branch Manager", "CA"), ("Summer Intern", "US"),
     ]
 
-    # The students scope leaves out the branch manager
+    # Canadian jobs are kept even in the students scope, which only narrows jobs elsewhere
     out = await WorkdayAdapter().fetch(make_source(scope="students"))
-    assert sorted(p.title for p in out) == ["Audit Co-op", "Summer Intern"]
+    assert sorted(p.title for p in out) == ["Audit Co-op", "Branch Manager", "Summer Intern"]
+
+
+@respx.mock
+async def test_students_scope_skips_us_jobs_that_are_not_for_students() -> None:
+    jobs = [
+        {"title": "Store Manager", "externalPath": "/job/d", "locationsText": "Austin, Texas"},
+        {"title": "Junior Analyst", "externalPath": "/job/e", "locationsText": "Austin, Texas"},
+    ]
+    respx.post(f"{API}/jobs").mock(return_value=Response(200, json={"total": 2, "jobPostings": jobs}))
+    respx.get(f"{API}/job/e").mock(
+        return_value=Response(200, json=detail("Junior Analyst", "Austin, Texas", "United States of America"))
+    )
+    out = await WorkdayAdapter().fetch(make_source(scope="students"))
+    assert [p.title for p in out] == ["Junior Analyst"]
 
 
 @respx.mock

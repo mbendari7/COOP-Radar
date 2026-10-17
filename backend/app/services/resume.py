@@ -32,6 +32,7 @@ from app import ai
 from app.ai import AICredentials
 from app.config import get_settings
 from app.ingest.skill_match import mentions
+from app.ingest.terms import length_bucket
 from app.llm import parse_json
 from app.models.match_result import MatchResult
 from app.models.posting import Posting, WorkMode
@@ -52,6 +53,7 @@ from app.services.postings import (
     SENIOR_TITLE_PATTERN,
     STUDENT_TITLE_PATTERN,
     has_grad_year,
+    length_clause,
 )
 
 logger = logging.getLogger(__name__)
@@ -199,7 +201,7 @@ def _student_fit(similarity: Any, prefs: JobPreferences | None = None) -> Any:
         adjusted = adjusted + case((same, _W_TERM), else_=0.0)
     if prefs is not None and prefs.durations:
         adjusted = adjusted + case(
-            (Posting.duration_months.in_(prefs.durations), _W_LENGTH), else_=0.0
+            (length_clause(list(prefs.durations)), _W_LENGTH), else_=0.0
         )
     return func.greatest(func.least(adjusted, 1.0), 0.0)
 
@@ -428,7 +430,7 @@ def fit_notes(
 
     months = row.get("duration_months")
     if months:
-        if prefs is not None and months in prefs.durations:
+        if prefs is not None and length_bucket(months) in prefs.durations:
             notes.append(f"{months} months long, the length you want")
         else:
             notes.append(f"{months} months long")

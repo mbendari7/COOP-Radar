@@ -1052,6 +1052,8 @@
           "duration_months": {
             "anyOf": [
               {
+                "maximum": 24.0,
+                "minimum": 2.0,
                 "type": "integer"
               },
               {
@@ -1352,6 +1354,18 @@
             "title": "Fields Of Study",
             "type": "array"
           },
+          "first_seen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Seen At"
+          },
           "grad_years": {
             "default": [],
             "items": {
@@ -1550,6 +1564,18 @@
             },
             "title": "Fields Of Study",
             "type": "array"
+          },
+          "first_seen_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Seen At"
           },
           "grad_years": {
             "default": [],
@@ -3493,6 +3519,23 @@
           },
           {
             "in": "query",
+            "name": "added_since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Added Since"
+            }
+          },
+          {
+            "in": "query",
             "name": "country",
             "required": false,
             "schema": {
@@ -3635,7 +3678,8 @@
                 "company",
                 "title",
                 "duration_months",
-                "term_start"
+                "term_start",
+                "first_seen_at"
               ],
               "title": "Sort",
               "type": "string"
@@ -3774,6 +3818,451 @@
           }
         },
         "summary": "Create Manual Posting",
+        "tags": [
+          "postings"
+        ]
+      }
+    },
+    "/api/postings/feed.rss": {
+      "get": {
+        "description": "An RSS feed of the newest jobs for a search. Takes the same filters as GET /api/postings and\nalways gives the 50 jobs we added most recently, so feed readers pick up new ones.",
+        "operationId": "postings_feed_api_postings_feed_rss_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maxLength": 200,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "city",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "City"
+            }
+          },
+          {
+            "in": "query",
+            "name": "province",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Province"
+            }
+          },
+          {
+            "in": "query",
+            "name": "term",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Term"
+            }
+          },
+          {
+            "in": "query",
+            "name": "season",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "winter",
+                      "spring",
+                      "summer",
+                      "fall"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Season"
+            }
+          },
+          {
+            "in": "query",
+            "name": "work_mode",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/WorkMode"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Work Mode"
+            }
+          },
+          {
+            "in": "query",
+            "name": "duration",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "integer"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Duration"
+            }
+          },
+          {
+            "in": "query",
+            "name": "skills",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Skills"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "software",
+                      "data",
+                      "design",
+                      "product",
+                      "hardware",
+                      "it_security",
+                      "business",
+                      "sales_marketing",
+                      "customer",
+                      "health",
+                      "public",
+                      "trades"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Category"
+            }
+          },
+          {
+            "in": "query",
+            "name": "company",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company"
+            }
+          },
+          {
+            "in": "query",
+            "name": "posted_within",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Posted Within"
+            }
+          },
+          {
+            "in": "query",
+            "name": "added_since",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "format": "date-time",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Added Since"
+            }
+          },
+          {
+            "in": "query",
+            "name": "country",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "items": {
+                    "enum": [
+                      "CA",
+                      "US"
+                    ],
+                    "type": "string"
+                  },
+                  "type": "array"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Country"
+            }
+          },
+          {
+            "in": "query",
+            "name": "program",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "enum": [
+                    "computer_science",
+                    "software_engineering",
+                    "computer_engineering",
+                    "electrical_engineering",
+                    "mechanical_engineering",
+                    "other_engineering",
+                    "data_science",
+                    "mathematics",
+                    "information_technology",
+                    "business",
+                    "finance_accounting",
+                    "marketing",
+                    "design",
+                    "science",
+                    "health_sciences",
+                    "social_sciences",
+                    "environment",
+                    "education",
+                    "engineering_technology"
+                  ],
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Program"
+            }
+          },
+          {
+            "in": "query",
+            "name": "grad_year",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 2100,
+                  "minimum": 2000,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Grad Year"
+            }
+          },
+          {
+            "in": "query",
+            "name": "show_expired",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Show Expired",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "show_closed",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Show Closed",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "students_only",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Students Only",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "hide_senior",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Hide Senior",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "search_mode",
+            "required": false,
+            "schema": {
+              "default": "keyword",
+              "enum": [
+                "keyword",
+                "semantic"
+              ],
+              "title": "Search Mode",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "sort",
+            "required": false,
+            "schema": {
+              "default": "posted_at",
+              "enum": [
+                "posted_at",
+                "deadline",
+                "company",
+                "title",
+                "duration_months",
+                "term_start",
+                "first_seen_at"
+              ],
+              "title": "Sort",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "order",
+            "required": false,
+            "schema": {
+              "default": "desc",
+              "enum": [
+                "asc",
+                "desc"
+              ],
+              "title": "Order",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "required": false,
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "title": "Page",
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page_size",
+            "required": false,
+            "schema": {
+              "default": 25,
+              "title": "Page Size",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/rss+xml": {}
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Postings Feed",
         "tags": [
           "postings"
         ]

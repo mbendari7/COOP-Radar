@@ -11,10 +11,11 @@ Every job links back to the employer's own Workday page to apply.
 source.config
   board     "<tenant>.<wdN>/<site>", like "td.wd3/TD_Bank_Careers"
   company   the name we show, like "TD"
-  scope     "students" keeps co-op, intern, student, new grad and campus roles.
-            "all" keeps every job in Canada plus the US roles settings.ingest_us_jobs allows.
+  scope     Every job the list shows in Canada is always kept, whatever the scope.
+            For jobs elsewhere, "students" keeps student, early career and campus roles and
+            "all" checks every job against settings.ingest_us_jobs.
             "auto", the default, is all for sites with up to 300 jobs and students for bigger
-            ones, since big employers list thousands of branch and store jobs
+            ones, since big employers list thousands of US branch and store jobs
   city, province   optional. Where Canadian jobs are when the site only names a building,
             like McGill listing "Bronfman Building". Used only when no province is found
 """
@@ -27,9 +28,10 @@ import httpx
 
 from app.ingest.base import AdapterError, BaseAdapter, RawPosting
 from app.ingest.boards import (
-    STUDENT_TITLE,
+    EARLY_CAREER_TITLE,
     _BoardAdapter,
     _details,
+    _is_canadian,
     _parse_dt,
     _work_mode,
     choose_location,
@@ -64,7 +66,12 @@ def wanted_by_scope(job: dict[str, Any], scope: str) -> bool:
         return True
     title = str(job.get("title") or "")
     groups = " ".join(str(b) for b in job.get("bulletFields") or [])
-    return bool(STUDENT_TITLE.search(title) or _CAMPUS.search(f"{title} {groups}"))
+    return bool(EARLY_CAREER_TITLE.search(title) or _CAMPUS.search(f"{title} {groups}"))
+
+
+def listed_in_canada(job: dict[str, Any]) -> bool:
+    """The list entry already shows a Canadian place. These jobs are kept whatever the scope."""
+    return _is_canadian(str(job.get("locationsText") or ""))
 
 
 def _country(info: dict[str, Any]) -> str:
@@ -135,7 +142,10 @@ class WorkdayAdapter(BaseAdapter):
             jobs, total = await self._list(client, api)
             if scope not in ("all", "students"):
                 scope = "all" if total <= _AUTO_ALL_UP_TO else "students"
-            kept = [j for j in jobs if j.get("externalPath") and wanted_by_scope(j, scope)]
+            kept = [
+                j for j in jobs
+                if j.get("externalPath") and (wanted_by_scope(j, scope) or listed_in_canada(j))
+            ]
             if scope == "all":
                 kept = [j for j in kept if _maybe_ours(str(j.get("title") or ""),
                                                        str(j.get("locationsText") or ""))]

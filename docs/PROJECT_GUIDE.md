@@ -232,22 +232,26 @@ flowchart TD
     I --> E["after commit: jobs.enqueue('embed_posting') per new posting"]
 ```
 
-**Career boards (the main source):** `seed/job_boards.py` lists ~170 employers as `(company, adapter_type, board)`,
+**Career boards (the main source):** `seed/job_boards.py` lists ~170 hand picked employers as `(company, adapter_type, board)`,
 with adapter types `greenhouse`, `lever`, `ashby`, `smartrecruiters` and `workday` (an optional fourth item adds config like a
 home city). Workday (`ingest/workday.py`) is what most big employers outside tech use: banks, insurers, energy, health,
 pharma, aerospace, food, retail, accounting and universities. Its careers page loads jobs from a public JSON endpoint
-(`/wday/cxs/<tenant>/<site>/jobs`, allowed by robots.txt); sites with up to 300 jobs keep every Canadian job and bigger
-ones keep student and campus roles (`scope`). Small and niche employers come from two more places. `seed/discover_boards.py`
+(`/wday/cxs/<tenant>/<site>/jobs`, allowed by robots.txt); every Canadian job is kept on every site, and for other
+places sites with up to 300 jobs are checked job by job while bigger ones keep student and campus roles (`scope`). Small and niche employers come from two more places. `seed/discover_boards.py`
 (run by the owner now and then, not by `start.py`) reads Common Crawl's free URL index for every Greenhouse, Lever,
 Ashby and Workday careers page it saw, asks each board's own API once, and writes the ones with jobs in Canada or US
 student roles to `seed/discovered_boards.json`, which `job_boards.py` seeds next to the hand picked list. And two
 `workable` sources (`ingest/workable.py`, migration 0012) page through Workable's public job search at
 jobs.workable.com (robots.txt allows it): every job in Canada, and US intern, co-op, student and new grad roles. With
-`ADZUNA_APP_ID` and `ADZUNA_APP_KEY` (a paid Adzuna plan) set, two `adzuna` sources are seeded too (`ingest/adzuna.py`). The runner reads each job's term and length with `ingest/terms.py` on import and
+`ADZUNA_APP_ID` and `ADZUNA_APP_KEY` (a paid Adzuna plan) set, two `adzuna` sources are seeded too (`ingest/adzuna.py`).
+Two `simplify` sources (`ingest/simplify.py`, migration 0013) read Simplify's public internship and new grad lists on
+GitHub (`.github/scripts/listings.json`), thousands of roles from big companies and startups, each with its terms;
+`{summer}` in the repo name moves to next year's list on its own, and terms that are already over are dropped.
+`discovered_boards.json` holds ~1,500 boards found this way (merged from two runs, case duplicates removed). The runner reads each job's term and length with `ingest/terms.py` on import and
 again on every re-import. These official public job-board APIs exist
 for syndicating a company's openings. `boards.py → choose_location()` keeps every location matching
 `INGEST_LOCATION_FILTER` (Canada; "Vancouver, WA" is excluded by its state code) and, per `INGEST_US_JOBS`, US jobs
-(default: only titles matching the student pattern). It parses `City, Province` / `City, State` (work-mode words like
+(default: titles open to students and recent grads, `EARLY_CAREER_TITLE`, or a whole source marked `early_career`). It parses `City, Province` / `City, State` (work-mode words like
 "Hybrid - New York" are ignored) and maps work mode. Greenhouse and SmartRecruiters list jobs without descriptions
 and fetch descriptions only for kept jobs, six at a time (`_details`), because some boards are 30 MB with them.
 The runner also stores `fields_of_study` and `grad_years` from the description (`services/education.py`: only

@@ -68,10 +68,14 @@ class Settings(BaseSettings):
     # for province codes. Leave it empty for the Canada default below
     # Use ".*" to keep every location
     ingest_location_filter: str = CANADA_LOCATION_FILTER
-    # Jobs in the US. "students" keeps only co-op, intern, student and new grad roles since lots
-    # of Canadian students do a US term. "all" keeps every US job and "none" skips them
+    # Jobs in the US. "students" keeps roles open to students and recent grads, like co-op,
+    # intern, new grad, junior and entry level (EARLY_CAREER_TITLE in app/ingest/boards.py),
+    # since lots of Canadian students do a US term. "all" keeps every US job, which can be tens
+    # of thousands and fills a free database fast. "none" skips them. Every job in Canada is
+    # always kept
     ingest_us_jobs: Literal["students", "all", "none"] = "students"
-    # Optional Adzuna job search API keys (app/ingest/adzuna.py). A paid plan at developer.adzuna.com.
+    # Optional Adzuna job search API keys (app/ingest/adzuna.py), a paid plan at
+    # developer.adzuna.com.
     # With both set we also import student jobs Adzuna gathers from employer sites in every field
     adzuna_app_id: str = ""
     adzuna_app_key: str = ""

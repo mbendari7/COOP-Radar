@@ -162,7 +162,12 @@ async def main() -> None:
     known = _known()
     async with httpx.AsyncClient(timeout=30.0, headers=_UA, follow_redirects=True) as client:
         print("Reading Common Crawl's URL index...", flush=True)
-        boards = sorted(b for b in await find_boards(client) if b not in known)
+        # Workday site names come in any case, like CircleKStoreJobs and circlekstorejobs, so
+        # compare without case and keep one spelling of each board
+        unique: dict[tuple[str, str], tuple[str, str]] = {}
+        for adapter, board in sorted(await find_boards(client)):
+            unique.setdefault((adapter, board.lower()), (adapter, board))
+        boards = [b for key, b in unique.items() if key not in known]
         print(f"Checking {len(boards)} boards for jobs in Canada or US student roles...", flush=True)
         gate = asyncio.Semaphore(_CONCURRENCY)
         done = 0

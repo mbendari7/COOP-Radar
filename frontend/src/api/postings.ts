@@ -6,7 +6,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { apiFetch } from './client'
+import { API_BASE, apiFetch } from './client'
 import type { components } from './types.gen'
 
 // Types
@@ -38,7 +38,7 @@ export type SearchMode = 'keyword' | 'semantic'
 export type Season = NonNullable<PostingListItem['season']>
 
 export type SortField =
-  | 'posted_at' | 'deadline' | 'company' | 'title' | 'duration_months' | 'term_start'
+  | 'posted_at' | 'deadline' | 'company' | 'title' | 'duration_months' | 'term_start' | 'first_seen_at'
 export type SortOrder = 'asc' | 'desc'
 export type PageSize = 10 | 25 | 50
 
@@ -56,6 +56,8 @@ export interface PostingListParams {
   company?: string[]
   /** Only jobs posted in the last N days (1, 3, 7, 14 or 30) */
   posted_within?: number
+  /** Only jobs CoopRadar first saw after this moment (ISO date and time) */
+  added_since?: string
   /** Countries to include. None means all */
   country?: CountryCode[]
   /** Jobs for a program. Named in the description or fitting its job types */
@@ -95,6 +97,7 @@ function buildQueryString(params: PostingListParams): string {
   params.category?.forEach((c) => sp.append('category', c))
   params.company?.forEach((c) => sp.append('company', c))
   if (params.posted_within) sp.set('posted_within', String(params.posted_within))
+  if (params.added_since) sp.set('added_since', params.added_since)
   params.country?.forEach((c) => sp.append('country', c))
   if (params.program) sp.set('program', params.program)
   if (params.grad_year) sp.set('grad_year', String(params.grad_year))
@@ -110,6 +113,16 @@ function buildQueryString(params: PostingListParams): string {
 
   const qs = sp.toString()
   return qs ? `?${qs}` : ''
+}
+
+/**
+ * The RSS feed address for a search. Same filters as the list, always the newest jobs first,
+ * so a feed reader or a feed to email service picks up new jobs on its own
+ */
+export function feedUrl(params: PostingListParams, origin: string = window.location.origin): string {
+  const filters = { ...params, sort: undefined, order: undefined, page: undefined, page_size: undefined }
+  const base = API_BASE || origin
+  return `${base}/api/postings/feed.rss${buildQueryString(filters)}`
 }
 
 const fetchPostings = (params: PostingListParams) =>
@@ -185,10 +198,11 @@ export function useCreatePosting() {
  * One filtered and sorted page of jobs.
  * The old page stays on screen while the next one loads.
  */
-export function usePostings(params: PostingListParams) {
+export function usePostings(params: PostingListParams, options: { enabled?: boolean } = {}) {
   return useQuery({
     queryKey: ['postings', params],
     queryFn: () => fetchPostings(params),
+    enabled: options.enabled ?? true,
     placeholderData: (prev) => prev,   // keep the last page showing while loading
   })
 }

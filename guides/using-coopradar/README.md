@@ -54,7 +54,7 @@ who it's for (the programs and graduation years the description mentions), the s
 description. Click **Apply on (company)'s site** to apply. On a phone, tapping a job opens its own page.
 
 Each job in the list shows at a glance: **Co-op**, **Internship** or **New grad**, the term ("Summer 2027"),
-**Grads 2027** when the posting says which graduation years it wants, and a few of the skills. **New** means it
+**Grad year 2027** when the posting says which graduation years it wants, and a few of the skills. **New** means it
 was posted in the last three days. The **postmark** on the right shows the city and the day the job was posted.
 It turns red on the job you're looking at.
 
@@ -66,10 +66,24 @@ CoopRadar never applies for you. You always apply on the employer's own website.
 
 ### Term and length
 
-Every job shows its term and length when it says them, like **Summer 2027 · 4 months**, with a small coloured dot
-for the season (blue for Winter, amber for Summer, orange for Fall). Use the **Any term** and **Any length** menus
-in the strip above the results, or **All filters**, to pick seasons and lengths. **Sort by** can put the soonest
-term first, or the shortest or longest first. Jobs that don't say their term or length show "Not stated".
+Every job shows its work term, when it runs and how long it is, like **Summer 2027 · May to Aug · 4 months**, with
+a small coloured dot for the season (blue for Winter, amber for Summer, orange for Fall). The length is what the job
+says, so a 6 month job shows 6 months. Use the **Any term** and **Any length** menus in the strip above the results,
+or **All filters**, to pick seasons and lengths. "About 8 months" also finds 6 to 9 month jobs. **Sort by** can put
+the soonest term first (terms that already started go to the bottom), or the shortest or longest first. Jobs that
+don't say their term or length show "Not stated".
+
+**Work term and graduation year are different things.** The work term is when you'd work, like Summer 2027. The
+graduation year is when you finish school, like 2029. A job that asks for a graduation year shows **Grad year 2029**
+on its own, and the **Graduation year** filter only hides jobs that ask for a different one.
+
+### Get new jobs as they come in
+
+CoopRadar checks every employer every 6 hours. When you come back, a blue bar says how many jobs for your search are
+new since your last visit, with a button to show only those. **Sort by: Newly added to CoopRadar** lists the newest
+first. To get new jobs without opening the site, set your filters, click **Get updates** and copy the feed link into
+a feed reader (like Feedly or Inoreader) or a feed to email service (like Blogtrottr). New jobs for that exact search
+then come to you.
 
 ## 3. Match your resume
 

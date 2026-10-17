@@ -1,7 +1,8 @@
 # CoopRadar
 
-Co-op job board: imports real jobs (all of Canada, plus US student roles) from ~170 employers' public career boards
-(Greenhouse, Lever, Ashby, SmartRecruiters, Workday) into Postgres, reading each description for the programs of study and
+Co-op job board: imports real jobs (all of Canada, plus US student and early career roles) from ~1,700 employers'
+public career boards (Greenhouse, Lever, Ashby, SmartRecruiters, Workday), Workable and Simplify's public student
+lists into Postgres, reading each description for the programs of study and
 graduation years it asks for. A student drops in a resume (no sign-up: temporary account); their program, degree and
 graduation year are read from it, and open jobs are filtered and scored in SQL (skills, student role, program, grad
 year, term) with "why it fits" notes, plus bring-your-own-key AI (review, re-rank, tailor, cover letter, cited Q&A).
@@ -30,7 +31,8 @@ Docs: `README.md` (technical + free hosting), `guides/using-coopradar/` (simple:
   `ingest/` career-board + feed adapters, runner, dedup, skill matching, extraction, embeddings ·
   `agent/` streamed tailor / cover letter / Q&A · `llm.py` Claude helpers ·
   `deps.py` auth deps · `store.py` session store · `jobs.py` background jobs
-- `backend/alembic/versions/` migrations (0001 to 0012) · `backend/seed/` skills, ~170 career boards (`job_boards.py`),
+- `backend/alembic/versions/` migrations (0001 to 0013) · `backend/seed/` skills, ~1,700 career boards (`job_boards.py` +
+  `discovered_boards.json`),
   sample postings (`SEED_*` flags) · `backend/tests/` pytest
 - `frontend/src/`: `api/` (`client.ts` + query hooks) · `pages/` · `components/` · `frontend/tests/` vitest ·
   `frontend/e2e/` Playwright (`*.e2e.ts`, run against a started site)

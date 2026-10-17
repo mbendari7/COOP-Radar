@@ -16,14 +16,15 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
   useFilterMeta, usePostings,
-  type CategoryKey, type PageSize, type ProgramKey, type SearchMode, type Season, type SortField,
-  type SortOrder, type WorkMode,
+  type CategoryKey, type PageSize, type PostingListParams, type ProgramKey, type SearchMode, type Season,
+  type SortField, type SortOrder, type WorkMode,
 } from '../api/postings'
 import { useMe } from '../api/auth'
 import { usePublicConfig } from '../api/meta'
 import { useMatches } from '../api/resume'
 import DemoButton from '../components/DemoButton'
 import { ActiveFilterChips, FilterDrawer, Pill } from '../components/FilterBar'
+import { GetUpdates, NewSinceLastVisit } from '../components/JobUpdates'
 import {
   COUNTRY_CHOICES, LEVELS, WORK_MODES, countActive, countriesFor,
   type CountryChoice, type Filters, type Level,
@@ -43,7 +44,7 @@ const P = {
   show_expired: 'show_expired', search_mode: 'search_mode', level: 'level',
   country: 'country', program: 'program', grad_year: 'grad_year',
   sort: 'sort', order: 'order', view: 'view', job: 'job',
-  page: 'page', page_size: 'page_size',
+  page: 'page', page_size: 'page_size', added_since: 'added_since',
 } as const
 
 const PAGE_SIZES: PageSize[] = [10, 25, 50]
@@ -56,6 +57,7 @@ const SEASON_KEYS: Season[] = ['winter', 'spring', 'summer', 'fall']
 // One menu for the sort field and direction like most job boards
 const SORTS: { value: string; label: string; sort: SortField; order: SortOrder }[] = [
   { value: 'posted_at:desc', label: 'Most recent', sort: 'posted_at', order: 'desc' },
+  { value: 'first_seen_at:desc', label: 'Newly added to CoopRadar', sort: 'first_seen_at', order: 'desc' },
   { value: 'deadline:asc', label: 'Deadline soonest', sort: 'deadline', order: 'asc' },
   { value: 'company:asc', label: 'Company A to Z', sort: 'company', order: 'asc' },
   { value: 'title:asc', label: 'Job title A to Z', sort: 'title', order: 'asc' },
@@ -109,14 +111,16 @@ export default function PostingsListPage() {
   const jobParam     = sp.get(P.job)
   const page         = Math.max(1, Number(sp.get(P.page) ?? 1))
   const page_size    = (([10, 25, 50].includes(Number(sp.get(P.page_size))) ? Number(sp.get(P.page_size)) : 25)) as PageSize
+  const since_raw    = sp.get(P.added_since) ?? ''
+  const added_since  = since_raw && !Number.isNaN(Date.parse(since_raw)) ? since_raw : ''
 
   const filters: Filters = {
     category, level, country, program, grad_year, province, city, work_mode, posted_within,
     term, season, duration, company, skills, show_expired,
   }
 
-  // Get the jobs
-  const { data, isLoading, isError, refetch } = usePostings({
+  // The filters alone, shared by the list, the new jobs bar and the feed link
+  const filterParams: PostingListParams = {
     q: q || undefined,
     city: city || undefined,
     province: province || undefined,
@@ -135,6 +139,12 @@ export default function PostingsListPage() {
     students_only: level === '',
     hide_senior: level === 'entry',
     search_mode,
+  }
+
+  // Get the jobs
+  const { data, isLoading, isError, refetch } = usePostings({
+    ...filterParams,
+    added_since: added_since || undefined,
     sort,
     order,
     page,
@@ -340,7 +350,8 @@ export default function PostingsListPage() {
               </p>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <GetUpdates params={filterParams} />
             <label htmlFor="sort-select" className="label-form">Sort by</label>
             <select
               id="sort-select"
@@ -366,6 +377,26 @@ export default function PostingsListPage() {
 
         <div className="pb-3 empty:hidden">
           <ActiveFilterChips filters={filters} meta={meta} onChange={changeFilters} onClearAll={clearAll} />
+        </div>
+
+        <div className="pb-3 empty:hidden">
+          {added_since ? (
+            <p className="flex flex-wrap items-center gap-2 border border-air-200 bg-air-50 px-3 py-2 text-sm" role="status">
+              <span>
+                Showing only jobs added since{' '}
+                {new Date(added_since).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}.
+              </span>
+              <button type="button" className="link font-semibold" onClick={() => update({ [P.added_since]: null })}>
+                Show all jobs
+              </button>
+            </p>
+          ) : (
+            <NewSinceLastVisit
+              params={filterParams}
+              active={Boolean(added_since)}
+              onShow={(since) => update({ [P.added_since]: since, [P.sort]: 'first_seen_at', [P.order]: 'desc' })}
+            />
+          )}
         </div>
 
         <div className={view === 'cards' ? 'grid lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,36rem)_minmax(0,1fr)]' : ''}>

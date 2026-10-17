@@ -165,6 +165,23 @@ _SCHOOL_CUE = re.compile(
     r"|\bbcomm?\b|\bbba\b|\bbmath\b|honou?rs|diploma|\bgpa\b|co-?op program)"
 )
 _YEAR = r"(20[1-4]\d)"
+# Between "Expected" and a year on a resume, these mean the year is about work, not graduation
+_NOT_GRADUATION = re.compile(r"(?i)co-?op|intern|work|term|availab|start|placement|position")
+# A resume line about the co-op they want, like "Seeking an 8 month co-op from May 2027"
+_WORK_TERM_LINE = re.compile(
+    r"(?im)^.*\b(seeking|looking for|available|availability|work terms?|co-?op terms?)\b.*$"
+)
+_SEASON_WORD = r"(?:winter|spring|summer|fall|autumn|hiver|été|ete|printemps|automne)"
+# The work term, not graduation: "for the Summer 2027 term", "starting May 2027", "2027 co-op".
+# Cut out of the text before we read grad years from it
+_TERM_PHRASE = re.compile(
+    r"(?i)(?:\b(?:for|during|in)\s+(?:the|a|an|our)?\s*)?\b" + _SEASON_WORD
+    + r"\s*(?:/\s*" + _SEASON_WORD + r"\s*)?'?(?:20)?\d{2}\s+"
+    r"(?:work\s+)?(?:terms?|internships?|intern\b|co-?ops?|sessions?|semesters?|placements?"
+    r"|cohorts?)"
+    r"|\b(?:start\w*|begin\w*|commenc\w*|available|availability)\b[^.;\n]{0,30}?\b20\d{2}\b"
+    r"|\b20\d{2}\s+(?:work\s+)?(?:terms?|internships?|co-?ops?|placements?)\b"
+)
 
 
 def _sentences_with_degree(text: str) -> list[str]:
@@ -181,8 +198,14 @@ def fields_in_posting(text: str) -> list[str]:
     return found
 
 
+# Whole words only, so "undergraduate" and "postgraduate" are never a graduation phrase
 _GRAD_CUE = re.compile(
-    r"(?i)(graduat\w*|class of|grad date|convocat\w*|completion of (your|their) degree)"
+    r"(?i)\b(graduat\w*|class of|grad date|convocat\w*|completion of (your|their) degree)"
+)
+# "Graduate students" or "graduate degree" is the level of study, not a grad year
+_GRAD_LEVEL = re.compile(
+    r"(?i)^\s*(students?|degrees?|programs?|studies|school|level|positions?|roles?"
+    r"|opportunit\w*|(or|and) undergrad\w*)\b"
 )
 
 
@@ -191,12 +214,17 @@ def grad_years_in_posting(text: str, today: date | None = None) -> list[int]:
     Grad years a job asks for, read from the text right after a graduation phrase.
     "graduating between December 2026 and June 2027" gives [2026, 2027]. Years way in the past
     or future are ignored. Empty means the job does not say.
+    The work term is something else. "Undergraduate students for the Summer 2027 term" asks
+    for no grad year, it is a Summer 2027 job (app/ingest/terms.py reads that).
     """
     this_year = (today or date.today()).year
     years: set[int] = set()
     for cue in _GRAD_CUE.finditer(text or ""):
         window = text[cue.end(): cue.end() + 90]
+        if cue.group(1).lower() == "graduate" and _GRAD_LEVEL.match(window):
+            continue
         window = re.split(r"[.\n;]", window, maxsplit=1)[0]
+        window = _TERM_PHRASE.sub(" ", window)
         for y in re.findall(_YEAR, window):
             if this_year - 1 <= int(y) <= this_year + 6:
                 years.add(int(y))
@@ -236,17 +264,24 @@ def detect_education(text: str, today: date | None = None) -> Education:
             result.degree = key
             break
 
-    # 1. Things like "Expected graduation: April 2028" or "Class of 2027" or "Graduating 2027"
-    explicit = re.search(
-        r"(?i)(expected|anticipated|graduat\w*|class of|convocation)\D{0,40}?" + _YEAR, joined
-    )
-    if explicit:
-        result.grad_year = int(explicit.group(2))
-        return result
-    # 2. The end of a date range near school like "Sept 2023 to Apr 2028" or "2024 to Present"
+    # 1. Things like "Expected graduation: April 2028" or "Class of 2027" or "Graduating 2027".
+    # Not "Expected co-op term: Summer 2027" or "Undergraduate, available May 2027", which say
+    # when they can work, not when they finish
+    for m in re.finditer(
+        r"(?i)\b(expected|anticipated|graduat\w*|class of|convocation)\b(\D{0,40}?)" + _YEAR,
+        joined,
+    ):
+        if not _NOT_GRADUATION.search(m.group(2)):
+            result.grad_year = int(m.group(3))
+            return result
+    # Lines about the co-op they want, like "Seeking a Summer 2027 co-op", never count below
+    joined = _TERM_PHRASE.sub(" ", _WORK_TERM_LINE.sub(" ", joined))
+    # 2. The end of a date range near school like "Sept 2023 to Apr 2028" or "2024 to Present".
+    # A range inside one year is a work term, not a degree
     ends = [
         int(m.group(2))
         for m in re.finditer(_YEAR + r"\s*[-–—to]+\s*(?:[A-Za-z.]+\s*)?" + _YEAR, joined)
+        if int(m.group(2)) > int(m.group(1))
     ]
     future = [y for y in ends if y >= this_year - 1]
     if future:

@@ -15,9 +15,9 @@ A job can say it in many ways, so we look for
 A season with no year gets the next one after today, so "Summer intern" in October means
 next summer.
 
-Length. Gives back 4, 8, 12 or 16 months, the normal co-op lengths, or None when it does
-not say. "6 month internship" rounds to 8 and "12 week internship" to 4, since we sort
-and filter by the usual co-op lengths. A month range like "May to August" counts too.
+Length. Gives back the length in whole months as the job states it, 2 to 24, or None when it
+does not say. "6 month internship" gives 6 and "12 week internship" gives 3. A month range like
+"May to August" counts too. Filters group lengths into the usual co-op ones with LENGTH_BUCKETS.
 """
 
 import re
@@ -171,17 +171,23 @@ def _term_in(text: str, today: date, is_title: bool = False) -> str | None:
     return None
 
 
-def round_to_coop_length(months: float) -> int | None:
-    """The normal co-op length closest to this many months. None when it is not a co-op length."""
-    if 2.5 <= months < 6:
-        return 4
-    if 6 <= months < 10:
-        return 8
-    if 10 <= months < 14.5:
-        return 12
-    if 14.5 <= months <= 20:
-        return 16
-    return None
+MIN_MONTHS, MAX_MONTHS = 2, 24
+# The usual co-op lengths and the real lengths each one covers. The length filter, the counts
+# next to it and resume preferences all use these, so a 6 month job shows under "about 8"
+LENGTH_BUCKETS: dict[int, tuple[int, int]] = {4: (2, 5), 8: (6, 9), 12: (10, 14), 16: (15, 24)}
+
+
+def whole_months(months: float) -> int | None:
+    """A job length in whole months, or None when it is too short or long to be a work term."""
+    rounded = round(months)
+    return rounded if MIN_MONTHS <= rounded <= MAX_MONTHS else None
+
+
+def length_bucket(months: int | None) -> int | None:
+    """The usual co-op length a real length falls under. 6 gives 8. None when unknown."""
+    if months is None:
+        return None
+    return next((key for key, (low, high) in LENGTH_BUCKETS.items() if low <= months <= high), None)
 
 
 def _cued(text: str, start: int, end: int) -> bool:
@@ -193,7 +199,7 @@ def _cued(text: str, start: int, end: int) -> bool:
 
 
 def duration_in_text(title: str, text: str = "") -> int | None:
-    """The co-op length in months (4, 8, 12 or 16) a job states, or None when it does not say."""
+    """The length in whole months a job states, like 4 or 6, or None when it does not say."""
     for part in (title or "", (text or "")[:8000]):
         found = _duration_in(part)
         if found:
@@ -207,13 +213,13 @@ def _duration_in(text: str) -> int | None:
     for m in _MONTHS_LONG.finditer(text):
         low = _number(m.group(1))
         if low and _cued(text, m.start(), m.end()):
-            rounded = round_to_coop_length(low)
+            rounded = whole_months(low)
             if rounded:
                 return rounded
     for m in _WEEKS_LONG.finditer(text):
         low = _number(m.group(1))
-        if low and 8 <= low <= 30 and _cued(text, m.start(), m.end()):
-            rounded = round_to_coop_length(low / 4.33)
+        if low and 8 <= low <= 52 and _cued(text, m.start(), m.end()):
+            rounded = whole_months(low / 4.345)
             if rounded:
                 return rounded
     whole = _YEAR_LONG.search(text)
@@ -229,10 +235,19 @@ def _duration_in(text: str) -> int | None:
             span += 12 * (end_year - start_year)
         elif span <= 0:
             span += 12
-        rounded = round_to_coop_length(span)
+        rounded = whole_months(span)
         if rounded:
             return rounded
     return None
+
+
+def term_start_date(term: str | None) -> date | None:
+    """"Summer 2027" gives May 1 2027, like term_start in the database. None without a year."""
+    season = season_of(term)
+    year = (term or "")[-4:]
+    if not season or not year.isdigit():
+        return None
+    return date(int(year), _START_MONTH[season], 1)
 
 
 def season_of(term: str | None) -> str | None:

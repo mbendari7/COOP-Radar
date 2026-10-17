@@ -43,7 +43,7 @@ class IngestSource(Base):
     __table_args__ = (
         CheckConstraint(
             "adapter_type IN ('json_api','rss','csv','manual','greenhouse','lever','ashby',"
-            "'smartrecruiters','workday','adzuna','workable')",
+            "'smartrecruiters','workday','adzuna','workable','simplify')",
             name="ck_ingest_sources_adapter_type",
         ),
         Index("idx_ingest_sources_enabled", "enabled", "auto_paused"),

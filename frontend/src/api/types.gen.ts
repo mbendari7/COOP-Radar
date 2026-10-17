@@ -342,6 +342,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/postings/feed.rss": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Postings Feed
+         * @description An RSS feed of the newest jobs for a search. Takes the same filters as GET /api/postings and
+         *     always gives the 50 jobs we added most recently, so feed readers pick up new ones.
+         */
+        get: operations["postings_feed_api_postings_feed_rss_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/postings/meta/filters": {
         parameters: {
             query?: never;
@@ -1286,6 +1307,8 @@ export interface components {
              * @default []
              */
             fields_of_study: string[];
+            /** First Seen At */
+            first_seen_at?: string | null;
             /**
              * Grad Years
              * @default []
@@ -1359,6 +1382,8 @@ export interface components {
              * @default []
              */
             fields_of_study: string[];
+            /** First Seen At */
+            first_seen_at?: string | null;
             /**
              * Grad Years
              * @default []
@@ -2267,6 +2292,7 @@ export interface operations {
                 category?: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades")[] | null;
                 company?: string[] | null;
                 posted_within?: number | null;
+                added_since?: string | null;
                 country?: ("CA" | "US")[] | null;
                 program?: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology") | null;
                 grad_year?: number | null;
@@ -2275,7 +2301,7 @@ export interface operations {
                 students_only?: boolean;
                 hide_senior?: boolean;
                 search_mode?: "keyword" | "semantic";
-                sort?: "posted_at" | "deadline" | "company" | "title" | "duration_months" | "term_start";
+                sort?: "posted_at" | "deadline" | "company" | "title" | "duration_months" | "term_start" | "first_seen_at";
                 order?: "asc" | "desc";
                 page?: number;
                 page_size?: number;
@@ -2330,6 +2356,60 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PostingListItem"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    postings_feed_api_postings_feed_rss_get: {
+        parameters: {
+            query?: {
+                q?: string | null;
+                city?: string | null;
+                province?: string | null;
+                term?: string | null;
+                season?: ("winter" | "spring" | "summer" | "fall")[] | null;
+                work_mode?: components["schemas"]["WorkMode"] | null;
+                duration?: number[] | null;
+                skills?: string[] | null;
+                category?: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades")[] | null;
+                company?: string[] | null;
+                posted_within?: number | null;
+                added_since?: string | null;
+                country?: ("CA" | "US")[] | null;
+                program?: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology") | null;
+                grad_year?: number | null;
+                show_expired?: boolean;
+                show_closed?: boolean;
+                students_only?: boolean;
+                hide_senior?: boolean;
+                search_mode?: "keyword" | "semantic";
+                sort?: "posted_at" | "deadline" | "company" | "title" | "duration_months" | "term_start" | "first_seen_at";
+                order?: "asc" | "desc";
+                page?: number;
+                page_size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/rss+xml": unknown;
                 };
             };
             /** @description Validation Error */

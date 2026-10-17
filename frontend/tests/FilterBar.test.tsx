@@ -100,9 +100,11 @@ describe('FilterBar', () => {
     expect(screen.getByRole('checkbox', { name: /remote/i })).toBeInTheDocument()
   })
 
-  it('renders length toggles for 4, 8, 12, 16 months', () => {
+  it('renders length toggles that each cover nearby lengths', () => {
     renderBar()
-    for (const d of [4, 8, 12, 16]) expect(screen.getByRole('checkbox', { name: new RegExp(`^${d} months`) })).toBeInTheDocument()
+    for (const name of [/^About 4 months/, /^About 8 months/, /^About 12 months/, /^16 months or more/]) {
+      expect(screen.getByRole('checkbox', { name })).toBeInTheDocument()
+    }
   })
 
   it('lists provinces for Canada and states only once the US is chosen', () => {
@@ -127,7 +129,7 @@ describe('FilterBar', () => {
     fireEvent.change(screen.getByLabelText('Program or major'), { target: { value: 'business' } })
     expect(onChange).toHaveBeenCalledWith({ program: 'business' })
     const year = new Date().getFullYear() + 1
-    fireEvent.change(screen.getByLabelText('Graduating in'), { target: { value: String(year) } })
+    fireEvent.change(screen.getByLabelText('Graduation year'), { target: { value: String(year) } })
     expect(onChange).toHaveBeenCalledWith({ grad_year: year })
   })
 
@@ -156,7 +158,7 @@ describe('ActiveFilterChips', () => {
       program: 'computer_science', grad_year: 2028,
     })
     expect(screen.getByText('Program: Computer Science')).toBeInTheDocument()
-    expect(screen.getByText('Graduating 2028')).toBeInTheDocument()
+    expect(screen.getByText('Grad year 2028')).toBeInTheDocument()
     expect(screen.getByText(/City: Waterloo/)).toBeInTheDocument()
     expect(screen.getByText('Python')).toBeInTheDocument()
     expect(screen.getByText('Data & AI')).toBeInTheDocument()
@@ -205,11 +207,11 @@ describe('Term season and length', () => {
     const onChange = vi.fn()
     renderBar({ ...EMPTY_FILTERS, duration: [4] }, onChange)
 
-    const eight = screen.getByRole('checkbox', { name: /8 months/ })
+    const eight = screen.getByRole('checkbox', { name: /About 8 months/ })
     expect(eight).toHaveTextContent('3')
     fireEvent.click(eight)
     expect(onChange).toHaveBeenCalledWith({ duration: [4, 8] })
-    fireEvent.click(screen.getByRole('checkbox', { name: /4 months/ }))
+    fireEvent.click(screen.getByRole('checkbox', { name: /About 4 months/ }))
     expect(onChange).toHaveBeenCalledWith({ duration: [] })
   })
 

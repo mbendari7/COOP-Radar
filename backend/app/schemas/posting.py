@@ -68,10 +68,12 @@ class PostingListItem(BaseModel):
     season: Season | None = None
     # The first day of the term like 2027-05-01. None when the term has no year
     term_start: date | None = None
-    # 4, 8, 12 or 16. None when the job does not say how long it is
+    # How long the job is in whole months, like 4 or 6. None when it does not say
     duration_months: int | None = None
     deadline: date
     posted_at: datetime
+    # When CoopRadar first saw it, for "new since your last visit"
+    first_seen_at: datetime | None = None
     skills: list[str]
     source_url: str | None
     # What the description asks for, grad years and programs. Empty means it did not say
@@ -180,7 +182,7 @@ class ManualPostingIn(BaseModel):
     deadline: date
     province: str | None = None
     work_mode: WorkMode | None = None
-    duration_months: int | None = None
+    duration_months: int | None = Field(default=None, ge=2, le=24)
     description: str | None = None
     skills: list[str] = []
     source_url: str | None = None
@@ -253,6 +255,8 @@ class PostingListParams(BaseModel):
     company: list[str] | None = None
     # Only jobs posted in the last N days
     posted_within: int | None = None
+    # Only jobs CoopRadar first saw after this moment, for "new since your last visit"
+    added_since: datetime | None = None
     # Countries, any of CA and US. None means all
     country: list[CountryCode] | None = None
     # Jobs for a program. The description names it or the job fits its job types
@@ -269,9 +273,10 @@ class PostingListParams(BaseModel):
 
     # The only sort columns we allow. Anything else is a 422 before the service runs
     # duration_months sorts by length and term_start by when the term begins. Jobs that do not
-    # say go last either way
+    # say go last either way. first_seen_at puts the jobs we added most recently first
     sort: Literal[
-        "posted_at", "deadline", "company", "title", "duration_months", "term_start"
+        "posted_at", "deadline", "company", "title", "duration_months", "term_start",
+        "first_seen_at",
     ] = "posted_at"
     order: Literal["asc", "desc"] = "desc"
 

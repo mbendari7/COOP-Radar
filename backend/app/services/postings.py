@@ -13,9 +13,10 @@ from typing import Any
 from uuid import UUID
 
 from fastapi import HTTPException
-from sqlalchemy import SmallInteger, func, literal, or_, select, text
+from sqlalchemy import SmallInteger, case, false, func, literal, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.ingest.terms import LENGTH_BUCKETS
 from app.models.posting import Posting, WorkMode
 from app.schemas.posting import (
     CategoryCount,
@@ -60,11 +61,16 @@ _SORT_MAP = {
     "title": Posting.title,
     "duration_months": Posting.duration_months,
     "term_start": Posting.term_start,
+    "first_seen_at": Posting.first_seen_at,
 }
 # Columns that can be empty. Empty ones go last in both directions
 _NULLABLE_SORTS = {"duration_months", "term_start"}
 _SEASON_ORDER: tuple[Season, ...] = ("winter", "spring", "summer", "fall")
 _DURATIONS = (4, 8, 12, 16)
+# Job lengths a CSV row can give, in whole months
+_CSV_LENGTHS = {str(n) for n in range(2, 25)}
+# A term that started this many days ago or more is too late to apply for
+_LATE_DAYS = 31
 
 
 async def list_postings(
@@ -150,7 +156,7 @@ async def list_postings(
 
     if params.duration:
         # More than one length means any of them, so show jobs of any picked length
-        stmt = stmt.where(Posting.duration_months.in_(params.duration))
+        stmt = stmt.where(length_clause(params.duration))
 
     if params.skills:
         # The job has to have every picked skill.
@@ -166,6 +172,9 @@ async def list_postings(
 
     if params.posted_within:
         stmt = stmt.where(Posting.posted_at >= func.now() - timedelta(days=params.posted_within))
+
+    if params.added_since:
+        stmt = stmt.where(Posting.first_seen_at > params.added_since)
 
     if params.country:
         stmt = stmt.where(Posting.country.in_(params.country))
@@ -187,7 +196,16 @@ async def list_postings(
     if params.search_mode != "semantic" or not params.q:
         sort_col = _SORT_MAP[params.sort]
         ordered = sort_col.desc() if params.order == "desc" else sort_col.asc()
-        if params.sort in _NULLABLE_SORTS:
+        if params.sort == "term_start":
+            # Terms that started over a month ago are too late to apply for, so they go last,
+            # after the coming ones and after jobs that name no term
+            too_late = case(
+                (Posting.term_start < date.today() - timedelta(days=_LATE_DAYS), 1), else_=0
+            )
+            stmt = stmt.order_by(
+                too_late, ordered.nulls_last(), Posting.posted_at.desc(), Posting.id
+            )
+        elif params.sort in _NULLABLE_SORTS:
             ordered = ordered.nulls_last()
             # Same length or start, newest first, so the list still feels fresh
             stmt = stmt.order_by(ordered, Posting.posted_at.desc(), Posting.id)
@@ -230,6 +248,17 @@ def program_clause(program: str) -> Any:
     """Jobs for a program. The description names a field it covers or the title fits its types."""
     info = PROGRAMS[program]
     return or_(Posting.fields_of_study.overlap(list(info.fields)), any_category(info.categories))
+
+
+def length_clause(buckets: list[int]) -> Any:
+    """
+    Jobs whose real length falls under any of these usual co-op lengths, so picking "about 8
+    months" also finds 6 and 9 month jobs (LENGTH_BUCKETS in app/ingest/terms.py).
+    """
+    ranges = [
+        Posting.duration_months.between(*LENGTH_BUCKETS[b]) for b in buckets if b in LENGTH_BUCKETS
+    ]
+    return or_(*ranges) if ranges else false()
 
 
 def has_grad_year(year: int) -> Any:
@@ -354,7 +383,7 @@ async def _open_counts(db: AsyncSession) -> _OpenCounts:
                     for season in _SEASON_ORDER
                 ),
                 *(
-                    func.count().filter(Posting.duration_months == months).label(f"months_{months}")
+                    func.count().filter(length_clause([months])).label(f"months_{months}")
                     for months in _DURATIONS
                 ),
             ).where(Posting.closed_at.is_(None), Posting.deadline >= date.today())
@@ -469,7 +498,7 @@ async def upload_csv(
             province=_clean(row.get("province")) or "ON",
             work_mode=work_mode or WorkMode.onsite,
             term=_clean(row["term"]),
-            duration_months=int(duration_val) if duration_val in {"4", "8", "12", "16"} else None,
+            duration_months=int(duration_val) if duration_val in _CSV_LENGTHS else None,
             deadline=date.fromisoformat(_clean(row["deadline"])),
             description=_clean(row.get("description")),
             source_url=_clean(row.get("source_url")) or None,

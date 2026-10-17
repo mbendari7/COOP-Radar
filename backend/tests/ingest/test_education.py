@@ -43,6 +43,12 @@ def test_no_degree_sentence_means_no_fields() -> None:
         ("Founded in 2015, we have 300 people. Graduates welcome.", []),
         ("Must be returning to school after the work term.", []),
         ("graduation date in 2045", []),  # too far away to be real
+        # The work term is not a grad year (regression: these all gave 2027 before)
+        ("Undergraduate students enrolled for the Summer 2027 term.", []),
+        ("Open to undergraduate and graduate students for a Fall 2027 co-op.", []),
+        ("Graduate students starting May 2027 are welcome.", []),
+        ("Students graduating in 2028, for our Summer 2027 internship.", [2028]),
+        ("Must be graduating in 2029 and available to start January 2027.", [2029]),
     ],
 )
 def test_grad_years(text: str, years: list[int]) -> None:
@@ -75,6 +81,23 @@ def test_computer_science_honours() -> None:
     resume = "McGill University, Honours Computer Science, 2023 – 2027\nGPA 3.8"
     found = detect_education(resume, today=TODAY)
     assert (found.program, found.grad_year) == ("computer_science", 2027)
+
+
+def test_co_op_availability_is_not_the_grad_year() -> None:
+    # Regression: the wanted work term was read as the graduation year
+    resume = (
+        "University of Waterloo, Computer Science (Co-op)\n"
+        "Expected co-op term: Summer 2027\n"
+        "Seeking an 8 month co-op starting May 2027\n"
+        "Sept 2024 - Apr 2029\n"
+    )
+    found = detect_education(resume, today=TODAY)
+    assert found.grad_year == 2029
+
+
+def test_undergraduate_line_is_not_graduation() -> None:
+    resume = "Undergraduate Research Assistant, McGill University, Summer 2026\nBSc Biology, 2024 - 2028"
+    assert detect_education(resume, today=TODAY).grad_year == 2028
 
 
 def test_nothing_found_is_blank() -> None:

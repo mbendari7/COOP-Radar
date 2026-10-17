@@ -338,3 +338,27 @@ Canadian jobs, BDO 230, IKO 117, every big bank 9 to 33 student roles). Not run:
 finishing locally (38 of 174 sources had run with no failures when checked).
 
 **What I reviewed / changed**: _(fill in after reviewing the diff)_
+
+## 2026-10-16. Work term kept apart from grad year, real lengths, ~1,700 employers, job updates
+
+**What the AI assistant did**:
+- Grad year vs work term. `grad_years_in_posting` matched "graduat" inside "undergraduate", so "Undergraduate students
+  for the Summer 2027 term" saved 2027 as a grad year. Now whole words only, "graduate students" is skipped as a level
+  of study, and work term phrases are cut out first. Resumes: "Expected co-op term: Summer 2027" and "Seeking a co-op
+  from May 2027" no longer read as the graduation year. Cards say "Grad year 2027", apart from the term chip.
+- Term start and length on every job: "Summer 2027 · May to Aug · 4 months" on cards, a Work term column with dates
+  in the table, start and end on details. Lengths are now the real months (6 stays 6, was rounded to 8); filters
+  group them (About 8 months = 6 to 9). "Term starting soonest" puts terms already under way last.
+- More jobs: every Canadian Workday job is kept (big sites kept only student roles before), US filter widened to
+  early career titles, new `simplify` adapter for Simplify's public internship and new grad lists, and
+  `discover_boards.py` re-run twice: ~1,500 new boards (it also had a case bug giving duplicate Workday boards).
+- Updates: `first_seen_at` column, `added_since` filter, "Newly added" sort, "N new since your last visit" bar,
+  and `GET /api/postings/feed.rss` with a Get updates panel. Migration 0013 covers lengths, the column and the source.
+- Not added: Google Jobs. It has no public API and its terms forbid automated collection.
+
+**Results (actual runs)**: ruff, mypy clean; backend 406 passed; `alembic upgrade`, downgrade to 0012, upgrade and
+`check` clean; frontend lint, tsc, build clean, 61 passed. Live: Simplify 4,332 internships and 2,619 new grad roles
+fetched, CIBC Workday 358 Canadian jobs; local import added 5,932 jobs (2,900 to 8,816 open). Playwright 8 of 8. Not run:
+a deploy, a full import of all 1,675 sources.
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_

@@ -85,7 +85,7 @@ are in `PRODUCT.md` and the finished design system is written down in `DESIGN.md
 | **Pydantic v2** | Data validation | Every request and response has a schema; bad input becomes a clean 422 error | `backend/app/schemas/` |
 | **SQLAlchemy 2.0** (async) | The database toolkit / ORM | Typed models and safe, composable SQL queries (every filter is a bound parameter, never string-built SQL) | `backend/app/models/`, `services/` |
 | **asyncpg** | Postgres driver | Fast async connection to the database | used by SQLAlchemy |
-| **Alembic** | Database migrations | Every schema change is a numbered, reversible script (0001 to 0012) | `backend/alembic/versions/` |
+| **Alembic** | Database migrations | Every schema change is a numbered, reversible script (0001 to 0013) | `backend/alembic/versions/` |
 | **httpx** | Async HTTP client | Calls the employers' career-board APIs | `backend/app/ingest/boards.py` |
 | **asyncio background jobs** | Python's built-in concurrency | Runs the importer every 6 hours inside the web server, so there's no separate worker to host | `backend/app/jobs.py` |
 | **argon2** | Password hashing | The current recommended way to store passwords | `backend/app/services/auth.py` |
@@ -130,7 +130,7 @@ flowchart LR
     end
     API --> DB[("PostgreSQL<br/>jobs · users · resumes · sessions")]
     JOBS --> DB
-    JOBS -->|"public JSON APIs"| BOARDS["~170 employer career boards<br/>Greenhouse · Lever · Ashby · SmartRecruiters · Workday"]
+    JOBS -->|"public JSON APIs"| BOARDS["~1,700 employer career boards<br/>Greenhouse · Lever · Ashby · SmartRecruiters · Workday"]
     API -->|"only with the visitor's own key"| AI["Claude · ChatGPT · Gemini"]
 ```
 
@@ -222,7 +222,7 @@ cite their sources. Tailoring and cover letters stream word by word (Server-Sent
 | Table | Holds |
 |---|---|
 | `postings` | every job: title, company, location, country, work mode, term, skills, `fields_of_study`, `grad_years`, a weighted full-text index |
-| `ingest_sources` / `ingest_runs` | the ~170 career boards and a log of each import |
+| `ingest_sources` / `ingest_runs` | the ~1,700 career boards and feeds and a log of each import |
 | `skills` | the skill list and aliases |
 | `users` | accounts (argon2 hash, admin and temporary flags) |
 | `resumes` | resume text, the student's preferences (JSON), the cached AI review |

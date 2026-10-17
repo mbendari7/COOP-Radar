@@ -92,7 +92,8 @@ class Posting(Base):
         Date, Computed(TERM_START_SQL, persisted=True), nullable=True
     )
 
-    # The check only allows the four normal co-op lengths. None means the job does not say
+    # The length in whole months as the job states it, 2 to 24. None means it does not say.
+    # Filters group these into the usual co-op lengths (LENGTH_BUCKETS in app/ingest/terms.py)
     duration_months: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)
 
     deadline: Mapped[date] = mapped_column(Date, nullable=False)
@@ -101,6 +102,11 @@ class Posting(Base):
         # The database fills this in so we never have to
         server_default=text("NOW()"),
         nullable=False,
+    )
+    # When CoopRadar first saw the job. posted_at is the employer's own date, which can be weeks
+    # before we import it, so "new since your last visit" and the job feed use this one
+    first_seen_at: Mapped[datetime] = mapped_column(
+        TIMESTAMP(timezone=True), server_default=text("NOW()"), nullable=False
     )
     description: Mapped[str] = mapped_column(Text, nullable=False)
     source_url: Mapped[str | None] = mapped_column(Text, nullable=True)
@@ -147,13 +153,14 @@ class Posting(Base):
 
     __table_args__ = (
         CheckConstraint(
-            "duration_months IN (4, 8, 12, 16)", name="ck_duration_months"
+            "duration_months BETWEEN 2 AND 24", name="ck_duration_months"
         ),
         # GIN indexes for full text search and array lookups
         Index("idx_postings_search_vector", "search_vector", postgresql_using="gin"),
         Index("idx_postings_skills", "skills", postgresql_using="gin"),
         # Normal indexes for sorting and exact filters
         Index("idx_postings_posted_at", "posted_at"),
+        Index("idx_postings_first_seen_at", "first_seen_at"),
         Index("idx_postings_deadline", "deadline"),
         Index("idx_postings_company", "company"),
         Index("idx_postings_title", "title"),

@@ -25,7 +25,7 @@ from app.ingest.base import AdapterError, RawPosting
 from app.ingest.dedup import duplicate_exists
 from app.ingest.extract import extract_fields
 from app.ingest.registry import adapter_for
-from app.ingest.terms import duration_in_text, term_in_text
+from app.ingest.terms import duration_in_text, term_in_text, whole_months
 from app.models.ingest_run import IngestRun
 from app.models.ingest_source import IngestSource
 from app.models.posting import Posting, WorkMode
@@ -36,7 +36,6 @@ _AUTO_PAUSE_THRESHOLD = 3
 # this far ahead. It is flagged in low_confidence_fields and pushed forward on every run
 # while the job is still listed, and the job closes as soon as it leaves the board
 _ESTIMATED_DEADLINE = timedelta(days=45)
-_VALID_DURATIONS = {4, 8, 12, 16}
 
 
 async def run_source(source_id: UUID, run_id: UUID | None = None) -> None:
@@ -222,8 +221,8 @@ async def _raw_to_posting(db: AsyncSession, raw: RawPosting, source_id: UUID) ->
         if not skills and extracted.skills:
             skills = extracted.skills
             low_confidence["skills"] = extracted.confidence_map.get("skills", 0.0)
-        if not duration and extracted.duration_months in _VALID_DURATIONS:
-            duration = extracted.duration_months
+        if not duration and extracted.duration_months:
+            duration = whole_months(extracted.duration_months)
 
     work_mode = WorkMode.onsite
     if work_mode_str and work_mode_str in WorkMode.__members__:

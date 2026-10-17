@@ -69,18 +69,18 @@ describe('PostingCard', () => {
       data: [makePosting({ title: 'Data Co-op', role: 'coop', city: 'Austin', province: 'TX', country: 'US' })],
     })
     expect(screen.getByText('Co-op')).toBeInTheDocument()
-    // The term and its length read together, like "Summer 2027 · 4 months"
-    expect(screen.getByText('Summer 2027 · 4 months')).toBeInTheDocument()
+    // The term, when it runs and its length read together, like "Summer 2027 · May to Aug · 4 months"
+    expect(screen.getByText('Summer 2027')).toHaveTextContent('Summer 2027 · May to Aug · 4 months')
     expect(screen.getAllByText(/Austin, TX, US/).length).toBeGreaterThan(0)
   })
 
-  it('leaves the term out when the job does not say, and shows a length on its own', () => {
+  it('says the term is not stated when the job does not say, and still shows the length', () => {
     renderTable({
       view: 'cards',
       data: [makePosting({ title: 'No term', term: 'Open', season: null, duration_months: 8 })],
     })
     expect(screen.queryByText(/Open/)).not.toBeInTheDocument()
-    expect(screen.getByText('8 months')).toBeInTheDocument()
+    expect(screen.getByText('Term not stated')).toHaveTextContent('Term not stated · 8 months')
   })
 
   it('sorts the table by term length when the Length header is clicked', () => {
