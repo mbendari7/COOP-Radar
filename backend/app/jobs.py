@@ -3,8 +3,8 @@ Background jobs that run inside the web server, so there is no extra worker or q
 
 enqueue(job, *args)  starts a job without making the request wait and logs any error
 scheduler()          starts with the app. Every 10 minutes it imports each career board
-                     that has not run in INGEST_INTERVAL_HOURS (6 by default), one at a
-                     time, and clears old sessions. On a brand new site the first pass
+                     that has not run in INGEST_INTERVAL_HOURS (6 by default), a few at a
+                     time, oldest first, and clears old sessions. On a brand new site the first pass
                      imports every board so real jobs show up a minute or two after start.
 
 Only three jobs run at once so a big import cannot hog the database connections
@@ -72,7 +72,11 @@ def enqueue(name: str, *args: str) -> None:
 
 
 async def _due_source_ids() -> list[str]:
-    """Ids of sources that are on, not paused and have not run within INGEST_INTERVAL."""
+    """
+    Ids of sources that are on, not paused and have not run within INGEST_INTERVAL.
+    Sources that never ran come first, then the ones that waited longest, so a free host that
+    falls asleep halfway still gets further through the list on every wake up.
+    """
     from sqlalchemy import or_, select
 
     from app.db import AsyncSessionLocal
@@ -80,20 +84,27 @@ async def _due_source_ids() -> list[str]:
 
     cutoff = datetime.now(UTC) - INGEST_INTERVAL
     async with AsyncSessionLocal() as db:
-        stmt = select(IngestSource.id).where(
-            IngestSource.enabled.is_(True),
-            IngestSource.auto_paused.is_(False),
-            or_(IngestSource.last_run_at.is_(None), IngestSource.last_run_at < cutoff),
+        stmt = (
+            select(IngestSource.id)
+            .where(
+                IngestSource.enabled.is_(True),
+                IngestSource.auto_paused.is_(False),
+                or_(IngestSource.last_run_at.is_(None), IngestSource.last_run_at < cutoff),
+            )
+            .order_by(IngestSource.last_run_at.asc().nulls_first(), IngestSource.id)
         )
         return [str(i) for i in (await db.execute(stmt)).scalars().all()]
 
 
 async def run_due_sources() -> int:
-    """Import every source that is due, one after another. Gives back how many ran."""
+    """
+    Import every source that is due, a few at a time (the job slots cap it at
+    _MAX_CONCURRENT_JOBS). Gives back how many ran.
+    """
     source_ids = await _due_source_ids()
     for source_id in source_ids:
         logger.info("Scheduled import for source %s", source_id)
-        await _run("run_source", (source_id,))
+    await asyncio.gather(*(_run("run_source", (source_id,)) for source_id in source_ids))
     return len(source_ids)
 
 
@@ -104,12 +115,25 @@ async def scheduler(store: object | None = None) -> None:
     while True:
         try:
             await run_due_sources()
+            await _delete_old_jobs()
             purge = getattr(store, "purge_expired", None)
             if purge is not None:
                 await purge()
         except Exception:  # noqa: BLE001 keep the scheduler going no matter what
             logger.exception("Scheduler cycle failed")
         await asyncio.sleep(_CHECK_EVERY_SECONDS)
+
+
+async def _delete_old_jobs() -> None:
+    """Drops jobs that closed a month ago so the database stays small (free plans are 0.5 GB)."""
+    from app.db import AsyncSessionLocal
+    from app.services.postings import delete_old_closed
+
+    async with AsyncSessionLocal() as db:
+        count = await delete_old_closed(db)
+        await db.commit()
+    if count:
+        logger.info("Deleted %d old closed jobs", count)
 
 
 async def _backfill_embeddings() -> None:

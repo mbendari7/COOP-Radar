@@ -40,7 +40,7 @@ export type Season = NonNullable<PostingListItem['season']>
 export type SortField =
   | 'posted_at' | 'deadline' | 'company' | 'title' | 'duration_months' | 'term_start' | 'first_seen_at'
 export type SortOrder = 'asc' | 'desc'
-export type PageSize = 10 | 25 | 50
+export type PageSize = 10 | 25 | 50 | 100
 
 export interface PostingListParams {
   q?: string
@@ -58,6 +58,8 @@ export interface PostingListParams {
   posted_within?: number
   /** Only jobs CoopRadar first saw after this moment (ISO date and time) */
   added_since?: string
+  /** With a term or length picked, also show jobs that don't say theirs, after the ones that match */
+  include_unstated?: boolean
   /** Countries to include. None means all */
   country?: CountryCode[]
   /** Jobs for a program. Named in the description or fitting its job types */
@@ -90,6 +92,9 @@ function buildQueryString(params: PostingListParams): string {
   if (params.work_mode) sp.set('work_mode', params.work_mode)
   if (params.duration?.length) {
     params.duration.forEach((d) => sp.append('duration', String(d)))
+  }
+  if (params.include_unstated && (params.season?.length || params.duration?.length || params.term)) {
+    sp.set('include_unstated', 'true')
   }
   if (params.skills?.length) {
     params.skills.forEach((s) => sp.append('skills', s))

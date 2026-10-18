@@ -9,7 +9,7 @@
     accent-color: #1e3a8a;
   }
   body {
-    @apply bg-white text-gray-900;
+    @apply bg-gray-50 text-gray-900;
     font-variant-numeric: tabular-nums;
   }
   ::selection {
@@ -41,18 +41,18 @@
   /* Page titles. A little narrow and heavy for character, but wide enough to read easily */
   .display {
     font-stretch: 94%;
-    @apply font-bold tracking-tight;
+    @apply font-display font-bold tracking-tight;
   }
 
   /* Buttons */
   .btn {
-    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-sm border-2 px-4 py-2 text-sm font-bold transition-colors disabled:cursor-not-allowed disabled:opacity-50;
+    @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg border px-4 py-2 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
   }
   .btn-primary {
-    @apply btn border-post-600 bg-post-600 text-white hover:border-post-700 hover:bg-post-700;
+    @apply btn border-post-600 bg-post-600 text-white shadow-sm hover:border-post-700 hover:bg-post-700 active:translate-y-px;
   }
   .btn-secondary {
-    @apply btn border-gray-900 bg-white text-gray-900 hover:bg-gray-100;
+    @apply btn border-gray-300 bg-white text-gray-900 shadow-sm hover:border-gray-400 hover:bg-gray-50;
   }
   .btn-quiet {
     @apply btn border-transparent bg-transparent text-air-700 hover:bg-air-50;
@@ -60,15 +60,20 @@
 
   /* Inputs and selects */
   .field {
-    @apply w-full rounded-sm border-[1.5px] border-gray-400 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-500 transition-colors hover:border-gray-600 focus:border-air-700 focus:outline-none focus:ring-0 disabled:opacity-50;
+    @apply w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder-gray-500 shadow-sm transition hover:border-gray-400 focus:border-air-600 focus:outline-none focus:ring-4 focus:ring-air-100 disabled:opacity-50;
   }
 
   /* Filter chips. Picked ones turn airmail blue */
   .chip {
-    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-sm border-[1.5px] border-gray-400 bg-white px-3 py-1 text-sm font-semibold text-gray-800 transition-colors hover:border-gray-700;
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-gray-300 bg-white px-3.5 py-1.5 text-sm font-medium text-gray-800 shadow-sm transition hover:border-gray-400 hover:bg-gray-50;
   }
   .chip-on {
-    @apply border-air-700 bg-air-700 text-white hover:border-air-800;
+    @apply border-air-700 bg-air-700 text-white hover:border-air-800 hover:bg-air-800;
+  }
+
+  /* A white card on the grey page */
+  .card {
+    @apply rounded-xl border border-gray-200 bg-white shadow-sm;
   }
 
   /* A plain text link */
@@ -84,9 +89,11 @@
 
 @layer utilities {
   .stretch-condensed {
+    font-family: Archivo, Inter, ui-sans-serif, system-ui, sans-serif;
     font-stretch: 75%;
   }
   .stretch-semi {
+    font-family: Archivo, Inter, ui-sans-serif, system-ui, sans-serif;
     font-stretch: 87%;
   }
 }

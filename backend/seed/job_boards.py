@@ -227,6 +227,15 @@ WORKABLE_SOURCES: list[tuple[str, dict[str, str]]] = [
 SIMPLIFY_SOURCES: list[tuple[str, dict[str, str]]] = [
     ("Simplify internship and co-op list", {"repo": "SimplifyJobs/Summer{summer}-Internships"}),
     ("Simplify new grad list", {"repo": "SimplifyJobs/New-Grad-Positions"}),
+    # Lists in the same format kept by other students. Repeats of Simplify's roles are skipped
+    ("vanshb03 internship list", {"repo": "vanshb03/Summer{summer}-Internships"}),
+]
+
+# Student kept lists of co-op roles on GitHub, written as a table in the README
+GITHUB_LIST_SOURCES: list[tuple[str, dict[str, str]]] = [
+    ("Canadian tech internships list", {
+        "repo": "negarprh/Canadian-Tech-Internships-{summer}", "country": "CA",
+    }),
 ]
 
 _DISCOVERED = Path(__file__).with_name("discovered_boards.json")
@@ -241,7 +250,10 @@ def discovered_boards() -> list[dict[str, str]]:
         rows = json.loads(_DISCOVERED.read_text(encoding="utf-8"))
     except (OSError, ValueError):
         return []
-    adapters = {"greenhouse", "lever", "ashby", "workday", "smartrecruiters"}
+    adapters = {
+        "greenhouse", "lever", "ashby", "workday", "smartrecruiters", "recruitee", "bamboohr",
+        "rippling", "oracle",
+    }
     return [
         {"company": str(r["company"]), "adapter_type": str(r["adapter_type"]), "board": str(r["board"])}
         for r in rows
@@ -276,6 +288,7 @@ async def seed_job_boards() -> None:
         entries.append((name, row["adapter_type"], {"board": row["board"], "company": row["company"]}))
     entries += [(name, "workable", config) for name, config in WORKABLE_SOURCES]
     entries += [(name, "simplify", config) for name, config in SIMPLIFY_SOURCES]
+    entries += [(name, "github_list", config) for name, config in GITHUB_LIST_SOURCES]
     if adzuna_configured():
         entries += [(name, "adzuna", config) for name, config in ADZUNA_SOURCES]
 

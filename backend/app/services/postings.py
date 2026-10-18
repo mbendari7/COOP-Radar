@@ -71,6 +71,8 @@ _DURATIONS = (4, 8, 12, 16)
 _CSV_LENGTHS = {str(n) for n in range(2, 25)}
 # A term that started this many days ago or more is too late to apply for
 _LATE_DAYS = 31
+# Imported jobs that closed this many days ago are deleted, unless someone saved them
+_KEEP_CLOSED_DAYS = 30
 
 
 async def list_postings(
@@ -145,18 +147,37 @@ async def list_postings(
     if params.province:
         stmt = stmt.where(Posting.province.ilike(params.province))
 
+    # With include_unstated a job that names no term (or no length) stays in, after the ones
+    # that match. These count how many of the picked things a job really states
+    stated: list[Any] = []
+
     if params.term:
-        stmt = stmt.where(Posting.term == params.term)
+        term_match = Posting.term == params.term
+        if params.include_unstated:
+            stmt = stmt.where(or_(term_match, Posting.season.is_(None)))
+            stated.append(term_match)
+        else:
+            stmt = stmt.where(term_match)
 
     if params.season:
-        stmt = stmt.where(Posting.season.in_(params.season))
+        season_match = season_clause(params.season)
+        if params.include_unstated:
+            stmt = stmt.where(or_(season_match, Posting.season.is_(None)))
+            stated.append(season_match)
+        else:
+            stmt = stmt.where(season_match)
 
     if params.work_mode:
         stmt = stmt.where(Posting.work_mode == params.work_mode)
 
     if params.duration:
         # More than one length means any of them, so show jobs of any picked length
-        stmt = stmt.where(length_clause(params.duration))
+        length_match = length_clause(params.duration)
+        if params.include_unstated:
+            stmt = stmt.where(or_(length_match, Posting.duration_months.is_(None)))
+            stated.append(length_match)
+        else:
+            stmt = stmt.where(length_match)
 
     if params.skills:
         # The job has to have every picked skill.
@@ -193,6 +214,9 @@ async def list_postings(
     # Sorting.
     # Smart search is already in order of closeness. Otherwise use the allowed sort.
     # Posting.id breaks ties so pages stay steady when sort values repeat
+    if stated:
+        # Jobs that say they match go first, then the ones that do not say
+        stmt = stmt.order_by(*(case((match, 0), else_=1) for match in stated))
     if params.search_mode != "semantic" or not params.q:
         sort_col = _SORT_MAP[params.sort]
         ordered = sort_col.desc() if params.order == "desc" else sort_col.asc()
@@ -250,6 +274,17 @@ def program_clause(program: str) -> Any:
     return or_(Posting.fields_of_study.overlap(list(info.fields)), any_category(info.categories))
 
 
+def season_clause(seasons: list[Season]) -> Any:
+    """
+    Jobs for a coming term in any of these seasons. A Winter 2026 job in October 2026 is too
+    late to apply for, so it does not count as Winter.
+    """
+    return Posting.season.in_(seasons) & or_(
+        Posting.term_start.is_(None),
+        Posting.term_start >= date.today() - timedelta(days=_LATE_DAYS),
+    )
+
+
 def length_clause(buckets: list[int]) -> Any:
     """
     Jobs whose real length falls under any of these usual co-op lengths, so picking "about 8
@@ -269,6 +304,26 @@ def has_grad_year(year: int) -> Any:
 def grad_year_clause(year: int) -> Any:
     """The job names no grad years or it names this one."""
     return or_(func.cardinality(Posting.grad_years) == 0, has_grad_year(year))
+
+
+async def delete_old_closed(db: AsyncSession, days: int = _KEEP_CLOSED_DAYS) -> int:
+    """
+    Deletes imported jobs that closed or passed their deadline over `days` ago, so a free
+    database does not fill up with old jobs. Jobs someone saved or tracks are kept.
+    Gives back how many were deleted. The caller commits.
+    """
+    from sqlalchemy import delete, exists
+
+    from app.models.saved_posting import SavedPosting
+
+    cutoff = date.today() - timedelta(days=days)
+    stmt = delete(Posting).where(
+        Posting.source_id.is_not(None),
+        or_(Posting.closed_at < func.now() - timedelta(days=days), Posting.deadline < cutoff),
+        ~exists().where(SavedPosting.posting_id == Posting.id),
+    )
+    result = await db.execute(stmt)
+    return int(getattr(result, "rowcount", 0) or 0)
 
 
 async def get_posting(posting_id: UUID, db: AsyncSession) -> PostingDetail:
@@ -379,7 +434,7 @@ async def _open_counts(db: AsyncSession) -> _OpenCounts:
                     for mode in WorkMode
                 ),
                 *(
-                    func.count().filter(Posting.season == season).label(f"season_{season}")
+                    func.count().filter(season_clause([season])).label(f"season_{season}")
                     for season in _SEASON_ORDER
                 ),
                 *(

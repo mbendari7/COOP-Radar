@@ -3,6 +3,7 @@ Tests for Simplify's student lists on GitHub (app/ingest/simplify.py). HTTP is f
 using entries shaped like the real listings.json.
 """
 
+import time
 from datetime import date
 
 import pytest
@@ -27,7 +28,7 @@ def listing(title: str, locations: list[str], **extra: object) -> dict[str, obje
         "title": title,
         "active": True,
         "terms": ["Summer 2027"],
-        "date_posted": 1771484864,
+        "date_posted": int(time.time()) - 86400,  # recent, old entries are skipped
         "url": f"https://jobs.example.com/{title}",
         "locations": locations,
         "is_visible": True,
@@ -56,7 +57,7 @@ def test_listing_becomes_a_posting_with_its_term() -> None:
         "Software Engineer Intern", "Maple Labs", "Toronto", "ON", "CA", "Summer 2027"
     )
     assert p.source_url == "https://jobs.example.com/Software Engineer Intern"
-    assert p.posted_at is not None and p.posted_at.year == 2026  # seconds, not milliseconds
+    assert p.posted_at is not None and p.posted_at.year >= 2026  # seconds, not milliseconds
     assert "Bachelor's" in (p.description or "")
 
 

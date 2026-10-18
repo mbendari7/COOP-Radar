@@ -1,8 +1,9 @@
 # Keeps the hosted site's jobs fresh on Render's free plan.
 #
 # A free Render web service sleeps after ~15 minutes without visitors, and the job importer
-# only runs while it's awake. Every 6 hours this wakes the site and keeps it up for ~20
-# minutes, long enough to import every career board. Free for public repositories.
+# only runs while it's awake. Every 6 hours this wakes the site and keeps it up for ~55
+# minutes. The importer does a few boards at a time, the ones that waited longest first, so
+# each wake up gets further through the ~1,700 boards. Free for public repositories.
 #
 # Turn it on: GitHub repo → Settings → Secrets and variables → Actions → Variables →
 # New repository variable: SITE_URL = https://your-site.onrender.com (no trailing slash).
@@ -20,7 +21,7 @@ jobs:
     name: Wake the site so it imports new jobs
     runs-on: ubuntu-latest
     if: ${{ vars.SITE_URL != '' }}
-    timeout-minutes: 30
+    timeout-minutes: 70
     steps:
       - name: Wake up (the first request can take a minute)
         run: |
@@ -31,7 +32,7 @@ jobs:
           echo "The site didn't answer" && exit 1
       - name: Stay awake while the importer runs
         run: |
-          for i in $(seq 1 5); do
+          for i in $(seq 1 13); do
             sleep 240
             curl -fsS --max-time 60 "${{ vars.SITE_URL }}/api/health" || true
           done

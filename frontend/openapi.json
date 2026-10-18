@@ -3432,6 +3432,16 @@
           },
           {
             "in": "query",
+            "name": "include_unstated",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Unstated",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
             "name": "skills",
             "required": false,
             "schema": {
@@ -3951,6 +3961,16 @@
                 }
               ],
               "title": "Duration"
+            }
+          },
+          {
+            "in": "query",
+            "name": "include_unstated",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Include Unstated",
+              "type": "boolean"
             }
           },
           {

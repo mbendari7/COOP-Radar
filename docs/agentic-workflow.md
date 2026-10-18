@@ -362,3 +362,27 @@ fetched, CIBC Workday 358 Canadian jobs; local import added 5,932 jobs (2,900 to
 a deploy, a full import of all 1,675 sources.
 
 **What I reviewed / changed**: _(fill in after reviewing the diff)_
+
+## 2026-10-17. More jobs per filter, new job sources, faster imports, a more modern look
+
+**What the AI assistant did**:
+- Why filters showed so few jobs: most employers never write the term, so Winter or Summer hid them, and the live
+  importer went through ~1,700 boards one at a time while the free host slept after ~20 minutes, so most boards were
+  never imported (4,771 jobs live). Fixes: `include_unstated` (on by default in the site, with a switch) keeps jobs that
+  don't say their term or length after the ones that do; a season only matches terms not yet under way; the
+  scheduler runs 3 boards at a time, never run and oldest first; the runner loads a source's jobs in one query; the
+  wake up workflow keeps the site up ~55 minutes; jobs closed over 30 days are deleted unless saved (free 0.5 GB DB).
+- New sources (migration 0014): `recruitee`, `bamboohr`, `rippling` (`ingest/ats.py`), `oracle` Oracle Cloud career
+  sites (`ingest/oracle.py`, e.g. Nokia 92 Canadian jobs), `github_list` for README tables (negarprh's Canadian tech
+  internships, 270 open rows), vanshb03's internship list; season only lists get a year, entries untouched for 180
+  days are skipped. `discover_boards.py` now also finds SmartRecruiters, Recruitee, BambooHR, Rippling and Oracle
+  boards, retries Common Crawl, reads 4,109 boards from the student lists' apply links (`--lists`) and adds to the file.
+- 100 jobs per page. Look: rounded corners, pill chips, white cards on a grey page, Inter for text (DESIGN.md updated).
+
+**Results (actual runs)**: ruff, mypy clean; backend 418 passed before the last API tests were added, `tests/api` 134
+passed after; alembic upgrade, downgrade to 0013, upgrade and `check` clean; frontend lint, tsc, build clean, 61
+Vitest passed plus the new feed URL test; Playwright 8 of 8. Local: open jobs 10,667 to 13,651 during the import; Canada
+co-op Winter with computer engineering 155 to 297 with the new switch. Not finished: the board search was stopped by
+the machine running low on memory before checking the boards it found, so `discovered_boards.json` is unchanged.
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_

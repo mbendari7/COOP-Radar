@@ -44,10 +44,10 @@ const P = {
   show_expired: 'show_expired', search_mode: 'search_mode', level: 'level',
   country: 'country', program: 'program', grad_year: 'grad_year',
   sort: 'sort', order: 'order', view: 'view', job: 'job',
-  page: 'page', page_size: 'page_size', added_since: 'added_since',
+  page: 'page', page_size: 'page_size', added_since: 'added_since', exact: 'exact',
 } as const
 
-const PAGE_SIZES: PageSize[] = [10, 25, 50]
+const PAGE_SIZES: PageSize[] = [10, 25, 50, 100]
 const CATEGORY_KEYS: CategoryKey[] = [
   'software', 'data', 'design', 'product', 'hardware', 'it_security', 'business',
   'sales_marketing', 'customer', 'health', 'public', 'trades',
@@ -110,7 +110,11 @@ export default function PostingsListPage() {
   const view         = sp.get(P.view) === 'table' ? 'table' : 'cards'
   const jobParam     = sp.get(P.job)
   const page         = Math.max(1, Number(sp.get(P.page) ?? 1))
-  const page_size    = (([10, 25, 50].includes(Number(sp.get(P.page_size))) ? Number(sp.get(P.page_size)) : 25)) as PageSize
+  const page_size    = ((PAGE_SIZES.includes(Number(sp.get(P.page_size)) as PageSize) ? Number(sp.get(P.page_size)) : 25)) as PageSize
+  // Most employers never write the term or length, so by default a term or length filter also
+  // shows jobs that don't say, after the ones that do. exact=1 shows only the ones that say
+  const exact        = sp.get(P.exact) === '1'
+  const termPicked   = season.length > 0 || duration.length > 0 || Boolean(term)
   const since_raw    = sp.get(P.added_since) ?? ''
   const added_since  = since_raw && !Number.isNaN(Date.parse(since_raw)) ? since_raw : ''
 
@@ -128,6 +132,7 @@ export default function PostingsListPage() {
     season: season.length ? season : undefined,
     work_mode: work_mode || undefined,
     duration: duration.length ? duration : undefined,
+    include_unstated: !exact,
     skills: skills.length ? skills : undefined,
     category: category.length ? category : undefined,
     company: company.length ? company : undefined,
@@ -237,7 +242,7 @@ export default function PostingsListPage() {
               <FilterIcon className="h-4 w-4" />
               All filters
               {active > 0 && (
-                <span className="bg-post-600 px-1.5 text-xs font-bold text-white">{active}</span>
+                <span className="rounded-full bg-post-600 px-1.5 text-xs font-bold text-white">{active}</span>
               )}
             </button>
             <span className="mx-1 h-5 w-px shrink-0 bg-gray-400" aria-hidden="true" />
@@ -364,7 +369,7 @@ export default function PostingsListPage() {
             >
               {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
-            <div className="hidden overflow-hidden rounded-sm border-[1.5px] border-gray-400 bg-white md:inline-flex" role="group" aria-label="Layout">
+            <div className="hidden overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm md:inline-flex" role="group" aria-label="Layout">
               <ViewButton active={view === 'cards'} label="List" onClick={() => update({ [P.view]: null })}>
                 <ListIcon className="h-4 w-4" />
               </ViewButton>
@@ -378,6 +383,25 @@ export default function PostingsListPage() {
         <div className="pb-3 empty:hidden">
           <ActiveFilterChips filters={filters} meta={meta} onChange={changeFilters} onClearAll={clearAll} />
         </div>
+
+        {termPicked && (
+          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
+            <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-gray-900">
+              <input
+                type="checkbox"
+                checked={!exact}
+                onChange={(e) => update({ [P.exact]: e.target.checked ? null : '1' })}
+                className="h-4 w-4 rounded border-gray-400"
+              />
+              Also show jobs that don't say their term or length
+            </label>
+            <span>
+              {exact
+                ? 'Only jobs that name it are shown.'
+                : 'Most employers never write it in the post. Jobs that do match come first.'}
+            </span>
+          </div>
+        )}
 
         <div className="pb-3 empty:hidden">
           {added_since ? (
@@ -399,8 +423,9 @@ export default function PostingsListPage() {
           )}
         </div>
 
-        <div className={view === 'cards' ? 'grid lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,36rem)_minmax(0,1fr)]' : ''}>
-          <div className="-mx-4 min-w-0 sm:mx-0 lg:border-r lg:border-gray-200">
+        <div className={view === 'cards' ? 'grid gap-4 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,36rem)_minmax(0,1fr)]' : ''}>
+          <div className="-mx-4 min-w-0 sm:mx-0">
+            <div className="overflow-hidden border-y border-gray-200 bg-white sm:rounded-xl sm:border sm:shadow-sm">
             <PostingsTable
               data={items}
               isLoading={isLoading}
@@ -415,8 +440,9 @@ export default function PostingsListPage() {
               selectedId={selectedId}
               onSelect={selectJob}
             />
+            </div>
 
-            <div className="space-y-4 px-4 pt-4 sm:px-0 lg:pr-5">
+            <div className="space-y-4 px-4 pt-4 sm:px-0">
               {data && level === '' && data.total < 15 && (
                 <p className="text-sm text-gray-700">
                   Co-op and intern roles are posted in waves before each term.{' '}
@@ -480,7 +506,7 @@ export default function PostingsListPage() {
           {view === 'cards' && items.length > 0 && (
             <aside
               aria-label="Job details"
-              className="hidden border-t border-gray-300 bg-white lg:sticky lg:top-14 lg:block lg:max-h-[calc(100vh-3.5rem)] lg:overflow-y-auto"
+              className="card hidden self-start lg:sticky lg:top-[4.5rem] lg:block lg:max-h-[calc(100vh-5.5rem)] lg:overflow-y-auto"
             >
               <PostingDetailPane id={selectedId} />
             </aside>
@@ -517,9 +543,9 @@ function JobSearchForm({
         e.preventDefault()
         onSearch(what.trim(), where)
       }}
-      className="flex flex-col gap-2 md:flex-row md:items-stretch md:gap-0 md:border-2 md:border-gray-900 md:bg-white md:focus-within:border-air-700"
+      className="flex flex-col gap-2 md:flex-row md:items-stretch md:gap-0 md:rounded-xl md:border md:border-gray-300 md:bg-white md:p-1.5 md:shadow-sm md:transition md:focus-within:border-air-600 md:focus-within:ring-4 md:focus-within:ring-air-100"
     >
-      <label className="flex flex-1 items-center gap-3 border-2 border-gray-900 bg-white px-3 md:border-0 md:px-4">
+      <label className="flex flex-1 items-center gap-3 rounded-lg border border-gray-300 bg-white px-3 shadow-sm md:border-0 md:px-3 md:shadow-none">
         <SearchIcon className="h-5 w-5 shrink-0 text-gray-700" />
         <span className="sr-only">What</span>
         <input
@@ -528,12 +554,12 @@ function JobSearchForm({
           onChange={(e) => setWhat(e.target.value)}
           placeholder="Job title, keyword or company"
           aria-label="Search jobs by title, keyword or company"
-          className="w-full border-0 bg-transparent py-2.5 text-base text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 md:py-3.5 md:text-[17px]"
+          className="w-full border-0 bg-transparent py-2.5 text-base text-gray-900 placeholder-gray-500 focus:outline-none focus:ring-0 md:py-2.5 md:text-[17px]"
         />
       </label>
       <span className="hidden w-[1.5px] self-stretch bg-gray-300 md:my-2.5 md:block" aria-hidden="true" />
       <div className="flex gap-2 md:contents">
-      <label className="flex min-w-0 flex-1 items-center gap-3 border-2 border-gray-900 bg-white px-3 md:w-72 md:flex-none md:border-0 md:px-4">
+      <label className="flex min-w-0 flex-1 items-center gap-3 rounded-lg border border-gray-300 bg-white px-3 shadow-sm md:w-72 md:flex-none md:border-0 md:px-3 md:shadow-none">
         <PinIcon className="h-5 w-5 shrink-0 text-gray-700" />
         <span className="sr-only">Where</span>
         <select
@@ -543,7 +569,7 @@ function JobSearchForm({
             onSearch(what.trim(), e.target.value)
           }}
           aria-label="Where"
-          className="w-full border-0 bg-transparent py-2.5 pl-0 text-base text-gray-900 focus:outline-none focus:ring-0 md:py-3.5 md:text-[17px]"
+          className="w-full border-0 bg-transparent py-2.5 pl-0 text-base text-gray-900 focus:outline-none focus:ring-0 md:py-2.5 md:text-[17px]"
         >
           <option value="">{country === 'US' ? 'Anywhere in the US' : country === 'all' ? 'Anywhere' : 'Anywhere in Canada'}</option>
           {country !== 'US' && canadian.length > 0 && (
@@ -558,7 +584,7 @@ function JobSearchForm({
           )}
         </select>
       </label>
-      <button type="submit" className="btn-primary shrink-0 px-4 py-2.5 text-base md:border-0 md:px-8 md:py-3.5">
+      <button type="submit" className="btn-primary shrink-0 px-4 py-2.5 text-base md:px-8">
         Find jobs
       </button>
       </div>

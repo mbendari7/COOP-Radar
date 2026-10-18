@@ -43,7 +43,7 @@ def role_of(title: str) -> RoleType:
 T = TypeVar("T")
 
 _DURATIONS = {4, 8, 12, 16}
-_PAGE_SIZES = {10, 25, 50}
+_PAGE_SIZES = {10, 25, 50, 100}
 _POSTED_WITHIN = {1, 3, 7, 14, 30}
 
 
@@ -248,6 +248,9 @@ class PostingListParams(BaseModel):
     work_mode: WorkMode | None = None
     # duration takes a list so you can pick more than one, like 4 or 8 months
     duration: list[int] | None = None
+    # With a term or length picked, also keep jobs that do not say their term or length (most
+    # employers never write it). Jobs that do match come first
+    include_unstated: bool = False
     skills: list[str] | None = None
     # Job types, any of them, worked out from the title (see app/services/categories.py)
     category: list[CategoryKey] | None = None

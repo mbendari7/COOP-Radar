@@ -2288,6 +2288,7 @@ export interface operations {
                 season?: ("winter" | "spring" | "summer" | "fall")[] | null;
                 work_mode?: components["schemas"]["WorkMode"] | null;
                 duration?: number[] | null;
+                include_unstated?: boolean;
                 skills?: string[] | null;
                 category?: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades")[] | null;
                 company?: string[] | null;
@@ -2379,6 +2380,7 @@ export interface operations {
                 season?: ("winter" | "spring" | "summer" | "fall")[] | null;
                 work_mode?: components["schemas"]["WorkMode"] | null;
                 duration?: number[] | null;
+                include_unstated?: boolean;
                 skills?: string[] | null;
                 category?: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades")[] | null;
                 company?: string[] | null;

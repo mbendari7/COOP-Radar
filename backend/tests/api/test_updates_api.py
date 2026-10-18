@@ -96,3 +96,80 @@ async def test_term_starting_soonest_puts_terms_that_are_over_last(
 
 async def test_feed_rejects_bad_filters(client: AsyncClient) -> None:
     assert (await client.get("/api/postings/feed.rss?season=monsoon")).status_code == 422
+
+
+async def test_include_unstated_keeps_jobs_that_do_not_say_their_term(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    # Regression: picking Winter showed about 30 jobs, since most employers never write the
+    # term. With include_unstated the jobs that say Winter come first, then the ones that don't
+    this_year = date.today().year
+    now = datetime.now(UTC)
+    await add(
+        db_session,
+        make_posting(title="Winter", term=f"Winter {this_year + 1}", posted_at=now - timedelta(days=3)),
+        make_posting(title="Unstated", term="Open", duration_months=None, posted_at=now),
+        make_posting(title="Summer", term=f"Summer {this_year + 1}", posted_at=now),
+    )
+
+    exact = (await client.get("/api/postings?season=winter")).json()
+    assert [i["title"] for i in exact["items"]] == ["Winter"]
+
+    loose = (await client.get("/api/postings?season=winter&include_unstated=true")).json()
+    assert [i["title"] for i in loose["items"]] == ["Winter", "Unstated"]
+
+    lengths = (await client.get("/api/postings?duration=4&include_unstated=true")).json()
+    assert {i["title"] for i in lengths["items"]} == {"Winter", "Unstated", "Summer"}
+    assert lengths["items"][-1]["title"] == "Unstated"
+
+
+async def test_a_hundred_jobs_per_page(client: AsyncClient) -> None:
+    assert (await client.get("/api/postings?page_size=100")).status_code == 200
+    assert (await client.get("/api/postings?page_size=99")).status_code == 422
+
+
+async def test_old_closed_jobs_are_deleted_unless_saved(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    from sqlalchemy import select
+
+    from app.models.ingest_source import IngestSource
+    from app.models.posting import Posting
+    from app.models.saved_posting import SavedPosting
+    from app.models.user import User
+    from app.services.postings import delete_old_closed
+
+    source = IngestSource(name="Old jobs", adapter_type="json_api", config={"url": "https://x"})
+    db_session.add(source)
+    await db_session.flush()
+    long_ago = datetime.now(UTC) - timedelta(days=60)
+    gone = make_posting(title="Gone", source_id=source.id, closed_at=long_ago)
+    kept_saved = make_posting(title="Saved", source_id=source.id, closed_at=long_ago)
+    recent = make_posting(title="Recent", source_id=source.id,
+                          closed_at=datetime.now(UTC) - timedelta(days=2))
+    manual = make_posting(title="Manual", closed_at=long_ago)  # added by hand, kept
+    await add(db_session, gone, kept_saved, recent, manual)
+    user = User(email="saver@example.com", hashed_password="x")
+    db_session.add(user)
+    await db_session.flush()
+    db_session.add(SavedPosting(user_id=user.id, posting_id=kept_saved.id))
+    await db_session.flush()
+
+    assert await delete_old_closed(db_session) == 1
+
+    titles = set((await db_session.execute(select(Posting.title))).scalars())
+    assert {"Saved", "Recent", "Manual"} <= titles and "Gone" not in titles
+
+
+async def test_a_season_means_a_coming_term(client: AsyncClient, db_session: AsyncSession) -> None:
+    # Regression: Winter showed "Winter 2026" jobs in October 2026, a term that already began
+    this_year = date.today().year
+    await add(
+        db_session,
+        make_posting(title="Past winter", term=f"Winter {this_year - 1}"),
+        make_posting(title="Next winter", term=f"Winter {this_year + 1}"),
+    )
+
+    for extra in ("", "&include_unstated=true"):
+        items = (await client.get(f"/api/postings?season=winter{extra}")).json()["items"]
+        assert [i["title"] for i in items] == ["Next winter"]

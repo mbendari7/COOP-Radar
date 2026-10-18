@@ -31,7 +31,7 @@ Docs: `README.md` (technical + free hosting), `guides/using-coopradar/` (simple:
   `ingest/` career-board + feed adapters, runner, dedup, skill matching, extraction, embeddings ·
   `agent/` streamed tailor / cover letter / Q&A · `llm.py` Claude helpers ·
   `deps.py` auth deps · `store.py` session store · `jobs.py` background jobs
-- `backend/alembic/versions/` migrations (0001 to 0013) · `backend/seed/` skills, ~1,700 career boards (`job_boards.py` +
+- `backend/alembic/versions/` migrations (0001 to 0014) · `backend/seed/` skills, ~1,700 career boards (`job_boards.py` +
   `discovered_boards.json`),
   sample postings (`SEED_*` flags) · `backend/tests/` pytest
 - `frontend/src/`: `api/` (`client.ts` + query hooks) · `pages/` · `components/` · `frontend/tests/` vitest ·

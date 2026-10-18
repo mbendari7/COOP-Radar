@@ -169,7 +169,7 @@ career boards and cached insights, 0008 the `kv_store` session table, 0009 `resu
 | `app/store.py` | The `Store` protocol (`hget/hset/incr/expire/delete`), `PostgresStore` on the `kv_store` table, `create_store()` (Redis when `REDIS_URL` is set), and the `get_store` dependency. |
 | `app/deps.py` | `get_current_user` (cookie → store `session:<token>` → `users` row; refreshes the 7-day TTL; 401/503), `get_optional_user` (same, but `None` instead of 401), `get_admin_user` (403 unless `is_admin`). |
 | `app/llm.py` | `get_client()` builds the Anthropic client from settings; `response_text()` joins text blocks and skips thinking blocks; `parse_json()` tolerates code fences and prose. |
-| `app/jobs.py` | `enqueue(name, *args)` runs a registered job (`run_source`, `embed_posting`) as an asyncio task, at most 3 at a time; `scheduler()` imports due sources one by one every 10 minutes and purges expired sessions. |
+| `app/jobs.py` | `enqueue(name, *args)` runs a registered job (`run_source`, `embed_posting`) as an asyncio task, at most 3 at a time; `scheduler()` imports due sources every 10 minutes, three at a time, never run first then oldest first (so a free host that sleeps halfway gets further each time), deletes imported jobs that closed or passed their deadline over 30 days ago unless someone saved them (`delete_old_closed`), and purges expired sessions. |
 | `app/api/postings.py` | List, detail, similar, filter metadata, CSV upload (rate-limited 3/hour per user via a store counter), manual create. |
 | `app/api/auth.py`, `me.py` | Register, login (5 failed attempts / 15 min → 429), logout, demo + guest temporary accounts, profile, change password, delete account, claim (keep) a temporary account. |
 | `app/api/saved.py` | Tracker CRUD, status changes (each one writes an event), CSV export. |
@@ -218,7 +218,7 @@ career boards and cached insights, 0008 the `kv_store` session table, 0009 `resu
 
 ```mermaid
 flowchart TD
-    T["Scheduler task (every 10 min:<br/>sources not run in 6 h, one at a time)"] --> R
+    T["Scheduler task (every 10 min:<br/>sources not run in 6 h, 3 at a time, oldest first)"] --> R
     A["Admin: Run now<br/>(commits IngestRun 'running', then jobs.enqueue)"] --> R
     R["runner.run_source(source_id, run_id?)"]
     R --> AD["adapter_for(source).fetch()<br/>json_api (httpx, retries) or rss (feedparser)"]
@@ -247,7 +247,19 @@ jobs.workable.com (robots.txt allows it): every job in Canada, and US intern, co
 Two `simplify` sources (`ingest/simplify.py`, migration 0013) read Simplify's public internship and new grad lists on
 GitHub (`.github/scripts/listings.json`), thousands of roles from big companies and startups, each with its terms;
 `{summer}` in the repo name moves to next year's list on its own, and terms that are already over are dropped.
-`discovered_boards.json` holds ~1,500 boards found this way (merged from two runs, case duplicates removed). The runner reads each job's term and length with `ingest/terms.py` on import and
+Two more `simplify` sources read vanshb03's lists in the same format; entries nobody touched in 180 days are skipped,
+and lists that give only a season ("Winter") get the first one after the role was posted. A `github_list` source
+(`ingest/github_lists.py`, migration 0014) reads negarprh's Canadian tech internships README table (company, role,
+place, apply link, date; `↳` means the company above, closed rows have no link and roles naming a term that is over
+are dropped). Three more hiring systems have public lists (`ingest/ats.py`): `recruitee` (`<board>.recruitee.com/api/offers/`),
+`bamboohr` (`<board>.bamboohr.com/careers/list`, then one detail per kept job) and `rippling`
+(`api.rippling.com/platform/api/ats/v1/board/<board>/jobs`). `oracle` (`ingest/oracle.py`) reads Oracle Cloud career
+sites, used by Nokia, utilities, pension plans and hospitals, through the same public endpoint their pages use
+(`/hcmRestApi/resources/latest/recruitingCEJobRequisitions`, 200 at a time), with board `<host>/<site number>`; the
+city comes from each job's details. `discover_boards.py` now also looks for SmartRecruiters, Recruitee, BambooHR and
+Rippling boards in Common Crawl, retries the index when it answers 502 or 504, takes boards from the apply links on
+the GitHub student lists (`--lists` does only that), adds to `discovered_boards.json` instead of replacing it, and
+names boards after the company on the list. `discovered_boards.json` holds ~1,500 boards (rerun the script to add the boards the new finders turn up). The runner reads each job's term and length with `ingest/terms.py` on import and
 again on every re-import. These official public job-board APIs exist
 for syndicating a company's openings. `boards.py → choose_location()` keeps every location matching
 `INGEST_LOCATION_FILTER` (Canada; "Vancouver, WA" is excluded by its state code) and, per `INGEST_US_JOBS`, US jobs

@@ -76,6 +76,14 @@ async def _execute_run(
         status = "failed"
 
     seen_refs: set[str] = set()
+    # Every job we already have from this source in one query, instead of one query per job.
+    # Big lists like Simplify's have thousands of rows and the database can be far away
+    known: dict[str, Posting] = {}
+    if raw_postings:
+        rows = await db.execute(
+            select(Posting).where(Posting.source_id == source_id, Posting.source_ref.is_not(None))
+        )
+        known = {p.source_ref: p for p in rows.scalars() if p.source_ref}
 
     for raw in raw_postings:
         try:
@@ -84,14 +92,7 @@ async def _execute_run(
             # treat its own jobs as duplicates and then close them
             if raw.source_ref:
                 seen_refs.add(raw.source_ref)
-                existing = (
-                    await db.execute(
-                        select(Posting).where(
-                            Posting.source_id == source_id,
-                            Posting.source_ref == raw.source_ref,
-                        )
-                    )
-                ).scalar_one_or_none()
+                existing = known.get(raw.source_ref)
                 if existing is not None:
                     _apply_updates(existing, raw)
                     updated += 1
@@ -104,6 +105,8 @@ async def _execute_run(
             db.add(posting)
             await db.flush()  # later rows need to see this one when checking duplicates
             new_postings.append(posting)
+            if raw.source_ref:
+                known[raw.source_ref] = posting  # the same job twice in one list updates it
             added += 1
         except Exception as exc:  # noqa: BLE001 one bad row should not fail the whole run
             errors += 1
@@ -114,16 +117,9 @@ async def _execute_run(
     # Close this source's jobs that left the feed. Skipped when the fetch failed
     # or came back empty so an outage never closes everything
     if seen_refs:
-        stale = (
-            await db.execute(
-                select(Posting).where(
-                    Posting.source_id == source_id,
-                    Posting.closed_at.is_(None),
-                    Posting.source_ref.is_not(None),
-                    Posting.source_ref.not_in(seen_refs),
-                )
-            )
-        ).scalars().all()
+        stale = [
+            p for ref, p in known.items() if p.closed_at is None and ref not in seen_refs
+        ]
         now = datetime.now(UTC)
         for p in stale:
             p.closed_at = now

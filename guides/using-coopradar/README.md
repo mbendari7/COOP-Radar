@@ -73,6 +73,12 @@ or **All filters**, to pick seasons and lengths. "About 8 months" also finds 6 t
 the soonest term first (terms that already started go to the bottom), or the shortest or longest first. Jobs that
 don't say their term or length show "Not stated".
 
+Most employers never write the term in the post, so picking **Winter** would hide most real co-op jobs. When you
+pick a term or a length, **Also show jobs that don't say their term or length** is on: jobs that say Winter come
+first, then the jobs that don't say, so you still see everything you could apply to. Untick it to see only the jobs
+that name the term. A term that already started, like Winter 2026 in October 2026, never counts as Winter. Pick
+**100** under **Per page** at the bottom to go through lots of jobs quickly.
+
 **Work term and graduation year are different things.** The work term is when you'd work, like Summer 2027. The
 graduation year is when you finish school, like 2029. A job that asks for a graduation year shows **Grad year 2029**
 on its own, and the **Graduation year** filter only hides jobs that ask for a different one.

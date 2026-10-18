@@ -1,6 +1,7 @@
 """Maps each adapter_type name to its adapter class."""
 
 from app.ingest.adzuna import AdzunaAdapter
+from app.ingest.ats import BambooHrAdapter, RecruiteeAdapter, RipplingAdapter
 from app.ingest.base import BaseAdapter
 from app.ingest.boards import (
     AshbyAdapter,
@@ -8,7 +9,9 @@ from app.ingest.boards import (
     LeverAdapter,
     SmartRecruitersAdapter,
 )
+from app.ingest.github_lists import GithubListAdapter
 from app.ingest.json_api import JsonApiAdapter
+from app.ingest.oracle import OracleAdapter
 from app.ingest.rss import RssAdapter
 from app.ingest.simplify import SimplifyAdapter
 from app.ingest.workable import WorkableAdapter
@@ -25,6 +28,11 @@ _ADAPTERS: dict[str, type[BaseAdapter]] = {
     "adzuna": AdzunaAdapter,
     "workable": WorkableAdapter,
     "simplify": SimplifyAdapter,
+    "recruitee": RecruiteeAdapter,
+    "bamboohr": BambooHrAdapter,
+    "rippling": RipplingAdapter,
+    "github_list": GithubListAdapter,
+    "oracle": OracleAdapter,
 }
 
 

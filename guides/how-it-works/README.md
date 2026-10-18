@@ -48,7 +48,7 @@ README, this table is your answer.
 | **React 18** | A library for building UIs out of components | Each part of the page (job row, postmark, filter panel, match) is a reusable component | `frontend/src/components/`, `pages/` |
 | **TypeScript** | JavaScript with types | Catches mistakes before the browser does; the API's types are generated from the backend, so frontend and backend can't drift apart | everywhere in `frontend/src/` |
 | **Vite** | Build tool and dev server | Instant reloads while developing; builds the optimized site for production | `vite.config.ts` |
-| **Tailwind CSS** | Utility CSS classes (`px-4`, `text-sm`) | Fast, consistent styling. The palette, square corners and font live in one config, and shared pieces like `btn-primary`, `field` and `chip` live in one CSS file | `tailwind.config.ts`, `src/index.css` |
+| **Tailwind CSS** | Utility CSS classes (`px-4`, `text-sm`) | Fast, consistent styling. The palette, rounded corners and fonts live in one config, and shared pieces like `btn-primary`, `field` and `chip` live in one CSS file | `tailwind.config.ts`, `src/index.css` |
 | **TanStack Query** | Data fetching and caching | Loads jobs, matches and filters, caches them, and refreshes after changes (e.g. after uploading a resume) | `frontend/src/api/*.ts` |
 | **TanStack Table** | Headless table logic | The sortable table view of jobs | `components/PostingsTable.tsx` |
 | **React Router** | Pages and URLs in a single-page app | `/`, `/resume`, `/postings/:id`, `/saved`...; all job filters live in the URL so searches are shareable | `App.tsx`, `pages/PostingsListPage.tsx` |
@@ -57,10 +57,10 @@ README, this table is your answer.
 
 ### The look
 
-The design borrows from a Canadian post office instead of the usual blue and grey job board. A postal red top bar,
-airmail blue for links and anything picked, white rows split by thin ink lines instead of rounded cards, and
-narrow capital labels like the ones on a customs form. The font is Archivo, which has a condensed width for
-headings and labels and a normal width for reading.
+The design borrows from a Canadian post office instead of the usual blue and grey job board: a postal red top
+bar, airmail blue for links and anything picked, and a round postmark on each job's details. Since October 2026 it is
+a little more modern: soft rounded corners, pill shaped chips, white cards on a light grey page and Inter for reading
+text, with Archivo (which has a condensed width) kept for page titles and the wordmark.
 
 The one signature piece is the **postmark**: a round, slightly tilted stamp on every job showing the city and the
 day it was posted, the way a real postmark shows the town and day a letter was mailed. When you pick a job its
@@ -85,7 +85,7 @@ are in `PRODUCT.md` and the finished design system is written down in `DESIGN.md
 | **Pydantic v2** | Data validation | Every request and response has a schema; bad input becomes a clean 422 error | `backend/app/schemas/` |
 | **SQLAlchemy 2.0** (async) | The database toolkit / ORM | Typed models and safe, composable SQL queries (every filter is a bound parameter, never string-built SQL) | `backend/app/models/`, `services/` |
 | **asyncpg** | Postgres driver | Fast async connection to the database | used by SQLAlchemy |
-| **Alembic** | Database migrations | Every schema change is a numbered, reversible script (0001 to 0013) | `backend/alembic/versions/` |
+| **Alembic** | Database migrations | Every schema change is a numbered, reversible script (0001 to 0014) | `backend/alembic/versions/` |
 | **httpx** | Async HTTP client | Calls the employers' career-board APIs | `backend/app/ingest/boards.py` |
 | **asyncio background jobs** | Python's built-in concurrency | Runs the importer every 6 hours inside the web server, so there's no separate worker to host | `backend/app/jobs.py` |
 | **argon2** | Password hashing | The current recommended way to store passwords | `backend/app/services/auth.py` |
@@ -149,7 +149,9 @@ The backend has four layers, the same for every feature:
 
 ### 4.1 Jobs come in (the importer)
 Files: `app/ingest/boards.py`, `app/ingest/runner.py`, list of employers in `backend/seed/job_boards.py`.
-1. On start-up and every 6 hours, the scheduler imports each employer's board, one at a time.
+1. On start-up and every 6 hours, the scheduler imports each employer's board, three at a time, the ones that
+   waited longest first. Jobs that closed over a month ago are deleted unless someone saved them, so the free
+   database stays small.
 2. An **adapter** per job-board system downloads the company's public job list. These APIs exist so companies'
    jobs can be shown on other sites: no keys, no scraping, and every job links back to the employer.
    - Greenhouse: the list first, then descriptions only for the jobs we keep (one board, SpaceX, is 30 MB with

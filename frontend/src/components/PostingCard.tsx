@@ -69,7 +69,7 @@ export default function PostingCard({ posting, showBookmark = false, selected = 
 
           <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
             {(term || length) && (
-              <span className="inline-flex items-center gap-1.5 border border-gray-300 bg-white px-2 py-0.5 font-semibold text-gray-900">
+              <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 font-semibold text-gray-900">
                 {posting.season && <span className={`h-2 w-2 rounded-full ${SEASON_DOT[posting.season]}`} aria-hidden="true" />}
                 {term || 'Term not stated'}{' '}
                 {termExtras.length > 0 && (
@@ -78,9 +78,9 @@ export default function PostingCard({ posting, showBookmark = false, selected = 
               </span>
             )}
             {posting.role !== 'job' && (
-              <span className="border border-air-200 bg-air-50 px-2 py-0.5 font-semibold text-air-800">{ROLE_LABELS[posting.role]}</span>
+              <span className="rounded-full bg-air-50 px-2.5 py-0.5 font-semibold text-air-800 ring-1 ring-inset ring-air-200">{ROLE_LABELS[posting.role]}</span>
             )}
-            {isNew && <span className="font-bold text-post-600">New</span>}
+            {isNew && <span className="rounded-full bg-post-50 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-post-700">New</span>}
             {posting.grad_years.length > 0 && (
               <span className="text-gray-700" title="The year you finish school, not the work term">
                 {gradYearsLabel(posting.grad_years)}
@@ -108,8 +108,8 @@ export function Tag({
   children, tone = 'plain',
 }: { children: React.ReactNode; tone?: 'plain' | 'accent' }) {
   const cls = {
-    plain: 'border-gray-300 bg-white text-gray-800',
+    plain: 'border-gray-200 bg-gray-50 text-gray-800',
     accent: 'border-air-200 bg-air-50 text-air-800',
   }[tone]
-  return <span className={`inline-block rounded-sm border px-2 py-0.5 font-medium ${cls}`}>{children}</span>
+  return <span className={`inline-block rounded-full border px-2.5 py-0.5 font-medium ${cls}`}>{children}</span>
 }

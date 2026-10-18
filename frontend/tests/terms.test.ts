@@ -44,6 +44,16 @@ describe('feedUrl', () => {
     )
     expect(url).toBe('https://coopradar.example/api/postings/feed.rss?q=data&season=summer&country=CA')
   })
+
+  it('asks for jobs that do not say their term only when a term or length is picked', () => {
+    const base = 'https://coopradar.example'
+    expect(feedUrl({ season: ['winter'], include_unstated: true }, base)).toBe(
+      `${base}/api/postings/feed.rss?season=winter&include_unstated=true`,
+    )
+    expect(feedUrl({ q: 'data', include_unstated: true }, base)).toBe(
+      `${base}/api/postings/feed.rss?q=data`,
+    )
+  })
 })
 
 describe('previousVisit', () => {

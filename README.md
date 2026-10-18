@@ -41,9 +41,9 @@ python start.py      # sets everything up the first time, then opens http://loca
 
 ## Design
 
-CoopRadar looks like a Canadian post office, not a template job board. A postal red top bar, airmail blue for
-links and anything picked, white rows split by thin ink rules instead of rounded cards, square corners, and narrow
-capital labels like a customs form, set in Archivo. Every job wears a round **postmark** with its city and the
+CoopRadar looks like a Canadian post office, not a template job board, kept clean and modern: a postal red top bar,
+airmail blue for links and anything picked, soft rounded corners, pill shaped chips, white cards on a light grey
+page, Inter for reading and Archivo for titles. Every job's details wear a round **postmark** with its city and the
 day it was posted, which stamps red when you pick the job. Match scores use the same stamp, and the time left to
 apply is drawn as a bar to scale.
 
@@ -96,7 +96,7 @@ The full walkthrough is in **[How it works](guides/how-it-works/README.md)**.
 | Frontend | **React 18**, **TypeScript**, **Vite**, **Tailwind CSS**, **TanStack Query** and **TanStack Table**, **React Router**, dnd-kit, types generated from the API's OpenAPI schema |
 | Backend | **Python 3.12**, **FastAPI**, **Pydantic v2**, **SQLAlchemy 2.0** (async, typed), asyncpg, httpx, argon2, pypdf, python-docx |
 | Database | **PostgreSQL 16**: generated `tsvector` + GIN full-text search, array overlap, title regex, JSONB, **pgvector** (optional smart search); **Alembic** migrations `0001` to `0010` |
-| Background work | asyncio tasks inside the web process with a 6-hourly scheduler; no separate worker or queue |
+| Background work | asyncio tasks inside the web process with a 6-hourly scheduler (3 boards at a time, oldest first, old closed jobs deleted after 30 days); no separate worker or queue |
 | AI | Bring your own key: Claude, ChatGPT or Gemini via their official SDKs; Server-Sent Events streaming |
 | Testing | **pytest** (~290 tests, incl. a p95 < 300 ms budget on 10,000 jobs), **Vitest** + Testing Library (45), **Playwright** end-to-end in a real browser (7) |
 | Quality | ruff, mypy `--strict`, ESLint, `tsc`; OpenAPI types checked for drift |
@@ -218,7 +218,7 @@ COOP-Radar/
 │   │   ├── services/             postings, resume (matching), education, categories, insights, auth, ...
 │   │   ├── ingest/               boards.py (Greenhouse/Lever/Ashby/SmartRecruiters), workday.py, adzuna.py, terms.py (term and length), runner, dedup, skill_match
 │   │   ├── schemas/ · models/ · agent/ · ai.py · jobs.py · store.py
-│   ├── alembic/versions/         0001 to 0013
+│   ├── alembic/versions/         0001 to 0014
 │   ├── seed/                     skills · job_boards (~1,700 employers) · sample postings
 │   └── tests/                    api/ · ingest/ · resume/ · eval/ · perf/
 └── frontend/

@@ -145,6 +145,16 @@ components:
 
 ## Overview
 
+**A little more modern (2026-10-17)**
+
+The user asked for the look to be slightly more modern. The red bar, airmail blue, the season dots and the postmark
+stay. What changed: soft rounded corners (6px small, 8px default, 10px for buttons and fields, 14px for cards), pill
+shaped filter chips, tags and role labels, 1px light grey borders with a small shadow instead of 2px ink borders, a
+light grey page (`gray-50`) with the job list and the details panel as white cards, a focus ring of airmail tint
+around fields and the search box, and Inter for reading text with Archivo kept for page titles and the wordmark.
+Where the text below says square corners, 2px or 1.5px ink borders, a flat white page or Archivo for body text,
+this paragraph wins.
+
 **Creative North Star: "Registered Mail", toned down for reading (2026-10-13)**
 
 The user asked for the theme to stay but be easier to read. So: labels are plain 13px sentence case instead of tiny

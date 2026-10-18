@@ -1,7 +1,8 @@
 import type { Config } from 'tailwindcss'
 
-// The look is a Canadian post office. Postal red for the top bar and the main buttons,
-// airmail blue for links and anything picked, white letter paper and an ink grey.
+// The look started as a Canadian post office: postal red for the top bar and the main buttons,
+// airmail blue for links and anything picked, and an ink grey. It is now a little more modern,
+// with soft rounded corners, pill chips, white cards on a light grey page and Inter for text.
 // blue and indigo point at airmail blue and brand at postal red so older class names still fit.
 
 const post = {
@@ -62,17 +63,18 @@ const config: Config = {
         slate: ink,
       },
       fontFamily: {
-        sans: ['Archivo', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['Archivo', 'Inter', 'ui-sans-serif', 'system-ui', 'sans-serif'],
       },
-      // Square corners like forms and envelopes. Only postmarks and dots are round
+      // Soft corners. Chips, dots and postmarks are fully round
       borderRadius: {
         none: '0',
-        sm: '0',
-        DEFAULT: '0',
-        md: '0',
-        lg: '0',
-        xl: '0',
-        '2xl': '0',
+        sm: '6px',
+        DEFAULT: '8px',
+        md: '8px',
+        lg: '10px',
+        xl: '14px',
+        '2xl': '18px',
         full: '9999px',
       },
       boxShadow: {
