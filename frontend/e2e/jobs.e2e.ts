@@ -1,4 +1,4 @@
-/** Browsing jobs like a job board. Search, quick filters, all filters and the details panel. */
+/** Browsing jobs like a job board. Search, the filter sidebar and the details panel. */
 
 import { expect, test } from '@playwright/test'
 
@@ -43,31 +43,41 @@ test.describe('jobs page', () => {
     await expect(page.getByText('No jobs match these filters')).toBeVisible()
   })
 
-  test('quick filters and the All filters panel change the URL', async ({ page }) => {
+  test('the filter sidebar changes the URL with no popup', async ({ page }) => {
     await page.goto('/')
-    await page.getByLabel('Experience level').selectOption('all')
+    const filters = page.getByRole('complementary', { name: 'Filters' })
+    await expect(filters).toBeVisible()
+    await filters.getByLabel('All levels').check()
     await expect(page).toHaveURL(/level=all/)
-    await page.getByRole('checkbox', { name: 'Remote' }).click()
+    await filters.getByRole('checkbox', { name: /Remote/ }).click()
     await expect(page).toHaveURL(/work_mode=remote/)
 
-    await page.getByRole('button', { name: /All filters/ }).click()
-    const dialog = page.getByRole('dialog', { name: 'All filters' })
-    await expect(dialog).toBeVisible()
-    await dialog.getByLabel('Past week').check()
+    // Date posted folds open in place
+    await filters.locator('summary', { hasText: 'Date posted' }).click()
+    await filters.getByLabel('Past week').check()
     await expect(page).toHaveURL(/posted_within=7/)
-    await dialog.getByRole('button', { name: /Show .*jobs?/ }).click()
-    await expect(dialog).toBeHidden()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
 
-    // Each active filter gets a removable chip
-    await page.getByRole('button', { name: 'Remove filter: Past week' }).click()
-    await expect(page).not.toHaveURL(/posted_within/)
+    await filters.getByRole('button', { name: /Clear all/ }).click()
+    await expect(page).not.toHaveURL(/posted_within|work_mode|level=/)
+  })
+
+  test('on a phone the Filters button opens the sidebar in place', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 800 })
+    await page.goto('/')
+    const filters = page.getByRole('complementary', { name: 'Filters' })
+    await expect(filters).toBeHidden()
+    await page.getByRole('button', { name: /^Filters/ }).click()
+    await expect(filters).toBeVisible()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 
   test('term season, length and term sorting work together', async ({ page }) => {
     await page.goto('/?level=all')
-    await page.getByLabel('Term season').selectOption('winter')
+    const filters = page.getByRole('complementary', { name: 'Filters' })
+    await filters.getByRole('checkbox', { name: /^Winter/ }).check()
     await expect(page).toHaveURL(/season=winter/)
-    await page.getByLabel('Term length').selectOption('8')
+    await filters.getByRole('checkbox', { name: /About 8 months/ }).click()
     await expect(page).toHaveURL(/duration=8/)
     await page.getByLabel('Sort by').selectOption('term_start:asc')
     await expect(page).toHaveURL(/sort=term_start/)
@@ -76,7 +86,7 @@ test.describe('jobs page', () => {
     const rows = page.getByRole('article')
     if (await rows.count()) await expect(rows.first()).toContainText('Winter')
 
-    await page.getByRole('button', { name: 'Remove filter: Winter term' }).click()
+    await filters.getByRole('checkbox', { name: /^Winter/ }).uncheck()
     await expect(page).not.toHaveURL(/season=/)
   })
 })

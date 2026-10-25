@@ -224,3 +224,38 @@ describe('Term season and length', () => {
     expect(onChange).toHaveBeenCalledWith({ season: [] })
   })
 })
+
+describe('Filter sidebar', () => {
+  it('only offers the term or length switch once one is picked', () => {
+    const { unmount } = render(
+      <FilterBar filters={EMPTY_FILTERS} meta={META} metaLoading={false} onChange={vi.fn()} onClearAll={vi.fn()} onExactChange={vi.fn()} />,
+    )
+    expect(screen.queryByLabelText(/Also show jobs that don.t say/)).not.toBeInTheDocument()
+    unmount()
+
+    const onExactChange = vi.fn()
+    render(
+      <FilterBar filters={{ ...EMPTY_FILTERS, season: ['winter'] }} meta={META} metaLoading={false} onChange={vi.fn()} onClearAll={vi.fn()} onExactChange={onExactChange} />,
+    )
+    const box = screen.getByLabelText(/Also show jobs that don.t say/)
+    expect(box).toBeChecked()
+    fireEvent.click(box)
+    expect(onExactChange).toHaveBeenCalledWith(true)
+  })
+
+  it('shows Clear all with the count of filters that are on', () => {
+    const onClearAll = vi.fn()
+    renderBar({ ...EMPTY_FILTERS, season: ['fall'], work_mode: 'remote' }, vi.fn(), onClearAll)
+    fireEvent.click(screen.getByRole('button', { name: 'Clear all (2)' }))
+    expect(onClearAll).toHaveBeenCalledOnce()
+  })
+
+  it('opens a folded group when one of its filters is on', () => {
+    const { container, unmount } = renderBar()
+    const posted = () => [...container.querySelectorAll('details')].find((d) => d.textContent?.startsWith('Date posted'))
+    expect(posted()?.open).toBe(false)
+    unmount()
+    const again = renderBar({ ...EMPTY_FILTERS, posted_within: 7 })
+    expect([...again.container.querySelectorAll('details')].find((d) => d.textContent?.startsWith('Date posted'))?.open).toBe(true)
+  })
+})

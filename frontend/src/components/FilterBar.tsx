@@ -1,20 +1,20 @@
 /**
  * Job filters.
- *   FilterBar has every filter in sections. Job type, level, program and grad year,
- *   country and place, work mode, date posted, term and length, company and skills
- *   FilterDrawer puts FilterBar in a panel that slides in from the side for All filters.
- *   The most used filters also sit in the strip above the results
- *   ActiveFilterChips shows what is switched on, each one removable, plus Clear all
+ *   FilterBar has every filter, laid out as the sidebar next to the results. Work term, level,
+ *   location, work mode and job type are always open. Studies, date posted, company and skills
+ *   and the rest fold open in place, so nothing ever pops up over the page
+ *   ActiveFilterChips shows what is switched on, each one removable, plus Clear all. The jobs
+ *   page shows them on phones, where the sidebar is folded away
  *
  * Every value comes from the URL and goes back to it (see PostingsListPage), and all
  * the filtering happens in SQL on the server.
  */
 
-import { useEffect, useRef, type ReactNode } from 'react'
+import { useRef, type ReactNode } from 'react'
 import type { CategoryKey, FilterMeta } from '../api/postings'
 import { isProvince, provinceName, workModeLabel } from '../utils/format'
 import {
-  COUNTRY_CHOICES, DURATIONS, LEVELS, POSTED_WITHIN, WORK_MODES, gradYears,
+  COUNTRY_CHOICES, DURATIONS, LEVELS, POSTED_WITHIN, WORK_MODES, countActive, gradYears,
   type CountryChoice, type Filters,
 } from './filters'
 import { XIcon } from './Icons'
@@ -26,9 +26,12 @@ interface Props {
   metaLoading: boolean
   onChange: (patch: Partial<Filters>) => void
   onClearAll: () => void
+  /** True when a term or length filter shows only the jobs that name it */
+  exact?: boolean
+  onExactChange?: (exact: boolean) => void
 }
 
-export default function FilterBar({ filters, meta, metaLoading, onChange }: Props) {
+export default function FilterBar({ filters, meta, metaLoading, onChange, onClearAll, exact = false, onExactChange }: Props) {
   const categories = (meta?.categories ?? []).filter(
     (c) => c.count > 0 || filters.category.includes(c.key),
   )
@@ -40,12 +43,145 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
   const regions = (meta?.provinces ?? []).filter((p) =>
     filters.country === 'all' ? true : filters.country === 'US' ? !isProvince(p) : isProvince(p),
   )
+  const termPicked = filters.season.length > 0 || filters.duration.length > 0 || Boolean(filters.term)
+  const active = countActive(filters)
 
   return (
-    <div className="divide-y divide-gray-300">
+    <div className="divide-y divide-gray-200">
+      <div className="flex items-center justify-between pb-3">
+        <h2 className="text-[15px] font-bold text-gray-900">Filters</h2>
+        {active > 0 && (
+          <button type="button" onClick={onClearAll} className="text-sm font-semibold text-air-700 hover:underline">
+            Clear all ({active})
+          </button>
+        )}
+      </div>
+
+      <Section title="Work term">
+        <ul className="space-y-1.5">
+          {SEASONS.map((s) => (
+            <li key={s.value}>
+              <label className="flex cursor-pointer items-center gap-2.5 text-sm text-gray-800">
+                <input
+                  type="checkbox"
+                  className="h-4 w-4"
+                  checked={filters.season.includes(s.value)}
+                  onChange={(e) =>
+                    onChange({
+                      season: e.target.checked
+                        ? [...filters.season, s.value]
+                        : filters.season.filter((x) => x !== s.value),
+                    })
+                  }
+                />
+                <span className={`h-2 w-2 shrink-0 rounded-full ${SEASON_DOT[s.value]}`} aria-hidden="true" />
+                <span className="flex-1">
+                  {s.label} <span className="text-xs text-gray-500">{s.short}</span>
+                </span>
+                <Count n={seasonCount(s.value)} />
+              </label>
+            </li>
+          ))}
+        </ul>
+        <p className="label-form mb-1.5 mt-4">Length</p>
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Length">
+          {DURATIONS.map((d) => (
+            <Pill
+              key={d}
+              small
+              on={filters.duration.includes(d)}
+              count={durationCount(d)}
+              onClick={() =>
+                onChange({
+                  duration: filters.duration.includes(d)
+                    ? filters.duration.filter((x) => x !== d)
+                    : [...filters.duration, d],
+                })
+              }
+            >
+              {LENGTH_BUCKETS[d].label}
+            </Pill>
+          ))}
+        </div>
+        {termPicked && onExactChange && (
+          <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-lg bg-gray-50 p-2.5 text-[13px] text-gray-700">
+            <input
+              type="checkbox"
+              checked={!exact}
+              onChange={(e) => onExactChange(!e.target.checked)}
+              className="mt-0.5 h-4 w-4 shrink-0"
+            />
+            <span>
+              <span className="font-semibold text-gray-900">Also show jobs that don't say</span>{' '}
+              Most employers never write the term. Jobs that name it come first.
+            </span>
+          </label>
+        )}
+      </Section>
+
+      <Section title="Experience level">
+        <RadioList name="level" options={LEVELS} value={filters.level} onChange={(level) => onChange({ level })} />
+      </Section>
+
+      <Section title="Location">
+        <RadioList
+          name="country"
+          options={COUNTRY_CHOICES.map((c) => {
+            // No number until the counts load, never a made up 0
+            const ca = countryCount('CA')
+            const us = countryCount('US')
+            const n = c.value === 'all'
+              ? (ca === undefined && us === undefined ? undefined : (ca ?? 0) + (us ?? 0))
+              : c.value === 'US' ? us : ca
+            return { ...c, count: n }
+          })}
+          value={filters.country}
+          onChange={(country: CountryChoice) => onChange({ country, province: '', city: '' })}
+        />
+        {filters.country !== '' && (
+          <p className="mt-1.5 text-xs text-gray-600">US jobs here are student roles like co-op, internships and new grad.</p>
+        )}
+        <div className="mt-3 space-y-2.5">
+          <Select
+            id="filter-province"
+            label={filters.country === 'US' ? 'State' : filters.country === 'all' ? 'Province or state' : 'Province'}
+            value={filters.province}
+            loading={metaLoading}
+            options={regions.map((p) => ({ value: p, label: provinceName(p) }))}
+            onChange={(province) => onChange({ province })}
+            placeholder="Anywhere"
+          />
+          <Select
+            id="filter-city"
+            label="City"
+            value={filters.city}
+            loading={metaLoading}
+            options={(meta?.cities ?? []).map((c) => ({ value: c, label: c }))}
+            onChange={(city) => onChange({ city })}
+            placeholder="Any city"
+          />
+        </div>
+      </Section>
+
+      <Section title="Work mode">
+        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Work mode">
+          {WORK_MODES.map((mode) => (
+            <Pill
+              key={mode}
+              small
+              on={filters.work_mode === mode}
+              onClick={() => onChange({ work_mode: filters.work_mode === mode ? '' : mode })}
+              count={modeCount(mode)}
+            >
+              {workModeLabel(mode)}
+            </Pill>
+          ))}
+        </div>
+      </Section>
+
       <Section title="Job type">
         {metaLoading && <p className="text-sm text-gray-600">Loading...</p>}
-        <ul className="grid gap-1.5 sm:grid-cols-2">
+        <ul className="space-y-1.5">
           {categories.map((c) => (
             <li key={c.key}>
               <label className="flex cursor-pointer items-center gap-2.5 text-sm text-gray-800">
@@ -69,12 +205,8 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
         </ul>
       </Section>
 
-      <Section title="Experience level">
-        <RadioList name="level" options={LEVELS} value={filters.level} onChange={(level) => onChange({ level })} />
-      </Section>
-
-      <Section title="Your studies">
-        <div className="grid gap-3 sm:grid-cols-2">
+      <Section title="Your studies" fold open={Boolean(filters.program || filters.grad_year)}>
+        <div className="space-y-2.5">
           <Select
             id="filter-program"
             label="Program or major"
@@ -95,65 +227,11 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
           />
         </div>
         <p className="mt-2 text-xs text-gray-600">
-          Program shows jobs that name it or fit it. Graduation year is when you finish school, not
-          your work term. It hides jobs that ask for a different one. Pick your work term under Term and length.
+          Graduation year is when you finish school, not your work term.
         </p>
       </Section>
 
-      <Section title="Country and location">
-        <RadioList
-          name="country"
-          options={COUNTRY_CHOICES.map((c) => {
-            const n = c.value === 'all'
-              ? (countryCount('CA') ?? 0) + (countryCount('US') ?? 0)
-              : countryCount(c.value === 'US' ? 'US' : 'CA')
-            return { ...c, count: n }
-          })}
-          value={filters.country}
-          onChange={(country: CountryChoice) => onChange({ country, province: '', city: '' })}
-        />
-        {filters.country !== '' && (
-          <p className="mt-1.5 text-xs text-gray-600">US jobs here are student roles like co-op, internships and new grad.</p>
-        )}
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          <Select
-            id="filter-province"
-            label={filters.country === 'US' ? 'State' : filters.country === 'all' ? 'Province or state' : 'Province'}
-            value={filters.province}
-            loading={metaLoading}
-            options={regions.map((p) => ({ value: p, label: provinceName(p) }))}
-            onChange={(province) => onChange({ province })}
-            placeholder="Anywhere"
-          />
-          <Select
-            id="filter-city"
-            label="City"
-            value={filters.city}
-            loading={metaLoading}
-            options={(meta?.cities ?? []).map((c) => ({ value: c, label: c }))}
-            onChange={(city) => onChange({ city })}
-            placeholder="Any city"
-          />
-        </div>
-        <p className="mt-2 text-xs text-gray-600">Remote jobs show up for every city.</p>
-      </Section>
-
-      <Section title="Work mode">
-        <div className="flex flex-wrap gap-2" role="group" aria-label="Work mode">
-          {WORK_MODES.map((mode) => (
-            <Pill
-              key={mode}
-              on={filters.work_mode === mode}
-              onClick={() => onChange({ work_mode: filters.work_mode === mode ? '' : mode })}
-              count={modeCount(mode)}
-            >
-              {workModeLabel(mode)}
-            </Pill>
-          ))}
-        </div>
-      </Section>
-
-      <Section title="Date posted">
+      <Section title="Date posted" fold open={filters.posted_within > 0}>
         <RadioList
           name="posted"
           options={POSTED_WITHIN}
@@ -162,77 +240,7 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
         />
       </Section>
 
-      <Section title="Term and length">
-        <div className="space-y-4">
-          <fieldset>
-            <legend className="label-form mb-1.5">Season</legend>
-            <ul className="space-y-1.5">
-              {SEASONS.map((s) => (
-                <li key={s.value}>
-                  <label className="flex cursor-pointer items-center gap-2.5 text-sm text-gray-800">
-                    <input
-                      type="checkbox"
-                      className="h-4 w-4"
-                      checked={filters.season.includes(s.value)}
-                      onChange={(e) =>
-                        onChange({
-                          season: e.target.checked
-                            ? [...filters.season, s.value]
-                            : filters.season.filter((x) => x !== s.value),
-                        })
-                      }
-                    />
-                    <span className={`h-2 w-2 shrink-0 rounded-full ${SEASON_DOT[s.value]}`} aria-hidden="true" />
-                    <span className="flex-1">
-                      {s.label} <span className="text-gray-600">({s.months})</span>
-                    </span>
-                    <Count n={seasonCount(s.value)} />
-                  </label>
-                </li>
-              ))}
-            </ul>
-          </fieldset>
-          <fieldset>
-            <legend className="label-form mb-1.5">Length</legend>
-            <div className="flex flex-wrap gap-2">
-              {DURATIONS.map((d) => (
-                <Pill
-                  key={d}
-                  on={filters.duration.includes(d)}
-                  count={durationCount(d)}
-                  onClick={() =>
-                    onChange({
-                      duration: filters.duration.includes(d)
-                        ? filters.duration.filter((x) => x !== d)
-                        : [...filters.duration, d],
-                    })
-                  }
-                >
-                  {LENGTH_BUCKETS[d].label}
-                </Pill>
-              ))}
-            </div>
-            <p className="mt-1.5 text-xs text-gray-600">
-              Each one covers nearby lengths too, so About 8 months finds 6 to 9 month jobs.
-            </p>
-          </fieldset>
-          <Select
-            id="filter-term"
-            label="Exact term"
-            value={filters.term}
-            loading={metaLoading}
-            options={(meta?.terms ?? []).filter((t) => t !== 'Open').map((t) => ({ value: t, label: t }))}
-            onChange={(term) => onChange({ term })}
-            placeholder="Any term"
-          />
-          <p className="text-xs text-gray-600">
-            Read from each job's title and description. Jobs that do not say their term or length
-            are left out when you pick one.
-          </p>
-        </div>
-      </Section>
-
-      <Section title="Company">
+      <Section title="Company and skills" fold open={filters.company.length > 0 || filters.skills.length > 0}>
         <Select
           id="filter-company"
           label="Add a company"
@@ -249,21 +257,20 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
           items={filters.company}
           onRemove={(c) => onChange({ company: filters.company.filter((x) => x !== c) })}
         />
-      </Section>
-
-      <Section title="Skills">
-        <Select
-          id="filter-skills"
-          label="Add a skill"
-          hideLabel
-          value=""
-          loading={metaLoading}
-          options={(meta?.skills ?? [])
-            .filter((s) => !filters.skills.includes(s))
-            .map((s) => ({ value: s, label: s }))}
-          onChange={(s) => s && onChange({ skills: [...filters.skills, s] })}
-          placeholder="Add a skill"
-        />
+        <div className="mt-2.5">
+          <Select
+            id="filter-skills"
+            label="Add a skill"
+            hideLabel
+            value=""
+            loading={metaLoading}
+            options={(meta?.skills ?? [])
+              .filter((s) => !filters.skills.includes(s))
+              .map((s) => ({ value: s, label: s }))}
+            onChange={(s) => s && onChange({ skills: [...filters.skills, s] })}
+            placeholder="Add a skill"
+          />
+        </div>
         <Picked
           items={filters.skills}
           onRemove={(s) => onChange({ skills: filters.skills.filter((x) => x !== s) })}
@@ -273,8 +280,17 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
         )}
       </Section>
 
-      <div className="py-4">
-        <label className="flex cursor-pointer items-center gap-2.5 text-sm text-gray-800">
+      <Section title="More" fold open={Boolean(filters.term) || filters.show_expired}>
+        <Select
+          id="filter-term"
+          label="Exact term"
+          value={filters.term}
+          loading={metaLoading}
+          options={(meta?.terms ?? []).filter((t) => t !== 'Open').map((t) => ({ value: t, label: t }))}
+          onChange={(term) => onChange({ term })}
+          placeholder="Any term"
+        />
+        <label className="mt-3 flex cursor-pointer items-center gap-2.5 text-sm text-gray-800">
           <input
             type="checkbox"
             className="h-4 w-4"
@@ -283,64 +299,7 @@ export default function FilterBar({ filters, meta, metaLoading, onChange }: Prop
           />
           Include jobs past their deadline
         </label>
-      </div>
-    </div>
-  )
-}
-
-/** All filters. The whole FilterBar in a side panel with the live job count. */
-export function FilterDrawer({
-  open, onClose, total, ...props
-}: Props & { open: boolean; onClose: () => void; total: number | undefined }) {
-  const closeRef = useRef<HTMLButtonElement>(null)
-
-  useEffect(() => {
-    if (!open) return
-    closeRef.current?.focus()
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    document.addEventListener('keydown', onKey)
-    const overflow = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = overflow
-    }
-  }, [open, onClose])
-
-  if (!open) return null
-  return (
-    <div className="fixed inset-0 z-50 flex">
-      <div className="absolute inset-0 bg-gray-950/50" onClick={onClose} aria-hidden="true" />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="filters-title"
-        className="relative flex h-full w-full max-w-lg flex-col bg-white shadow-xl"
-      >
-        <div className="flex items-center justify-between bg-post-600 px-5 py-3.5 text-white">
-          <h2 id="filters-title" className="text-xl font-bold">All filters</h2>
-          <button
-            ref={closeRef}
-            type="button"
-            onClick={onClose}
-            aria-label="Close filters"
-            className="rounded-sm p-1 text-white hover:bg-white/15"
-          >
-            <XIcon className="h-5 w-5" />
-          </button>
-        </div>
-        <div className="flex-1 overflow-y-auto px-5">
-          <FilterBar {...props} />
-        </div>
-        <div className="flex items-center justify-between gap-3 border-t border-gray-300 px-5 py-3">
-          <button type="button" onClick={props.onClearAll} className="text-sm font-semibold text-gray-800 hover:underline">
-            Reset all
-          </button>
-          <button type="button" onClick={onClose} className="btn-primary px-5">
-            {total === undefined ? 'Show jobs' : `Show ${total.toLocaleString()} job${total === 1 ? '' : 's'}`}
-          </button>
-        </div>
-      </div>
+      </Section>
     </div>
   )
 }
@@ -407,26 +366,46 @@ export function ActiveFilterChips({
 
 // Small pieces
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+/**
+ * One group of filters with its heading. With fold it is a details box that opens and closes
+ * in place, starting open when one of its filters is on.
+ */
+function Section({
+  title, children, fold = false, open = false,
+}: { title: string; children: ReactNode; fold?: boolean; open?: boolean }) {
+  if (fold) {
+    return (
+      <details className="group py-3" open={open}>
+        <summary className="flex cursor-pointer list-none items-center justify-between text-[13px] font-semibold text-gray-900 [&::-webkit-details-marker]:hidden">
+          {title}
+          <span className="text-gray-500 transition-transform group-open:rotate-90" aria-hidden="true">›</span>
+        </summary>
+        <fieldset className="mt-3">
+          <legend className="sr-only">{title}</legend>
+          {children}
+        </fieldset>
+      </details>
+    )
+  }
   return (
-    <fieldset className="py-4">
+    <fieldset className="py-3.5">
       <legend className="sr-only">{title}</legend>
-      <h3 className="label-form mb-3 !text-gray-900" aria-hidden="true">{title}</h3>
+      <h3 className="mb-2.5 text-[13px] font-semibold text-gray-900" aria-hidden="true">{title}</h3>
       {children}
     </fieldset>
   )
 }
 
 export function Pill({
-  on, onClick, count, children,
-}: { on: boolean; onClick: () => void; count?: number; children: ReactNode }) {
+  on, onClick, count, small = false, children,
+}: { on: boolean; onClick: () => void; count?: number; small?: boolean; children: ReactNode }) {
   return (
     <button
       type="button"
       role="checkbox"
       aria-checked={on}
       onClick={onClick}
-      className={`chip ${on ? 'chip-on' : ''}`}
+      className={`chip ${small ? 'px-2.5 py-1 text-[13px] shadow-none' : ''} ${on ? 'chip-on' : ''}`}
     >
       {children}
       {count !== undefined && (

@@ -9,9 +9,9 @@ export const ROLE_LABELS: Record<RoleType, string> = {
   job: 'Job',
 }
 
-/** Wide enough for the list and details side by side, which is Tailwind's lg breakpoint. */
+/** Wide enough for the filters, list and details side by side, which is Tailwind's xl breakpoint. */
 export function splitViewVisible(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia?.('(min-width: 1024px)').matches === true
+  return typeof window !== 'undefined' && window.matchMedia?.('(min-width: 1280px)').matches === true
 }
 
 /** Program tags saved on jobs. They match FIELD_LABELS in app/services/education.py. */

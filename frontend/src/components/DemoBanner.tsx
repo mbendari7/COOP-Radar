@@ -14,7 +14,7 @@ export default function DemoBanner() {
 
   return (
     <div role="status" className="border-b border-gray-300 bg-air-50 text-sm text-gray-900">
-      <div className="mx-auto max-w-7xl space-y-2 px-4 py-2">
+      <div className="w-full space-y-2 px-4 py-2 lg:px-6">
         <p>
           <strong className="font-bold">You're using a temporary account.</strong>{' '}
           Everything here is private to you and deleted after 7 days.{' '}

@@ -10,10 +10,12 @@ from app.ingest.boards import (
     SmartRecruitersAdapter,
 )
 from app.ingest.github_lists import GithubListAdapter
+from app.ingest.himalayas import HimalayasAdapter
 from app.ingest.json_api import JsonApiAdapter
 from app.ingest.oracle import OracleAdapter
 from app.ingest.rss import RssAdapter
 from app.ingest.simplify import SimplifyAdapter
+from app.ingest.themuse import TheMuseAdapter
 from app.ingest.workable import WorkableAdapter
 from app.ingest.workday import WorkdayAdapter
 
@@ -33,6 +35,8 @@ _ADAPTERS: dict[str, type[BaseAdapter]] = {
     "rippling": RipplingAdapter,
     "github_list": GithubListAdapter,
     "oracle": OracleAdapter,
+    "themuse": TheMuseAdapter,
+    "himalayas": HimalayasAdapter,
 }
 
 

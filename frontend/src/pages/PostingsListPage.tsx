@@ -1,8 +1,10 @@
 /**
  * The jobs page.
  *
- * A tinted search strip on top with What, Where and Find jobs, and the quick filters under it.
- * Below that the results list on the left and the picked job's details on the right.
+ * One search row on top with What, Where and Find jobs, and the resume shortcut on the right.
+ * Below it the page uses the full screen width: every filter in a sidebar on the left, then the
+ * results list, then the picked job's details on wide screens. Nothing opens in a popup. On
+ * phones the Filters button opens the sidebar in place above the results.
  *
  * Everything lives in the URL query string (useSearchParams) so views can be shared, Back from
  * a job brings back the exact list, and a refresh keeps it all. Each change replaces the
@@ -23,18 +25,16 @@ import { useMe } from '../api/auth'
 import { usePublicConfig } from '../api/meta'
 import { useMatches } from '../api/resume'
 import DemoButton from '../components/DemoButton'
-import { ActiveFilterChips, FilterDrawer, Pill } from '../components/FilterBar'
+import FilterBar, { ActiveFilterChips } from '../components/FilterBar'
 import { GetUpdates, NewSinceLastVisit } from '../components/JobUpdates'
 import {
-  COUNTRY_CHOICES, LEVELS, WORK_MODES, countActive, countriesFor,
-  type CountryChoice, type Filters, type Level,
+  countActive, countriesFor, type CountryChoice, type Filters, type Level,
 } from '../components/filters'
 import { ArrowRightIcon, FilterIcon, ListIcon, PinIcon, SearchIcon, TableIcon } from '../components/Icons'
 import { PostingDetailPane } from '../components/PostingDetailView'
 import PostingsTable from '../components/PostingsTable'
 import { SearchModeToggle } from '../components/SearchModeToggle'
-import { SEASONS } from '../components/terms'
-import { isProvince, provinceName, workModeLabel } from '../utils/format'
+import { isProvince, provinceName } from '../utils/format'
 
 // URL param names live in one place so nobody makes a typo
 const P = {
@@ -83,7 +83,8 @@ export default function PostingsListPage() {
   const { data: config } = usePublicConfig()
   const { data: matches } = useMatches(Boolean(me))
   const hasResume = Boolean(matches?.resume)
-  const [drawerOpen, setDrawerOpen] = useState(false)
+  // Phones only. Wide screens always show the filters
+  const [filtersOpen, setFiltersOpen] = useState(false)
 
   // Read everything from the URL with sensible defaults
   const q            = sp.get(P.q) ?? ''
@@ -114,7 +115,6 @@ export default function PostingsListPage() {
   // Most employers never write the term or length, so by default a term or length filter also
   // shows jobs that don't say, after the ones that do. exact=1 shows only the ones that say
   const exact        = sp.get(P.exact) === '1'
-  const termPicked   = season.length > 0 || duration.length > 0 || Boolean(term)
   const since_raw    = sp.get(P.added_since) ?? ''
   const added_since  = since_raw && !Number.isNaN(Date.parse(since_raw)) ? since_raw : ''
 
@@ -225,122 +225,70 @@ export default function PostingsListPage() {
 
   return (
     <div>
-      {/* The search strip */}
-      <div className="border-b border-gray-300 bg-gray-100">
-        <div className="mx-auto max-w-7xl px-4 pb-3 pt-3 md:pb-4 md:pt-5">
-          <JobSearchForm
-            q={q}
-            province={province}
-            country={country}
-            provinces={meta?.provinces ?? []}
-            onSearch={(what, where) => update({ [P.q]: what || null, [P.province]: where || null, [P.city]: null })}
-          />
-
-          {/* The filters people change most, one tap each */}
-          <div className="-mx-4 mt-3 flex items-center gap-2 overflow-x-auto px-4 pb-1" role="group" aria-label="Quick filters">
-            <button type="button" onClick={() => setDrawerOpen(true)} className="chip shrink-0">
+      {/* The search row, with the resume shortcut on the right */}
+      <div className="border-b border-gray-200 bg-white">
+        <div className="flex w-full flex-col gap-2 px-4 py-3 lg:flex-row lg:items-center lg:gap-6 lg:px-6">
+          <div className="min-w-0 flex-1 xl:max-w-5xl">
+            <JobSearchForm
+              q={q}
+              province={province}
+              country={country}
+              provinces={meta?.provinces ?? []}
+              onSearch={(what, where) => update({ [P.q]: what || null, [P.province]: where || null, [P.city]: null })}
+            />
+          </div>
+          <div className="flex items-center justify-between gap-3 lg:ml-auto">
+            <button
+              type="button"
+              onClick={() => setFiltersOpen((o) => !o)}
+              aria-expanded={filtersOpen}
+              aria-controls="job-filters"
+              className="chip lg:hidden"
+            >
               <FilterIcon className="h-4 w-4" />
-              All filters
+              {filtersOpen ? 'Hide filters' : 'Filters'}
               {active > 0 && (
                 <span className="rounded-full bg-post-600 px-1.5 text-xs font-bold text-white">{active}</span>
               )}
             </button>
-            <span className="mx-1 h-5 w-px shrink-0 bg-gray-400" aria-hidden="true" />
-            <select
-              aria-label="Experience level"
-              value={level}
-              onChange={(e) => changeFilters({ level: e.target.value as Level })}
-              className="chip shrink-0 py-1 pl-3 pr-8 focus:border-air-700 focus:outline-none focus:ring-0"
-            >
-              {LEVELS.map((l) => <option key={l.value} value={l.value}>{l.label}</option>)}
-            </select>
-            <select
-              aria-label="Country"
-              value={country}
-              onChange={(e) => changeFilters({ country: e.target.value as CountryChoice, province: '', city: '' })}
-              className="chip shrink-0 py-1 pl-3 pr-8 focus:border-air-700 focus:outline-none focus:ring-0"
-            >
-              {COUNTRY_CHOICES.map((c) => <option key={c.value} value={c.value}>{c.label}</option>)}
-            </select>
-            <select
-              aria-label="Term season"
-              value={season.length > 1 ? 'several' : season[0] ?? ''}
-              onChange={(e) => changeFilters({ season: e.target.value ? [e.target.value as Season] : [] })}
-              className={`chip shrink-0 py-1 pl-3 pr-8 focus:border-air-700 focus:outline-none focus:ring-0 ${season.length ? 'chip-on' : ''}`}
-            >
-              <option value="">Any term</option>
-              {season.length > 1 && <option value="several" disabled>{season.length} seasons</option>}
-              {SEASONS.map((s) => {
-                const n = meta?.seasons?.find((x) => x.key === s.value)?.count
-                return <option key={s.value} value={s.value}>{s.label}{n !== undefined ? ` (${n})` : ''}</option>
-              })}
-            </select>
-            <select
-              aria-label="Term length"
-              value={duration.length > 1 ? 'several' : duration[0] ? String(duration[0]) : ''}
-              onChange={(e) => changeFilters({ duration: e.target.value ? [Number(e.target.value)] : [] })}
-              className={`chip shrink-0 py-1 pl-3 pr-8 focus:border-air-700 focus:outline-none focus:ring-0 ${duration.length ? 'chip-on' : ''}`}
-            >
-              <option value="">Any length</option>
-              {duration.length > 1 && <option value="several" disabled>{duration.length} lengths</option>}
-              {[4, 8, 12, 16].map((d) => {
-                const n = meta?.durations?.find((x) => x.months === d)?.count
-                return <option key={d} value={d}>{d} months{n !== undefined ? ` (${n})` : ''}</option>
-              })}
-            </select>
-            <span className="mx-1 h-5 w-px shrink-0 bg-gray-400" aria-hidden="true" />
-            {WORK_MODES.map((m) => (
-              <span key={m} className="shrink-0">
-                <Pill
-                  on={work_mode === m}
-                  onClick={() => changeFilters({ work_mode: work_mode === m ? '' : m })}
-                >
-                  {workModeLabel(m)}
-                </Pill>
-              </span>
-            ))}
-            {config?.semantic_search_enabled && (
-              <span className="ml-auto shrink-0">
-                <SearchModeToggle
-                  value={search_mode}
-                  onChange={(mode) => update({ [P.search_mode]: mode === 'keyword' ? null : mode })}
-                />
-              </span>
-            )}
+            {!meLoading && <ResumeShortcut hasResume={hasResume} fits={matches?.items.length ?? 0} />}
           </div>
         </div>
       </div>
 
-      <FilterDrawer
-        open={drawerOpen}
-        onClose={() => setDrawerOpen(false)}
-        total={data?.total}
-        filters={filters}
-        meta={meta}
-        metaLoading={metaLoading}
-        onChange={changeFilters}
-        onClearAll={clearAll}
-      />
+      <div className="grid w-full gap-6 px-4 pb-8 pt-4 lg:grid-cols-[15rem_minmax(0,1fr)] lg:px-6 2xl:grid-cols-[16rem_minmax(0,1fr)]">
+        {/* Every filter, always in view on wide screens. On phones the Filters button opens it in place */}
+        <aside
+          id="job-filters"
+          aria-label="Filters"
+          className={`${filtersOpen ? 'block' : 'hidden'} rounded-xl border border-gray-200 bg-white px-4 py-3 lg:sticky lg:top-[4.5rem] lg:block lg:max-h-[calc(100vh-5.5rem)] lg:self-start lg:overflow-y-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:px-0 lg:py-0`}
+        >
+          <FilterBar
+            filters={filters}
+            meta={meta}
+            metaLoading={metaLoading}
+            onChange={changeFilters}
+            onClearAll={clearAll}
+            exact={exact}
+            onExactChange={(on) => update({ [P.exact]: on ? '1' : null })}
+          />
+          {config?.semantic_search_enabled && (
+            <div className="border-t border-gray-200 py-3">
+              <SearchModeToggle
+                value={search_mode}
+                onChange={(mode) => update({ [P.search_mode]: mode === 'keyword' ? null : mode })}
+              />
+            </div>
+          )}
+          <div className="border-t border-gray-200 py-3">
+            <GetUpdates params={filterParams} />
+          </div>
+        </aside>
 
-      {/* Resume shortcut. Match first, or jump back to the matches */}
-      {!meLoading && !hasResume && <ResumePrompt jobs={meta?.open_jobs} employers={meta?.companies?.length} />}
-      {hasResume && (
-        <Link to="/resume" className="block border-b border-gray-200 bg-air-700 text-white hover:bg-air-800">
-          <span className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2.5 text-sm">
-            <span>
-              <span className="font-bold">{matches?.items.length ?? 0} jobs fit your resume.</span>{' '}
-              See them ranked, with why each one fits.
-            </span>
-            <ArrowRightIcon className="h-4 w-4 shrink-0" />
-          </span>
-        </Link>
-      )}
-
-      <div className="mx-auto max-w-7xl px-4 pb-8">
-        {/* How many, sort and layout */}
-        <div className="flex flex-wrap items-end justify-between gap-3 pb-3 pt-4">
-          <div>
-            <h1 className="display text-[22px] leading-tight text-gray-900 sm:text-[26px]" aria-live="polite" aria-atomic="true">
+        <section aria-label="Results" className="min-w-0">
+          {/* How many, sort and layout */}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 pb-3">
+            <h1 className="display text-[19px] leading-tight text-gray-900 sm:text-[21px]" aria-live="polite" aria-atomic="true">
               {data ? (
                 <>
                   {data.total.toLocaleString()}{' '}
@@ -349,169 +297,146 @@ export default function PostingsListPage() {
                 </>
               ) : 'Loading jobs...'}
             </h1>
-            {data && data.total > 0 && (
-              <p className="label-form mt-1">
-                Showing {first.toLocaleString()} to {last.toLocaleString()} of {data.total.toLocaleString()}
+            <div className="flex items-center gap-2">
+              <label htmlFor="sort-select" className="sr-only">Sort by</label>
+              <select
+                id="sort-select"
+                value={SORTS.some((s) => s.value === sortValue) ? sortValue : 'posted_at:desc'}
+                onChange={(e) => {
+                  const s = SORTS.find((x) => x.value === e.target.value)
+                  if (s) update({ [P.sort]: s.sort, [P.order]: s.order })
+                }}
+                className="field w-auto py-1.5"
+              >
+                {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
+              </select>
+              <div className="hidden overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm md:inline-flex" role="group" aria-label="Layout">
+                <ViewButton active={view === 'cards'} label="List" onClick={() => update({ [P.view]: null })}>
+                  <ListIcon className="h-4 w-4" />
+                </ViewButton>
+                <ViewButton active={view === 'table'} label="Table" onClick={() => update({ [P.view]: 'table' })}>
+                  <TableIcon className="h-4 w-4" />
+                </ViewButton>
+              </div>
+            </div>
+          </div>
+
+          {/* The sidebar already shows what is on, so the chips are only for phones */}
+          <div className="pb-3 empty:hidden lg:hidden">
+            <ActiveFilterChips filters={filters} meta={meta} onChange={changeFilters} onClearAll={clearAll} />
+          </div>
+
+          <div className="pb-3 empty:hidden">
+            {added_since ? (
+              <p className="flex flex-wrap items-center gap-2 rounded-lg border border-air-200 bg-air-50 px-3 py-2 text-sm" role="status">
+                <span>
+                  Showing only jobs added since{' '}
+                  {new Date(added_since).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}.
+                </span>
+                <button type="button" className="link font-semibold" onClick={() => update({ [P.added_since]: null })}>
+                  Show all jobs
+                </button>
               </p>
+            ) : (
+              <NewSinceLastVisit
+                params={filterParams}
+                active={Boolean(added_since)}
+                onShow={(since) => update({ [P.added_since]: since, [P.sort]: 'first_seen_at', [P.order]: 'desc' })}
+              />
             )}
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <GetUpdates params={filterParams} />
-            <label htmlFor="sort-select" className="label-form">Sort by</label>
-            <select
-              id="sort-select"
-              value={SORTS.some((s) => s.value === sortValue) ? sortValue : 'posted_at:desc'}
-              onChange={(e) => {
-                const s = SORTS.find((x) => x.value === e.target.value)
-                if (s) update({ [P.sort]: s.sort, [P.order]: s.order })
-              }}
-              className="field w-auto py-1.5"
-            >
-              {SORTS.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-            </select>
-            <div className="hidden overflow-hidden rounded-lg border border-gray-300 bg-white shadow-sm md:inline-flex" role="group" aria-label="Layout">
-              <ViewButton active={view === 'cards'} label="List" onClick={() => update({ [P.view]: null })}>
-                <ListIcon className="h-4 w-4" />
-              </ViewButton>
-              <ViewButton active={view === 'table'} label="Table" onClick={() => update({ [P.view]: 'table' })}>
-                <TableIcon className="h-4 w-4" />
-              </ViewButton>
-            </div>
-          </div>
-        </div>
 
-        <div className="pb-3 empty:hidden">
-          <ActiveFilterChips filters={filters} meta={meta} onChange={changeFilters} onClearAll={clearAll} />
-        </div>
+          <div className={view === 'cards' ? 'grid gap-4 xl:grid-cols-[minmax(0,28rem)_minmax(0,1fr)] 2xl:grid-cols-[minmax(0,34rem)_minmax(0,1fr)]' : ''}>
+            <div className="-mx-4 min-w-0 sm:mx-0">
+              <div className="overflow-hidden border-y border-gray-200 bg-white sm:rounded-xl sm:border sm:shadow-sm">
+                <PostingsTable
+                  data={items}
+                  isLoading={isLoading}
+                  isError={isError}
+                  onRetry={() => refetch()}
+                  sort={sort}
+                  order={order}
+                  onSortChange={(field, dir) => update({ [P.sort]: field, [P.order]: dir })}
+                  showBookmarks
+                  onClearFilters={clearAll}
+                  view={view}
+                  selectedId={selectedId}
+                  onSelect={selectJob}
+                />
+              </div>
 
-        {termPicked && (
-          <div className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg bg-gray-50 px-3 py-2 text-sm text-gray-700">
-            <label className="inline-flex cursor-pointer items-center gap-2 font-semibold text-gray-900">
-              <input
-                type="checkbox"
-                checked={!exact}
-                onChange={(e) => update({ [P.exact]: e.target.checked ? null : '1' })}
-                className="h-4 w-4 rounded border-gray-400"
-              />
-              Also show jobs that don't say their term or length
-            </label>
-            <span>
-              {exact
-                ? 'Only jobs that name it are shown.'
-                : 'Most employers never write it in the post. Jobs that do match come first.'}
-            </span>
-          </div>
-        )}
+              <div className="space-y-4 px-4 pt-4 sm:px-0">
+                {data && level === '' && data.total < 15 && (
+                  <p className="text-sm text-gray-700">
+                    Co-op and intern roles are posted in waves before each term.{' '}
+                    <button type="button" className="link" onClick={() => changeFilters({ level: 'entry' })}>
+                      Show entry level jobs too
+                    </button>
+                    {country === '' && (
+                      <>
+                        {' '}or{' '}
+                        <button type="button" className="link" onClick={() => changeFilters({ country: 'all' })}>
+                          add US internships
+                        </button>
+                      </>
+                    )}
+                    .
+                  </p>
+                )}
 
-        <div className="pb-3 empty:hidden">
-          {added_since ? (
-            <p className="flex flex-wrap items-center gap-2 border border-air-200 bg-air-50 px-3 py-2 text-sm" role="status">
-              <span>
-                Showing only jobs added since{' '}
-                {new Date(added_since).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}.
-              </span>
-              <button type="button" className="link font-semibold" onClick={() => update({ [P.added_since]: null })}>
-                Show all jobs
-              </button>
-            </p>
-          ) : (
-            <NewSinceLastVisit
-              params={filterParams}
-              active={Boolean(added_since)}
-              onShow={(since) => update({ [P.added_since]: since, [P.sort]: 'first_seen_at', [P.order]: 'desc' })}
-            />
-          )}
-        </div>
-
-        <div className={view === 'cards' ? 'grid gap-4 lg:grid-cols-[minmax(0,32rem)_minmax(0,1fr)] xl:grid-cols-[minmax(0,36rem)_minmax(0,1fr)]' : ''}>
-          <div className="-mx-4 min-w-0 sm:mx-0">
-            <div className="overflow-hidden border-y border-gray-200 bg-white sm:rounded-xl sm:border sm:shadow-sm">
-            <PostingsTable
-              data={items}
-              isLoading={isLoading}
-              isError={isError}
-              onRetry={() => refetch()}
-              sort={sort}
-              order={order}
-              onSortChange={(field, dir) => update({ [P.sort]: field, [P.order]: dir })}
-              showBookmarks
-              onClearFilters={clearAll}
-              view={view}
-              selectedId={selectedId}
-              onSelect={selectJob}
-            />
-            </div>
-
-            <div className="space-y-4 px-4 pt-4 sm:px-0">
-              {data && level === '' && data.total < 15 && (
-                <p className="text-sm text-gray-700">
-                  Co-op and intern roles are posted in waves before each term.{' '}
-                  <button type="button" className="link" onClick={() => changeFilters({ level: 'entry' })}>
-                    Show entry level jobs too
-                  </button>
-                  {country === '' && (
-                    <>
-                      {' '}or{' '}
-                      <button type="button" className="link" onClick={() => changeFilters({ country: 'all' })}>
-                        add US internships
+                {/* Pages */}
+                {data && data.total > 0 && (
+                  <nav className="flex flex-col items-center justify-between gap-3 sm:flex-row" aria-label="Pages">
+                    <div className="flex items-center gap-2 text-sm text-gray-700">
+                      <span>{first.toLocaleString()} to {last.toLocaleString()} of {data.total.toLocaleString()}</span>
+                      <label htmlFor="page-size-select" className="sr-only">Per page</label>
+                      <select
+                        id="page-size-select"
+                        value={page_size}
+                        onChange={(e) => update({ [P.page_size]: e.target.value, [P.page]: '1' })}
+                        className="field w-auto py-1"
+                      >
+                        {PAGE_SIZES.map((s) => <option key={s} value={s}>{s} per page</option>)}
+                      </select>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm">
+                      <button
+                        disabled={page <= 1}
+                        onClick={() => update({ [P.page]: String(page - 1) })}
+                        className="btn-secondary px-3 py-1.5"
+                        aria-label="Previous page"
+                      >
+                        Previous
                       </button>
-                    </>
-                  )}
-                  .
+                      <span className="px-2 text-gray-700">Page {page} of {totalPages}</span>
+                      <button
+                        disabled={page >= totalPages}
+                        onClick={() => update({ [P.page]: String(page + 1) })}
+                        className="btn-secondary px-3 py-1.5"
+                        aria-label="Next page"
+                      >
+                        Next
+                      </button>
+                    </div>
+                  </nav>
+                )}
+                <p className="text-xs text-gray-600">
+                  Know a job that's missing? Signed in users can <Link to="/add" className="underline">add it</Link>.
                 </p>
-              )}
-
-              {/* Pages */}
-              {data && data.total > 0 && (
-                <nav className="flex flex-col items-center justify-between gap-3 sm:flex-row" aria-label="Pages">
-                  <div className="flex items-center gap-2 text-sm text-gray-700">
-                    <label htmlFor="page-size-select" className="label-form">Per page</label>
-                    <select
-                      id="page-size-select"
-                      value={page_size}
-                      onChange={(e) => update({ [P.page_size]: e.target.value, [P.page]: '1' })}
-                      className="field w-auto py-1"
-                    >
-                      {PAGE_SIZES.map((s) => <option key={s} value={s}>{s}</option>)}
-                    </select>
-                  </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <button
-                      disabled={page <= 1}
-                      onClick={() => update({ [P.page]: String(page - 1) })}
-                      className="btn-secondary px-3 py-1.5"
-                      aria-label="Previous page"
-                    >
-                      Previous
-                    </button>
-                    <span className="px-2 text-gray-700">Page {page} of {totalPages}</span>
-                    <button
-                      disabled={page >= totalPages}
-                      onClick={() => update({ [P.page]: String(page + 1) })}
-                      className="btn-secondary px-3 py-1.5"
-                      aria-label="Next page"
-                    >
-                      Next
-                    </button>
-                  </div>
-                </nav>
-              )}
-              <p className="text-xs text-gray-600">
-                Know a job that's missing? Signed in users can <Link to="/add" className="underline">add it</Link>.
-              </p>
+              </div>
             </div>
-          </div>
 
-          {/* The picked job's details, next to the list on wide screens */}
-          {view === 'cards' && items.length > 0 && (
-            <aside
-              aria-label="Job details"
-              className="card hidden self-start lg:sticky lg:top-[4.5rem] lg:block lg:max-h-[calc(100vh-5.5rem)] lg:overflow-y-auto"
-            >
-              <PostingDetailPane id={selectedId} />
-            </aside>
-          )}
-        </div>
+            {/* The picked job's details, next to the list on wide screens */}
+            {view === 'cards' && items.length > 0 && (
+              <aside
+                aria-label="Job details"
+                className="card hidden self-start xl:sticky xl:top-[4.5rem] xl:block xl:max-h-[calc(100vh-5.5rem)] xl:overflow-y-auto"
+              >
+                <PostingDetailPane id={selectedId} />
+              </aside>
+            )}
+          </div>
+        </section>
       </div>
     </div>
   )
@@ -592,24 +517,22 @@ function JobSearchForm({
   )
 }
 
-/** For visitors with no resume yet. One line pointing at the main feature */
-function ResumePrompt({ jobs, employers }: { jobs?: number; employers?: number }) {
+/** The resume shortcut on the search row. Match first, or jump back to the matches */
+function ResumeShortcut({ hasResume, fits }: { hasResume: boolean; fits: number }) {
+  if (hasResume) {
+    return (
+      <Link to="/resume" className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-air-700 hover:underline">
+        {fits.toLocaleString()} jobs fit your resume
+        <ArrowRightIcon className="h-4 w-4" />
+      </Link>
+    )
+  }
   return (
-    <section aria-label="Match your resume" className="border-b border-gray-200 bg-white">
-      <div className="mx-auto flex max-w-7xl items-center justify-between gap-3 px-4 py-2">
-        <p className="min-w-0 text-sm text-gray-800">
-          <span className="font-bold text-gray-900">See which of these jobs fit you.</span>{' '}
-          <span className="hidden md:inline">
-            Upload your resume and we'll rank jobs by your program, graduation year and skills.
-            {jobs ? ` ${jobs.toLocaleString()} open jobs from ${employers ?? 'real'} employers.` : ''}
-          </span>
-        </p>
-        <div className="flex shrink-0 items-center gap-2">
-          <Link to="/resume" className="btn-primary px-3 py-1">Upload resume</Link>
-          <span className="hidden sm:inline-flex"><DemoButton variant="secondary" label="Try a sample" /></span>
-        </div>
-      </div>
-    </section>
+    <div className="flex items-center gap-2">
+      <span className="hidden text-sm text-gray-700 2xl:inline">See which jobs fit you</span>
+      <Link to="/resume" className="btn-primary whitespace-nowrap px-3 py-1.5">Match my resume</Link>
+      <span className="hidden sm:inline-flex"><DemoButton variant="secondary" label="Try a sample" /></span>
+    </div>
   )
 }
 

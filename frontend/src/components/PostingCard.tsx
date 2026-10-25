@@ -1,7 +1,8 @@
 /**
  * One job in the results list. A plain row split from the next by a thin rule.
- * Title, then employer and place, then the facts students scan for first: the term and
- * its length, the kind of role and when it was posted. The postmark lives on the details panel.
+ * Three short lines and nothing more: the title, then employer and place, then the facts
+ * students scan for first. The season and term with its dates and length, the kind of role,
+ * and on the right when it was posted. Skills and grad years live on the details panel.
  *
  * On wide screens clicking a row picks it for the details panel next to the list (onSelect).
  * On phones, or when there is no panel, it opens the job's own page.
@@ -12,7 +13,7 @@ import { useNavigate } from 'react-router-dom'
 import type { PostingListItem } from '../api/postings'
 import BookmarkButton from './BookmarkButton'
 import { ROLE_LABELS, splitViewVisible } from './roles'
-import { SEASON_DOT, gradYearsLabel, lengthLabel, termDates, termLabel } from './terms'
+import { SEASON_DOT, lengthLabel, termDates, termLabel } from './terms'
 import { formatLocation, timeAgo, workModeLabel } from '../utils/format'
 
 interface Props {
@@ -51,50 +52,44 @@ export default function PostingCard({ posting, showBookmark = false, selected = 
       }}
       aria-current={selected ? 'true' : undefined}
       className={`group relative cursor-pointer border-b border-gray-200 px-4 py-3 transition-colors focus:outline-none focus-visible:bg-air-50 sm:px-5 ${
-        selected ? 'lg:bg-air-50' : 'hover:bg-gray-50'
+        selected ? 'xl:bg-air-50 xl:shadow-[inset_3px_0_0_theme(colors.air.700)]' : 'hover:bg-gray-50'
       }`}
       aria-label={`${posting.title} at ${posting.company}`}
     >
-      <div className="flex items-start gap-4">
+      <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h3 className={`text-[17px] font-bold leading-snug ${selected ? 'text-gray-900 lg:text-air-700' : 'text-gray-900 group-hover:text-air-700'}`}>
+          <h3 className={`text-[16px] font-bold leading-snug ${selected ? 'text-gray-900 xl:text-air-700' : 'text-gray-900 group-hover:text-air-700'}`}>
             {posting.title}
           </h3>
-          <p className="mt-0.5 text-[15px] text-gray-700">
+          <p className="mt-0.5 truncate text-[14px] text-gray-700">
             <span className="font-semibold text-gray-900">{posting.company}</span>
             <span className="mx-1.5 text-gray-400" aria-hidden="true">·</span>
             {formatLocation(posting.city, posting.province, posting.country)}
-            {posting.work_mode !== 'onsite' && posting.city !== 'Remote' && <> ({workModeLabel(posting.work_mode)})</>}
+            {posting.work_mode !== 'onsite' && posting.city !== 'Remote' && <> · {workModeLabel(posting.work_mode)}</>}
           </p>
 
-          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 text-sm">
-            {(term || length) && (
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-gray-100 px-2.5 py-0.5 font-semibold text-gray-900">
-                {posting.season && <span className={`h-2 w-2 rounded-full ${SEASON_DOT[posting.season]}`} aria-hidden="true" />}
-                {term || 'Term not stated'}{' '}
-                {termExtras.length > 0 && (
-                  <span className="font-normal text-gray-700">· {termExtras.join(' · ')}</span>
-                )}
-              </span>
-            )}
-            {posting.role !== 'job' && (
-              <span className="rounded-full bg-air-50 px-2.5 py-0.5 font-semibold text-air-800 ring-1 ring-inset ring-air-200">{ROLE_LABELS[posting.role]}</span>
-            )}
-            {isNew && <span className="rounded-full bg-post-50 px-2 py-0.5 text-xs font-bold uppercase tracking-wide text-post-700">New</span>}
-            {posting.grad_years.length > 0 && (
-              <span className="text-gray-700" title="The year you finish school, not the work term">
-                {gradYearsLabel(posting.grad_years)}
-              </span>
-            )}
-            <span className="text-gray-600">Posted {timeAgo(posting.posted_at)}</span>
-          </p>
-          {posting.skills.length > 0 && (
-            <p className="mt-1 text-[13px] text-gray-600">{posting.skills.slice(0, 4).join(' · ')}</p>
-          )}
+          <div className="mt-1.5 flex items-center justify-between gap-3 text-[13px]">
+            <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+              {(term || length) && (
+                <span className="inline-flex items-center gap-1.5 font-semibold text-gray-900">
+                  {posting.season && <span className={`h-2 w-2 shrink-0 rounded-full ${SEASON_DOT[posting.season]}`} aria-hidden="true" />}
+                  {term || 'Term not stated'}{' '}
+                  {termExtras.length > 0 && (
+                    <span className="font-normal text-gray-600">· {termExtras.join(' · ')}</span>
+                  )}
+                </span>
+              )}
+              {posting.role !== 'job' && (
+                <span className="rounded-full bg-air-50 px-2 py-px font-semibold text-air-800">{ROLE_LABELS[posting.role]}</span>
+              )}
+              {isNew && <span className="rounded-full bg-post-50 px-2 py-px font-bold text-post-700">New</span>}
+            </p>
+            <span className="shrink-0 whitespace-nowrap text-gray-500">{timeAgo(posting.posted_at)}</span>
+          </div>
         </div>
 
         {showBookmark && (
-          <div className="shrink-0">
+          <div className="-mr-1.5 -mt-1 shrink-0">
             <BookmarkButton postingId={posting.id} isSaved={posting.is_saved === true} />
           </div>
         )}

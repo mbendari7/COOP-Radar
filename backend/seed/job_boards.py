@@ -238,6 +238,15 @@ GITHUB_LIST_SOURCES: list[tuple[str, dict[str, str]]] = [
     }),
 ]
 
+# Public job APIs that gather many employers. The Muse for internships (mostly US, some
+# Canada) and Himalayas for remote jobs open to people in Canada. No keys needed
+MUSE_SOURCES: list[tuple[str, dict[str, str]]] = [
+    ("The Muse internships", {"levels": "Internship", "pages": "150"}),
+]
+HIMALAYAS_SOURCES: list[tuple[str, dict[str, str]]] = [
+    ("Himalayas remote jobs (Canada)", {"pages": "150"}),
+]
+
 _DISCOVERED = Path(__file__).with_name("discovered_boards.json")
 
 
@@ -289,6 +298,8 @@ async def seed_job_boards() -> None:
     entries += [(name, "workable", config) for name, config in WORKABLE_SOURCES]
     entries += [(name, "simplify", config) for name, config in SIMPLIFY_SOURCES]
     entries += [(name, "github_list", config) for name, config in GITHUB_LIST_SOURCES]
+    entries += [(name, "themuse", config) for name, config in MUSE_SOURCES]
+    entries += [(name, "himalayas", config) for name, config in HIMALAYAS_SOURCES]
     if adzuna_configured():
         entries += [(name, "adzuna", config) for name, config in ADZUNA_SOURCES]
 

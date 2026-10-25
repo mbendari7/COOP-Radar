@@ -49,7 +49,7 @@ export default function PostingDetailPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-6 sm:py-8">
+    <div className="w-full px-4 py-6 sm:py-8 lg:px-6">
       {back}
       <div className="grid gap-10 lg:grid-cols-[1fr_18rem]">
         <div className="min-w-0">

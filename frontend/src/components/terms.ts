@@ -5,11 +5,11 @@
 
 import type { Season } from '../api/postings'
 
-export const SEASONS: { value: Season; label: string; months: string }[] = [
-  { value: 'winter', label: 'Winter', months: 'January to April' },
-  { value: 'spring', label: 'Spring', months: 'dates vary by school' },
-  { value: 'summer', label: 'Summer', months: 'May to August' },
-  { value: 'fall', label: 'Fall', months: 'September to December' },
+export const SEASONS: { value: Season; label: string; months: string; short: string }[] = [
+  { value: 'winter', label: 'Winter', months: 'January to April', short: 'Jan to Apr' },
+  { value: 'spring', label: 'Spring', months: 'dates vary by school', short: 'varies' },
+  { value: 'summer', label: 'Summer', months: 'May to August', short: 'May to Aug' },
+  { value: 'fall', label: 'Fall', months: 'September to December', short: 'Sep to Dec' },
 ]
 
 /** A small dot so seasons are easy to tell apart when scanning a long list */

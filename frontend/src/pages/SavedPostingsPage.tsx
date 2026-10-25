@@ -72,7 +72,7 @@ export default function SavedPostingsPage() {
   const statusCounts = data?.status_counts ?? {}
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8">
+    <div className="w-full px-4 py-8 lg:px-6">
       {/* Title row */}
       <div className="mb-5 flex flex-wrap items-end justify-between gap-4">
         <h1 className="display text-4xl text-gray-900">Tracker</h1>

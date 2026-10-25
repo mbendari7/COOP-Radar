@@ -28,7 +28,7 @@ python start.py      # sets everything up the first time, then opens http://loca
 
 | | |
 |---|---|
-| **Real jobs, every field** | Jobs from ~1,700 employers' own career sites via the public Greenhouse, Lever, Ashby, SmartRecruiters and Workday job-board APIs, plus Workable's job search and Simplify's public internship and new grad lists, imported every 6 hours: tech, banks, insurers, energy, health and pharma, aerospace, accounting, food, retail and universities. Every job in Canada, plus US co-op, internship, new grad and entry level roles. Each job shows its work term, when it runs and how long it is, kept apart from the graduation year it asks for. New jobs since your last visit, and an RSS feed for any search. Optional Adzuna key adds student jobs it gathers from employer sites in every field. |
+| **Real jobs, every field** | Jobs from ~1,700 employers' own career sites via the public Greenhouse, Lever, Ashby, SmartRecruiters and Workday job-board APIs, plus Workable's job search, The Muse's internships, Himalayas' remote jobs open to Canada and Simplify's public internship and new grad lists, imported every 6 hours: tech, banks, insurers, energy, health and pharma, aerospace, accounting, food, retail and universities. Every job in Canada, plus US co-op, internship, new grad and entry level roles. Each job shows its work term, when it runs and how long it is, kept apart from the graduation year it asks for. New jobs since your last visit, and an RSS feed for any search. Optional Adzuna key adds student jobs it gathers from employer sites in every field. |
 | **Term and length** | Each job's term season (Winter, Spring, Summer, Fall) and length (4, 8, 12 or 16 months) are read from its title and description. Filter by season and length, sort by term start or by length, and see both on every row. Jobs that don't say are marked "Not stated" instead of guessed. |
 | **Job-board search** | What / Where search, quick filters (level, country, on-site / hybrid / remote) and an *All filters* panel: job type, program or major, graduation year, province or state, city, date posted, term, length, company, skills. Results list beside a details panel; everything lives in the URL. |
 | **Reads the job description** | At import, each description is parsed for the programs of study it names ("Bachelor's in Computer Science, Engineering...") and the graduation years it wants ("graduating in December 2027 or 2028"). |
@@ -218,7 +218,7 @@ COOP-Radar/
 │   │   ├── services/             postings, resume (matching), education, categories, insights, auth, ...
 │   │   ├── ingest/               boards.py (Greenhouse/Lever/Ashby/SmartRecruiters), workday.py, adzuna.py, terms.py (term and length), runner, dedup, skill_match
 │   │   ├── schemas/ · models/ · agent/ · ai.py · jobs.py · store.py
-│   ├── alembic/versions/         0001 to 0014
+│   ├── alembic/versions/         0001 to 0015
 │   ├── seed/                     skills · job_boards (~1,700 employers) · sample postings
 │   └── tests/                    api/ · ingest/ · resume/ · eval/ · perf/
 └── frontend/

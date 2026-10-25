@@ -6,11 +6,10 @@
  * Temporary guest or demo accounts get a strip under the bar offering to keep the account.
  */
 
-import { lazy, Suspense, useState } from 'react'
-import { Link, NavLink, Navigate, Route, Routes } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
+import { Link, NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom'
 import { useAiKey } from './api/aiKey'
 import { useMe, useLogout } from './api/auth'
-import AuthModal from './components/AuthModal'
 import DemoBanner from './components/DemoBanner'
 import DemoButton from './components/DemoButton'
 import { LogoMark } from './components/Icons'
@@ -22,6 +21,7 @@ const ResumePage = lazy(() => import('./pages/ResumePage'))
 const AiKeyPage = lazy(() => import('./pages/AiKeyPage'))
 const SavedPostingsPage = lazy(() => import('./pages/SavedPostingsPage'))
 const AccountSettingsPage = lazy(() => import('./pages/AccountSettingsPage'))
+const SignInPage = lazy(() => import('./pages/SignInPage'))
 const AdminSourcesPage = lazy(() =>
   import('./pages/AdminSourcesPage').then((m) => ({ default: m.AdminSourcesPage }))
 )
@@ -53,13 +53,15 @@ function Header() {
   const { data: me, isLoading } = useMe()
   const aiKey = useAiKey()
   const logout = useLogout()
-  const [authOpen, setAuthOpen] = useState(false)
+  const location = useLocation()
+  // Come back to the same page after signing in
+  const next = location.pathname === '/sign-in' ? '/' : `${location.pathname}${location.search}`
 
   return (
     <header className="sticky top-0 z-30">
       <div className="bg-post-600 text-white">
         {/* One row on wide screens. On phones the tabs drop to a second row so nothing hides off screen */}
-        <div className="mx-auto flex max-w-7xl flex-wrap items-center px-4">
+        <div className="flex w-full flex-wrap items-center px-4 lg:px-6">
           <Link to="/" className="order-1 flex h-14 shrink-0 items-center gap-2.5" aria-label="CoopRadar home">
             <LogoMark className="h-7 w-7 text-white sm:h-8 sm:w-8" />
             <span className="stretch-condensed text-[19px] font-extrabold uppercase tracking-[0.03em] sm:text-[22px]">CoopRadar</span>
@@ -109,19 +111,18 @@ function Header() {
             ) : (
               <>
                 <DemoButton variant="header" />
-                <button
-                  onClick={() => setAuthOpen(true)}
+                <Link
+                  to={`/sign-in?next=${encodeURIComponent(next)}`}
                   className="border-2 border-white bg-white px-3.5 py-1 text-sm font-bold text-post-700 hover:bg-post-50"
                 >
                   Sign in
-                </button>
+                </Link>
               </>
             )}
           </div>
         </div>
       </div>
 
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab="login" />
       <DemoBanner />
     </header>
   )
@@ -141,6 +142,7 @@ export default function App() {
             <Route path="/ai-key" element={<AiKeyPage />} />
             <Route path="/account" element={<AccountSettingsPage />} />
             <Route path="/add" element={<AddPostingsPage />} />
+            <Route path="/sign-in" element={<SignInPage />} />
             {/* Old links still land somewhere useful */}
             <Route path="/matches" element={<Navigate to="/resume" replace />} />
             <Route path="/upload" element={<Navigate to="/add" replace />} />
@@ -150,7 +152,7 @@ export default function App() {
         </Suspense>
       </main>
       <footer className="border-t border-gray-300 bg-white">
-        <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-6 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex w-full flex-col gap-3 px-4 py-6 lg:px-6 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
           <p className="flex items-center gap-2">
             <LogoMark className="h-5 w-5 text-post-600" />
             <span>Jobs come straight from employers' own career pages. You always apply on their site.</span>

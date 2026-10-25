@@ -386,3 +386,30 @@ co-op Winter with computer engineering 155 to 297 with the new switch. Not finis
 the machine running low on memory before checking the boards it found, so `discovered_boards.json` is unchanged.
 
 **What I reviewed / changed**: _(fill in after reviewing the diff)_
+
+## 2026-10-25. Less cluttered jobs page, full width, no popups, two more job sources
+
+**What the AI assistant did**:
+- Feedback from a tester: the site was good but felt cluttered. The jobs page had seven bands stacked above the list
+  (search, a strip of quick filter menus, the resume bar, the count row, filter chips, the term notice, the new jobs
+  bar) and its filters lived in a popup drawer.
+- Full width: header, footer, temporary account strip, jobs page, tracker and job page drop the 7xl cap.
+- One search row with the resume shortcut on its right. Every filter now sits in a sidebar on the left, always in view
+  on laptops and up. Work term, length, level, location, work mode and job type are open; studies, date posted,
+  company and skills and the rest fold open in place. The "also show jobs that don't say their term" switch and the
+  feed link moved into it. On phones a Filters button opens the same sidebar above the results. Chips show only on
+  phones. The details pane shows from 1280 px wide (`splitViewVisible`).
+- No popups: the filter drawer is gone, Get updates opens in place, and the sign in popup became a `/sign-in` page
+  (`?next=` back to where you were, only paths on this site) plus an inline form on the resume page.
+- Job rows are three lines: title, employer and place, then season dot, term, dates, length, role, New and posted
+  time. Skills and grad years stay on the details panel.
+- New sources (migration 0015): `themuse` (internships, posted in the last 90 days) and `himalayas` (remote jobs open
+  to Canada). Checked live: The Muse 33 of 40 kept on 2 pages, Himalayas 24 of 40. Fixed the country count showing 0
+  while loading.
+
+**Results (actual runs)**: ruff, mypy clean; backend 429 passed (plus the new stale post test, 10 of 10 in its file);
+alembic upgrade, downgrade to 0014, upgrade and `check` clean on an empty DB; frontend lint, tsc, build clean, 69
+Vitest passed; Playwright 9 of 9 against a local site. Screenshots checked at 1366, 1920 and 390 px wide. Not run: a
+deploy, a full import of the new sources.
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_

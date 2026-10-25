@@ -40,7 +40,7 @@ import {
   type MatchResultOut,
   type ResumeOut,
 } from '../api/resume'
-import AuthModal from '../components/AuthModal'
+import AuthForm from '../components/AuthForm'
 import ConversationPanel from '../components/ConversationPanel'
 import ResumeFitPanel from '../components/ResumeFitPanel'
 import {
@@ -527,7 +527,15 @@ function ResumeDropzone({ compact, prefs }: { compact: boolean; prefs: JobPrefer
           Your resume stays private in your account and only goes to an AI if you add your own key. Delete it any time.
         </p>
       )}
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab="register" />
+      {authOpen && !me && (
+        <section aria-label="Make an account" className="mt-4 rounded-xl border border-gray-300 bg-white p-5">
+          <p className="mb-4 text-sm text-gray-800">
+            <span className="font-bold text-gray-900">This site needs an account to read resumes.</span>{' '}
+            Make one, or sign in, then drop your resume again.
+          </p>
+          <AuthForm initialTab="register" autoFocus onDone={() => setAuthOpen(false)} />
+        </section>
+      )}
     </div>
   )
 }

@@ -244,6 +244,11 @@ student roles to `seed/discovered_boards.json`, which `job_boards.py` seeds next
 `workable` sources (`ingest/workable.py`, migration 0012) page through Workable's public job search at
 jobs.workable.com (robots.txt allows it): every job in Canada, and US intern, co-op, student and new grad roles. With
 `ADZUNA_APP_ID` and `ADZUNA_APP_KEY` (a paid Adzuna plan) set, two `adzuna` sources are seeded too (`ingest/adzuna.py`).
+Two public job APIs with no key came in with migration 0015. `themuse` (`ingest/themuse.py`) reads The Muse's
+internship level (about 10,000 roles, mostly US): the Internship tag counts as a student role, jobs posted over 90 days
+ago are skipped since the API still lists old ones, and a 429 keeps what was read so far (500 calls an hour).
+`himalayas` (`ingest/himalayas.py`) searches Himalayas for remote jobs open to Canada (about 9,000) and keeps the ones
+whose country list names Canada, shown as Remote, Canada.
 Two `simplify` sources (`ingest/simplify.py`, migration 0013) read Simplify's public internship and new grad lists on
 GitHub (`.github/scripts/listings.json`), thousands of roles from big companies and startups, each with its terms;
 `{summer}` in the repo name moves to next year's list on its own, and terms that are already over are dropped.

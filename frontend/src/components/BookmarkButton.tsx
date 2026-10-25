@@ -2,14 +2,14 @@
  * Save or unsave a job.
  *
  * A filled bookmark means it is saved and an outline means it is not.
- * If nobody is signed in, clicking opens the sign in box.
+ * If nobody is signed in, clicking goes to the sign in page and comes back after.
  * It flips right away and then lets the server confirm.
  */
 
 import { useState } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { useMe } from '../api/auth'
 import { useSavePosting, useUnsavePosting } from '../api/saved'
-import AuthModal from './AuthModal'
 
 interface Props {
   postingId: string
@@ -21,7 +21,8 @@ interface Props {
 
 export default function BookmarkButton({ postingId, savedId, isSaved, onSaved, onUnsaved }: Props) {
   const { data: me } = useMe()
-  const [authOpen, setAuthOpen] = useState(false)
+  const navigate = useNavigate()
+  const location = useLocation()
   const [optimistic, setOptimistic] = useState<boolean | null>(null)
 
   const savePosting = useSavePosting()
@@ -34,7 +35,7 @@ export default function BookmarkButton({ postingId, savedId, isSaved, onSaved, o
     e.stopPropagation()  // do not open the job when clicking the bookmark
 
     if (!me) {
-      setAuthOpen(true)
+      navigate(`/sign-in?next=${encodeURIComponent(location.pathname + location.search)}`)
       return
     }
 
@@ -59,7 +60,6 @@ export default function BookmarkButton({ postingId, savedId, isSaved, onSaved, o
   }
 
   return (
-    <>
       <button
         onClick={handleClick}
         disabled={isPending}
@@ -82,8 +82,5 @@ export default function BookmarkButton({ postingId, savedId, isSaved, onSaved, o
           </svg>
         )}
       </button>
-
-      <AuthModal open={authOpen} onClose={() => setAuthOpen(false)} initialTab="login" />
-    </>
   )
 }
