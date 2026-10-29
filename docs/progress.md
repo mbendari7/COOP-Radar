@@ -80,6 +80,19 @@ passed (perf p95 47 ms), migrations round-trip + `alembic check`, frontend 42 pa
 7/7 against the local site, screenshots in Edge. Not verified: Render + Neon deploy, the CI Playwright job on
 GitHub, the refresh workflow.
 
+2026-10-29: the first load is instant on the free hosting. `GET /api/postings/snapshot` (first page, filter
+choices and the first job's details, the same for everyone) is cached by Vercel's CDN and saved in the browser,
+the page shows it while the real list loads and says when the server is waking up. `refresh-jobs.yml` now pings
+the site every 10 minutes from 7 am to 1 am Eastern. Startup skips the seed when nothing changed (fingerprint in
+`kv_store`), loads boards in two statements, serves before seeding and waits a minute before importing; replies are
+gzipped and built files cached for a year. New source: Government of Canada Job Bank (migration 0016, student and
+apprentice filters plus about 30 program searches, 21 day rolling window). New job type Hospitality, food & tourism
+and programs Hospitality and Law / Paralegal. UI: one visible scroll bar, no duplicate resume buttons, hyphens no
+longer spaced out. Verified: backend 455 passed (perf budget too), ruff, mypy, migrations round trip and `alembic check`; frontend 72
+Vitest, lint, tsc, build; hosted mode run locally; a live Job Bank import; a browser test with the API held back
+8 s showed the jobs and details in about a second; Playwright 9 of 9 against a local site. Not verified: the Vercel CDN caching and the keep awake
+workflow on the real hosts.
+
 ## Open work
 
 1. ~~Merge everything into `main`~~ (done 2026-10-10).

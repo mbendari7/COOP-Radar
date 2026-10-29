@@ -384,6 +384,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/postings/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Postings Snapshot
+         * @description The first page of jobs and the filter choices in one reply that is the same for everyone,
+         *     so it can be cached. The site shows it the moment the page opens, then swaps in the
+         *     visitor's own list (with saved jobs marked) when that arrives.
+         */
+        get: operations["postings_snapshot_api_postings_snapshot_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/postings/upload": {
         parameters: {
             query?: never;
@@ -870,7 +892,7 @@ export interface components {
              * Key
              * @enum {string}
              */
-            key: "software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades";
+            key: "software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades" | "hospitality";
             /** Label */
             label: string;
         };
@@ -946,7 +968,7 @@ export interface components {
              * Program
              * @default
              */
-            program: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology") | "";
+            program: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology" | "hospitality" | "law_justice") | "";
             /**
              * Program Label
              * @default
@@ -1103,7 +1125,7 @@ export interface components {
              * Categories
              * @default []
              */
-            categories: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades")[];
+            categories: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades" | "hospitality")[];
             /**
              * City
              * @default
@@ -1144,7 +1166,7 @@ export interface components {
              * Program
              * @default
              */
-            program: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology") | "";
+            program: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology" | "hospitality" | "law_justice") | "";
             /**
              * Province
              * @default
@@ -1424,13 +1446,24 @@ export interface components {
             title: string;
             work_mode: components["schemas"]["WorkMode"];
         };
+        /**
+         * PostingsSnapshot
+         * @description The first page of the jobs page as nobody has filtered it yet, plus the filter choices.
+         *     It is the same for every visitor, so the CDN in front of the site can keep a copy and show
+         *     it at once, even while a sleeping free server is still waking up.
+         */
+        PostingsSnapshot: {
+            filters: components["schemas"]["FilterMeta"];
+            first_job?: components["schemas"]["PostingDetail"] | null;
+            postings: components["schemas"]["Page_PostingListItem_"];
+        };
         /** ProgramOption */
         ProgramOption: {
             /**
              * Key
              * @enum {string}
              */
-            key: "computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology";
+            key: "computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology" | "hospitality" | "law_justice";
             /** Label */
             label: string;
         };
@@ -2290,12 +2323,12 @@ export interface operations {
                 duration?: number[] | null;
                 include_unstated?: boolean;
                 skills?: string[] | null;
-                category?: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades")[] | null;
+                category?: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades" | "hospitality")[] | null;
                 company?: string[] | null;
                 posted_within?: number | null;
                 added_since?: string | null;
                 country?: ("CA" | "US")[] | null;
-                program?: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology") | null;
+                program?: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology" | "hospitality" | "law_justice") | null;
                 grad_year?: number | null;
                 show_expired?: boolean;
                 show_closed?: boolean;
@@ -2382,12 +2415,12 @@ export interface operations {
                 duration?: number[] | null;
                 include_unstated?: boolean;
                 skills?: string[] | null;
-                category?: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades")[] | null;
+                category?: ("software" | "data" | "design" | "product" | "hardware" | "it_security" | "business" | "sales_marketing" | "customer" | "health" | "public" | "trades" | "hospitality")[] | null;
                 company?: string[] | null;
                 posted_within?: number | null;
                 added_since?: string | null;
                 country?: ("CA" | "US")[] | null;
-                program?: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology") | null;
+                program?: ("computer_science" | "software_engineering" | "computer_engineering" | "electrical_engineering" | "mechanical_engineering" | "other_engineering" | "data_science" | "mathematics" | "information_technology" | "business" | "finance_accounting" | "marketing" | "design" | "science" | "health_sciences" | "social_sciences" | "environment" | "education" | "engineering_technology" | "hospitality" | "law_justice") | null;
                 grad_year?: number | null;
                 show_expired?: boolean;
                 show_closed?: boolean;
@@ -2441,6 +2474,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["FilterMeta"];
+                };
+            };
+        };
+    };
+    postings_snapshot_api_postings_snapshot_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PostingsSnapshot"];
                 };
             };
         };

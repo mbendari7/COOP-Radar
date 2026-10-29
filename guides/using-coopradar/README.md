@@ -2,8 +2,9 @@
 
 A plain guide for students and anyone who isn't a developer. No coding needed.
 
-**CoopRadar is a free job site for co-op students.** It collects real co-op, internship and entry-level jobs from
-employers' own career pages, and when you upload your resume it shows you the jobs you're actually a good fit for:
+**CoopRadar is a free job site for co-op students in every program.** It collects real co-op, internship,
+student, apprentice and entry-level jobs from employers' own career pages and from the Government of Canada's Job
+Bank, in every field from software and engineering to nursing, teaching, trades and hospitality. When you upload your resume it shows you the jobs you're actually a good fit for:
 matched to your program, your graduation year and your skills, using what each job description asks for.
 
 - [1. Open the site](#1-open-the-site)
@@ -23,30 +24,32 @@ matched to your program, your graduation year and your skills, using what each j
 If someone shared a link with you, just open it. That's all. There's nothing to install and you don't need an
 account.
 
-> On the free hosting plan the site goes to sleep when nobody has used it for a while. If the first page takes
-> about a minute to load, that's why. It's quick after that.
+> The newest co-op jobs show up right away. On the free hosting plan the server can be asleep (mostly late at
+> night). Then a small blue note says it is waking up: you can already scroll the jobs, and searching or opening
+> other jobs works after about a minute. It's quick after that.
 
 ---
 
 ## 2. Find jobs
 
 The **Find jobs** page works like Indeed or LinkedIn. The look is borrowed from a Canadian post office: a red bar
-at the top, plain white rows split by thin lines, and a round **postmark** on every job.
+at the top, plain white rows split by thin lines, and a round **postmark** on the job you're reading.
 
 **Search bar.** Type a job title, keyword or company in the first box ("data analyst", "React", "Shopify"), pick a
 province or state in the second, and click **Find jobs**.
 
-**Quick filters** (the row under the search bar):
-- **Co-op & internships** is picked by default. Switch to *Students & entry-level* to add junior jobs, or
-  *All levels* for everything.
-- **Canada** is the default. Switch to *United States* or *Canada and US* to include US internships and new grad
-  roles (many students do a US co-op term).
-- **On-site / Hybrid / Remote**: click one to show only that kind.
+**Filters** sit in a column on the left, always in view on a computer. On a phone, tap **Filters** to open them
+above the results. Nothing opens in a popup.
+- **Work term** and **Length**: Winter, Spring, Summer or Fall, and about 4, 8, 12 or 16 months.
+- **Experience level**: **Co-op & internships** is picked by default. Switch to *Students & entry-level* to add
+  junior jobs, or *All levels* for everything.
+- **Location**: **Canada** is the default. Switch to *United States* or *Canada and US* to include US internships
+  and new grad roles (many students do a US co-op term). Then province or state and city.
+- Further down: on-site, hybrid or remote, job type (software, health, trades, business, public sector...), your
+  program or major, your graduation year, date posted, company and skills.
 
-**All filters** opens a panel with everything else: job type (software, data, design, business...), your program
-or major, your graduation year, province or state and city, date posted, term and length, company, and skills.
-Every filter you turn on shows up as a small tag above the results; click its **x** to remove it, or
-**Clear all**.
+Click **Clear all** to start over. The list scrolls with the page; the filter column and the job details have their
+own scroll bar that only shows while your mouse is over them.
 
 **Reading a job.** On a computer, click a job in the list and its details open on the right. You see a row of
 facts (type, term, length, when it was posted, the deadline), a bar showing **how many days are left to apply**,
@@ -54,9 +57,14 @@ who it's for (the programs and graduation years the description mentions), the s
 description. Click **Apply on (company)'s site** to apply. On a phone, tapping a job opens its own page.
 
 Each job in the list shows at a glance: **Co-op**, **Internship** or **New grad**, the term ("Summer 2027"),
-**Grad year 2027** when the posting says which graduation years it wants, and a few of the skills. **New** means it
-was posted in the last three days. The **postmark** on the right shows the city and the day the job was posted.
-It turns red on the job you're looking at.
+**Grad year 2027** when the posting says which graduation years it wants, and how long ago it was posted. The
+**postmark** in the job's details shows the city and the day the job was posted.
+
+**Jobs for every program.** Besides company career pages, CoopRadar reads Canada's Job Bank: jobs it marks for
+students and apprentices (shown with "(student)" or "(apprentice)" in the title), plus jobs for nursing and
+personal support, early childhood education and teaching, social work, trades, cooking, engineering technology,
+labs, accounting, marketing and more. Job Bank posts often have no full description here; click **Apply** to read
+it on Job Bank. Pick *Students & entry-level* to see the regular Job Bank jobs as well.
 
 Some career pages don't give a deadline. Then the deadline is our guess and the page says so.
 
@@ -191,7 +199,7 @@ Then:
    ```
 4. The first time takes a few minutes: it installs everything, builds the site and creates a private database in
    a `.coopradar` folder in your home folder. Then your browser opens **http://localhost:8000**. Real jobs appear a
-   few minutes later (it pulls them from about 170 employers).
+   few minutes later and keep coming in for about an hour (it pulls them from about 1,700 employers and Job Bank).
 
 Next time, `python start.py` starts in seconds. To stop it, press **Ctrl + C** in the terminal. To start over with
 empty data, delete the `.coopradar` folder in your home folder.
@@ -218,7 +226,7 @@ Want it on the internet for others? See **Host it for free** in the [main README
 
 | What you see | What to do |
 |---|---|
-| The site takes a minute to load | It was asleep (free hosting). Wait a minute. It's quick after that. |
+| The site says it is waking up | The free server was asleep. The jobs you see are a few minutes old; searching works after about a minute. It's quick after that. |
 | "The jobs didn't load" on a site you host yourself | Wait a minute and click **Try again** (the server may be waking up). If it never works, open `vercel.json` and check the `/api` line ends with `/api/:path*`, like `https://your-site.onrender.com/api/:path*`. See **Host it for free** in the [main README](../../README.md#host-it-for-free). |
 | "Could not extract text" | Your PDF is probably a scanned image. Export it again from Word or Google Docs. |
 | "That file is over 5 MB" | Export a smaller PDF (remove photos). |

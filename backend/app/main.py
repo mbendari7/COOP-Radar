@@ -13,10 +13,13 @@ from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from sqlalchemy import text
 from starlette.exceptions import HTTPException
+from starlette.responses import Response
+from starlette.types import Scope
 
 from app.api.admin import router as admin_router
 from app.api.ai import router as ai_router
@@ -74,21 +77,35 @@ async def http_exception_handler(request: Request, exc: Exception) -> JSONRespon
     return JSONResponse(status_code=exc.status_code, content=body, headers=exc.headers)
 
 
+class HashedAssets(StaticFiles):
+    """
+    The built JS and CSS. Their names change whenever their content does, so browsers can
+    keep them for a year and never ask again. That makes every visit after the first faster.
+    """
+
+    async def get_response(self, path: str, scope: Scope) -> Response:
+        response = await super().get_response(path, scope)
+        if response.status_code == 200:
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        return response
+
+
 def mount_frontend(app: FastAPI, static_dir: Path) -> None:
     """
     Serve the built React site from the API too, so one server is the whole website.
     Same origin means no CORS trouble and normal cookies. Has to run after the API routers.
 
-    /assets/* gives the hashed JS and CSS files
+    /assets/* gives the hashed JS and CSS files, kept by browsers for a year
     any other GET that is not /api/* gives a real file if there is one or else index.html
-    so pages like /saved still work after a refresh
+    so pages like /saved still work after a refresh. index.html is checked again on every
+    visit so a new version of the site shows up right away
     """
     index = static_dir / "index.html"
     if not index.is_file():
         return
     root = static_dir.resolve()
     if (static_dir / "assets").is_dir():
-        app.mount("/assets", StaticFiles(directory=static_dir / "assets"), name="assets")
+        app.mount("/assets", HashedAssets(directory=static_dir / "assets"), name="assets")
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa(full_path: str) -> FileResponse:
@@ -98,7 +115,7 @@ def mount_frontend(app: FastAPI, static_dir: Path) -> None:
         # Checking the parents stops sneaky paths like /../../etc/passwd
         if full_path and candidate.is_file() and root in candidate.parents:
             return FileResponse(candidate)
-        return FileResponse(index)
+        return FileResponse(index, headers={"Cache-Control": "no-cache"})
 
 
 def create_app() -> FastAPI:
@@ -114,6 +131,10 @@ def create_app() -> FastAPI:
     )
 
     app.add_exception_handler(HTTPException, http_exception_handler)
+
+    # Squeeze replies over 1 KB. A page of jobs as JSON gets about 6 times smaller.
+    # Streamed AI answers (text/event-stream) are left alone so they still arrive word by word
+    app.add_middleware(GZipMiddleware, minimum_size=1000)
 
     # Let the Vite dev server and any sites in the settings call the API
     # allow_credentials=True is needed so cookies work across origins

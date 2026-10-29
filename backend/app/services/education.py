@@ -40,6 +40,10 @@ FIELD_PATTERNS: dict[str, str] = {
                    r"|\bplanning\b|\bgis\b|sustainability",
     "education": r"\beducation\b|teaching|early childhood",
     "trades": r"technician|technologist|engineering technology|skilled trades|apprentice\w*",
+    "hospitality": r"hospitality|tourism|culinary|hotel (and restaurant )?management"
+                   r"|event management|food service|travel services",
+    "law": r"\blaw\b|paralegal|legal studies|justice studies|police foundations"
+           r"|criminal justice|law clerk",
 }
 FIELD_LABELS: dict[str, str] = {
     "cs": "Computer Science / Software", "engineering": "Engineering",
@@ -50,6 +54,7 @@ FIELD_LABELS: dict[str, str] = {
     "health": "Health Sciences / Nursing", "social": "Social Sciences / Humanities",
     "environment": "Environment / Geography", "education": "Education",
     "trades": "Technology / Skilled Trades",
+    "hospitality": "Hospitality / Tourism / Culinary", "law": "Law / Paralegal / Justice",
 }
 
 # A sentence counts as a degree requirement when it mentions one of these
@@ -65,6 +70,7 @@ ProgramKey = Literal[
     "mechanical_engineering", "other_engineering", "data_science", "mathematics",
     "information_technology", "business", "finance_accounting", "marketing", "design", "science",
     "health_sciences", "social_sciences", "environment", "education", "engineering_technology",
+    "hospitality", "law_justice",
 ]
 
 
@@ -102,6 +108,17 @@ PROGRAMS: dict[str, Program] = {
         ("it", "cs"), ("it_security", "software")),
     "mathematics": Program(
         "Mathematics", r"mathematics|\bmath\b|actuarial", ("data_math",), ("data", "business")),
+    # Before business, so "Hospitality Management" or "Business Law" find the specific one
+    "hospitality": Program(
+        "Hospitality / Tourism / Culinary",
+        r"hospitality|tourism|culinary|hotel (and restaurant )?management|event management"
+        r"|food and nutrition management|chef training",
+        ("hospitality", "business"), ("hospitality", "customer", "business")),
+    "law_justice": Program(
+        "Law / Paralegal / Justice",
+        r"paralegal|legal studies|justice studies|police foundations|criminal justice|law clerk"
+        r"|\bj\.?d\.?\b|juris doctor|\bll\.?b\b|\blaw\b",
+        ("law", "social"), ("business", "public")),
     "finance_accounting": Program(
         "Finance / Accounting / Economics", r"finance|accounting|economics",
         ("finance", "business", "data_math"), ("business",)),
@@ -126,7 +143,8 @@ PROGRAMS: dict[str, Program] = {
     "health_sciences": Program(
         "Health Sciences / Nursing / Kinesiology",
         r"nursing|health sciences?|kinesiology|pharmacy|public health|biomedical|nutrition"
-        r"|physiotherapy|paramedic|medical laboratory",
+        r"|physiotherapy|paramedic|medical laboratory|personal support worker|practical nursing"
+        r"|dental (hygiene|assisting)|pharmacy technician|medical radiation",
         ("health", "science"), ("health",)),
     "science": Program(
         "Science (physics, chemistry, biology...)",

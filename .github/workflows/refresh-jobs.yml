@@ -1,38 +1,36 @@
-# Keeps the hosted site's jobs fresh on Render's free plan.
+# Keeps the hosted site awake so it opens quickly, and its jobs fresh.
 #
-# A free Render web service sleeps after ~15 minutes without visitors, and the job importer
-# only runs while it's awake. Every 6 hours this wakes the site and keeps it up for ~55
-# minutes. The importer does a few boards at a time, the ones that waited longest first, so
-# each wake up gets further through the ~1,700 boards. Free for public repositories.
+# A free Render web service sleeps after ~15 minutes without visitors. Waking it takes 30 to 60
+# seconds, which is the slow first load people notice, and the job importer only runs while it
+# is awake. This pings the site every 10 minutes from 7 am to 1 am Eastern time (11:00 to 04:59
+# UTC), so it stays up all day and imports a few boards at a time, the ones that waited longest
+# first. It sleeps overnight, which keeps it inside Render's 750 free hours a month and leaves
+# Neon's free database time for the importer.
 #
 # Turn it on: GitHub repo → Settings → Secrets and variables → Actions → Variables →
 # New repository variable: SITE_URL = https://your-site.onrender.com (no trailing slash).
-# Without SITE_URL it does nothing.
+# Without SITE_URL it does nothing. Free for public repositories. For a private repository,
+# use a free uptime checker like UptimeRobot or cron-job.org on SITE_URL/api/health instead
+# (see README.md "Make it load fast"). GitHub can run scheduled jobs a few minutes late.
 
-name: Refresh jobs
+name: Keep the site awake
 
 on:
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "*/10 0-4,11-23 * * *"
   workflow_dispatch:
 
 jobs:
   wake:
-    name: Wake the site so it imports new jobs
+    name: Ping the site
     runs-on: ubuntu-latest
     if: ${{ vars.SITE_URL != '' }}
-    timeout-minutes: 70
+    timeout-minutes: 5
     steps:
-      - name: Wake up (the first request can take a minute)
+      - name: Ping (a sleeping site can take a minute to answer)
         run: |
-          for i in $(seq 1 10); do
+          for i in $(seq 1 4); do
             if curl -fsS --max-time 90 "${{ vars.SITE_URL }}/api/health"; then exit 0; fi
-            sleep 15
+            sleep 10
           done
           echo "The site didn't answer" && exit 1
-      - name: Stay awake while the importer runs
-        run: |
-          for i in $(seq 1 13); do
-            sleep 240
-            curl -fsS --max-time 60 "${{ vars.SITE_URL }}/api/health" || true
-          done

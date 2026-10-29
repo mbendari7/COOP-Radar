@@ -176,7 +176,7 @@ The signature is the postmark. Each job carries a round two ring stamp with its 
 **Key Characteristics:**
 - Postal red owns the top bar and the main action. Airmail blue owns links, fit and selection.
 - White letter paper ground with an envelope tint for the filter strip and picked rows.
-- Archivo at narrow widths for headings and labels, normal width for reading, tabular numbers.
+- Archivo at narrow widths for headings and labels, normal width for reading, tabular numbers where they line up.
 - Square corners and 1.5px ink rules. Rows, not cards.
 - The tilted postmark and stage stamp are the one round, playful element.
 
@@ -220,7 +220,7 @@ Two strong postal colors on white paper, held in place by a cool ink grey.
 - **Display** (800, 36px rising to 48px on wide screens, line height about 1, 82% width, tight tracking): page titles such as Find co-op jobs that fit you and Tracker. The picked job title in the details panel uses the same style at 28px to 34px.
 - **Headline** (800, 24px, 82% width): section heads like About you and empty state lines. The list header uses 22px to 26px and names the range in view.
 - **Title** (700, 16px, line height 1.375): job titles in list rows. Match titles and the days left line use 87% width at 18px to 20px.
-- **Body** (400, 14px, line height 1.5, tabular numbers): most UI text. Reading text in the details panel is 15px at line height 1.625, capped at 70ch.
+- **Body** (400, 14px, line height 1.5): most UI text. Reading text in the details panel is 15px at line height 1.625, capped at 70ch.
 - **Label** (700, 11px, uppercase, 0.08em tracking, 78% width): form field labels, fact names in the ruled facts row, Sort by, Showing 1 to 25 of 168, and short headings over a list such as Skills it mentions.
 - **Wordmark** (800, 19px to 22px, uppercase, 75% width): CoopRadar on the red bar only.
 - **Stamp** (800, 17px at 75% width, with 9px bold ring lines): text inside postmarks and stage stamps.
@@ -228,7 +228,9 @@ Two strong postal colors on white paper, held in place by a cool ink grey.
 ### Named Rules
 **The Customs Slip Rule.** Uppercase belongs to labels, the wordmark and stamps. Headings and body stay in sentence case.
 
-**The Tabular Rule.** Numbers are tabular across the whole site so counts, dates and days left line up.
+**The Tabular Rule.** Numbers that sit in a column, like the filter counts, use `tabular-nums` so they line up. It is not set on the whole page: in Inter it also widens hyphens, which turned "Co-op" into "Co - op".
+
+**The One Scroll Bar Rule.** The page has one visible scroll bar. Panels that scroll on their own (the filter column, the job details) use `scroll-quiet`, so their thin bar only shows while the pointer is over them, and tab rows that scroll sideways on phones use `scroll-none`. Every bar is thin and ink grey. On computers the page keeps room for its bar (`scrollbar-gutter: stable`) so nothing jumps sideways.
 
 ## Layout
 

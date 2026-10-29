@@ -41,17 +41,22 @@ expire (Render's free Postgres is deleted 30 days after it's created).
 4. The first build takes about 5 to 10 minutes. Your site is at `https://coopradar-xxxx.onrender.com`. Add your own
    domain under **Settings → Custom Domains** if you like.
 5. Within a few minutes of going live, about 2,800 jobs are imported. Refresh **Find jobs** to see them.
-6. **Keep jobs fresh**: in GitHub, **Settings → Secrets and variables → Actions → Variables**, add `SITE_URL` with
-   your Render address. `.github/workflows/refresh-jobs.yml` then wakes the site every 6 hours and keeps it up for
-   about 20 minutes so every board is re-imported. It's free for public repositories.
+6. **Keep it awake and fresh**: in GitHub, **Settings → Secrets and variables → Actions → Variables**, add
+   `SITE_URL` with your Render address. `.github/workflows/refresh-jobs.yml` then pings the site every 10 minutes
+   from 7 am to 1 am Eastern, so visitors rarely meet a sleeping server and the importer keeps going. It's free for
+   public repositories; for a private one point a free uptime checker (UptimeRobot, cron-job.org) at
+   `/api/health` every 10 minutes instead.
 
 **Free plan caveats** (check the providers' pricing pages, since these change):
-- The free Render web service **sleeps after about 15 minutes idle**. The first visit after that takes about a
-  minute. Logins survive the sleep because sessions are stored in the database.
+- The free Render web service **sleeps after about 15 minutes idle** and waking takes about a minute. The keep
+  awake workflow covers the day (about 560 of the 750 free hours a month). With the Vercel front (Option A2) the
+  first page still opens at once while it wakes, from the cached job snapshot. Logins survive the sleep because
+  sessions are stored in the database.
 - Neon's free plan has 0.5 GB of storage and a monthly compute allowance; its database also sleeps after 5 idle
-  minutes and wakes in about a second. CoopRadar uses a small fraction of both.
-- For a pitch or interview, open the site a minute early, or upgrade the Render service to a paid instance
-  (always on).
+  minutes and wakes in about a second. Keeping the site awake means the importer runs more of the day, so check
+  Neon's usage page in the first week. If it gets close to the limit, set `INGEST_INTERVAL_HOURS=12` on Render.
+- For a pitch or interview at night, open the site a minute early, or upgrade the Render service to a paid
+  instance (always on).
 
 Already deployed with Render's own database? Create the Neon project, change `DATABASE_URL` in the Render
 dashboard (**Environment**), and redeploy; the site migrates and re-imports jobs by itself. Accounts and saved jobs
@@ -78,8 +83,10 @@ Steps:
 4. Open `https://<project>.vercel.app/api/health`. It should say `{"status":"ok"}`. Then open
    `https://<project>.vercel.app/api/postings?page_size=10`. It should be JSON with `items`, not a web page.
 
-Notes: `vercel.json` turns off Vercel caching for `/api` because answers are per visitor. The Render free plan
-still sleeps after about 15 minutes, so the first request after a quiet spell waits for it to wake. Running the
+Notes: `vercel.json` turns off Vercel caching for `/api` because answers are per visitor, except
+`/api/postings/snapshot`, which is the same for everyone. Vercel keeps that one for 5 minutes and then serves its
+copy for up to a week while it fetches a fresh one, so the jobs page opens at once even when Render is asleep;
+only searching and other pages wait for it to wake. Running the
 whole thing on Vercel alone would mean replacing the in-process importer with Vercel Cron jobs (which have short
 time limits per run, while a full import takes several minutes); that's possible but not set up here.
 

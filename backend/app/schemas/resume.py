@@ -24,7 +24,7 @@ class JobPreferences(BaseModel):
     open jobs that fit these. Keywords like "data analyst" push fitting jobs higher.
     """
 
-    categories: list[CategoryKey] = Field(default=[], max_length=12)
+    categories: list[CategoryKey] = Field(default=[], max_length=13)
     keywords: str = Field(default="", max_length=100)
     province: str = Field(default="", max_length=2)
     city: str = Field(default="", max_length=100)

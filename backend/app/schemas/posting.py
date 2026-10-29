@@ -170,6 +170,18 @@ class FilterMeta(BaseModel):
     durations: list[DurationCount] = []
 
 
+class PostingsSnapshot(BaseModel):
+    """
+    The first page of the jobs page as nobody has filtered it yet, plus the filter choices.
+    It is the same for every visitor, so the CDN in front of the site can keep a copy and show
+    it at once, even while a sleeping free server is still waking up.
+    """
+    postings: PostingsPage
+    filters: FilterMeta
+    # The first job in full, so its details show at once next to the list
+    first_job: PostingDetail | None = None
+
+
 # Query params
 
 class ManualPostingIn(BaseModel):

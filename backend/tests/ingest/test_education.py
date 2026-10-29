@@ -4,6 +4,7 @@ from datetime import date
 
 import pytest
 
+from app.services.categories import title_fits
 from app.services.education import (
     detect_education,
     fields_in_posting,
@@ -103,3 +104,35 @@ def test_undergraduate_line_is_not_graduation() -> None:
 def test_nothing_found_is_blank() -> None:
     found = detect_education("Jane Doe\nSkills: Python, Django\nBuilt APIs.", today=TODAY)
     assert (found.program, found.degree, found.grad_year) == ("", "", None)
+
+
+# Programs and job types beyond tech, like the Job Bank jobs bring in
+
+@pytest.mark.parametrize(
+    "line,program",
+    [
+        ("Diploma, Hospitality and Tourism Management, Humber College, 2027", "hospitality"),
+        ("Paralegal diploma, Seneca College, expected 2027", "law_justice"),
+        ("Practical Nursing diploma, Conestoga College, 2027", "health_sciences"),
+        ("Bachelor of Commerce, Business Management, 2028", "business"),
+    ],
+)
+def test_college_programs_are_read_from_the_resume(line: str, program: str) -> None:
+    assert detect_education(f"Education\n{line}", today=TODAY).program == program
+
+
+@pytest.mark.parametrize(
+    "title,key,fits",
+    [
+        ("Cook (student)", "hospitality", True),
+        ("Hotel night auditor", "hospitality", True),
+        ("SQL Server Developer", "hospitality", False),
+        ("Early childhood educator (ECE)", "public", True),
+        ("ECE Co-op", "public", False),
+        ("Personal support worker - home support", "health", True),
+        ("Dental assistant", "health", True),
+        ("Paralegal", "business", True),
+    ],
+)
+def test_job_types_cover_job_bank_titles(title: str, key: str, fits: bool) -> None:
+    assert title_fits(key, title) is fits

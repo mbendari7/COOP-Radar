@@ -8,7 +8,13 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=Inter:wght@400..800&display=swap" rel="stylesheet" />
+    <!-- Fonts load without holding up the page. Until they arrive the text uses the system font.
+         Only the widths and weights the site uses, so the files stay small -->
+    <link rel="preload" as="style" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,700..800&family=Inter:wght@400..800&display=swap" />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,700..800&family=Inter:wght@400..800&display=swap" media="print" onload="this.media='all'" />
+    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,700..800&family=Inter:wght@400..800&display=swap" /></noscript>
+    <!-- Start talking to the API while the code downloads -->
+    <link rel="preload" as="fetch" href="/api/postings/snapshot" crossorigin="use-credentials" />
     <title>CoopRadar</title>
   </head>
   <body>

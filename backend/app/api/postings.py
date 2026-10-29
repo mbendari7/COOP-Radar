@@ -1,8 +1,8 @@
 """
 Job postings. A thin layer that hands everything to the service.
 
-Order matters here. /meta/filters has to come before /{id} or FastAPI tries
-to read "meta" as an id and answers 422.
+Order matters here. /meta/filters and /snapshot have to come before /{id} or FastAPI
+tries to read "meta" as an id and answers 422.
 
 When someone is signed in each job gets is_saved set to true or false.
 Everyone else just gets None.
@@ -35,6 +35,7 @@ from app.schemas.posting import (
     PostingListItem,
     PostingListParams,
     PostingsPage,
+    PostingsSnapshot,
     SimilarPostingsResponse,
 )
 from app.services.feed import build_feed
@@ -60,6 +61,32 @@ async def postings_filter_meta(db: AsyncSession = Depends(get_db)) -> FilterMeta
     The site caches this for 5 minutes since it only changes when new jobs come in.
     """
     return await get_filter_meta(db)
+
+
+# What the jobs page asks for before anyone filters: co-op and internships in Canada, newest first
+_SNAPSHOT_VIEW = PostingListParams(country=["CA"], students_only=True)
+# Browsers keep it for a minute and a CDN like Vercel's for 5. After that the CDN still answers
+# with its copy for up to a week while it fetches a new one, so nobody waits for a sleeping server
+SNAPSHOT_CACHE = "public, max-age=60, s-maxage=300, stale-while-revalidate=604800"
+
+
+@router.get("/snapshot", response_model=PostingsSnapshot)
+async def postings_snapshot(
+    response: Response, db: AsyncSession = Depends(get_db)
+) -> PostingsSnapshot:
+    """
+    The first page of jobs and the filter choices in one reply that is the same for everyone,
+    so it can be cached. The site shows it the moment the page opens, then swaps in the
+    visitor's own list (with saved jobs marked) when that arrives.
+    """
+    response.headers["Cache-Control"] = SNAPSHOT_CACHE
+    postings = await list_postings(_SNAPSHOT_VIEW, db)
+    first_job = await get_posting(postings.items[0].id, db) if postings.items else None
+    if first_job is not None:
+        first_job.low_confidence_fields = None  # only admins see these
+    return PostingsSnapshot(
+        postings=postings, filters=await get_filter_meta(db), first_job=first_job
+    )
 
 
 @router.post("/upload", response_model=CsvUploadResult)

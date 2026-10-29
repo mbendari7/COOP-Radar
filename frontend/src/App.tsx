@@ -68,7 +68,7 @@ function Header() {
           </Link>
 
           <nav
-            className="order-3 -mx-4 flex h-11 w-[calc(100%+2rem)] items-stretch gap-0.5 overflow-x-auto whitespace-nowrap border-t border-white/25 px-2 md:order-2 md:mx-0 md:ml-auto md:h-14 md:w-auto md:border-t-0 md:px-0"
+            className="order-3 -mx-4 flex h-11 w-[calc(100%+2rem)] items-stretch gap-0.5 overflow-x-auto scroll-none whitespace-nowrap border-t border-white/25 px-2 md:order-2 md:mx-0 md:ml-auto md:h-14 md:w-auto md:border-t-0 md:px-0"
             aria-label="Main"
           >
             <NavLink to="/" end className={navClass}>Find jobs</NavLink>

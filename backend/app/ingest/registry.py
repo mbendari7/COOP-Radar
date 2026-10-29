@@ -11,6 +11,7 @@ from app.ingest.boards import (
 )
 from app.ingest.github_lists import GithubListAdapter
 from app.ingest.himalayas import HimalayasAdapter
+from app.ingest.jobbank import JobBankAdapter
 from app.ingest.json_api import JsonApiAdapter
 from app.ingest.oracle import OracleAdapter
 from app.ingest.rss import RssAdapter
@@ -37,6 +38,7 @@ _ADAPTERS: dict[str, type[BaseAdapter]] = {
     "oracle": OracleAdapter,
     "themuse": TheMuseAdapter,
     "himalayas": HimalayasAdapter,
+    "jobbank": JobBankAdapter,
 }
 
 

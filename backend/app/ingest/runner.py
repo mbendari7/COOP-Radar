@@ -68,8 +68,10 @@ async def _execute_run(
     new_postings: list[Posting] = []
 
     raw_postings: list[RawPosting] = []
+    adapter = None
     try:
-        raw_postings = await adapter_for(source).fetch(source)
+        adapter = adapter_for(source)
+        raw_postings = await adapter.fetch(source)
     except (AdapterError, ValueError) as exc:
         error_log.append(str(exc))
         errors += 1
@@ -115,12 +117,17 @@ async def _execute_run(
                 status = "partial"
 
     # Close this source's jobs that left the feed. Skipped when the fetch failed
-    # or came back empty so an outage never closes everything
+    # or came back empty so an outage never closes everything. Feeds with a rolling window
+    # only show recent jobs, so theirs close once they are older than the window instead
     if seen_refs:
-        stale = [
-            p for ref, p in known.items() if p.closed_at is None and ref not in seen_refs
-        ]
         now = datetime.now(UTC)
+        window = getattr(adapter, "rolling_window", None)
+        window = window if isinstance(window, timedelta) else None
+        stale = [
+            p for ref, p in known.items()
+            if p.closed_at is None and ref not in seen_refs
+            and (window is None or p.posted_at < now - window)
+        ]
         for p in stale:
             p.closed_at = now
             closed += 1

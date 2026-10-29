@@ -197,3 +197,33 @@ def test_vercel_api_rewrite_keeps_the_path() -> None:
     assert len(api) == 1
     assert api[0]["destination"].startswith("https://")
     assert api[0]["destination"].endswith("/api/:path*")
+
+
+def test_vercel_caches_only_the_snapshot() -> None:
+    """Personal replies must never be cached by the CDN. The snapshot is the same for everyone."""
+    config = json.loads((Path(__file__).parents[3] / "vercel.json").read_text(encoding="utf-8"))
+    rules = {r["source"]: {h["key"]: h["value"] for h in r["headers"]} for r in config["headers"]}
+    caching = "x-vercel-enable-rewrite-caching"
+    assert rules["/api/((?!postings/snapshot).*)"][caching] == "0"
+    assert rules["/api/postings/snapshot"][caching] == "1"
+    assert "immutable" in rules["/assets/(.*)"]["Cache-Control"]
+
+
+async def test_built_files_are_cached_and_the_page_is_checked_each_visit(tmp_path: Path) -> None:
+    (tmp_path / "assets").mkdir()
+    (tmp_path / "index.html").write_text("<html>app</html>")
+    (tmp_path / "assets" / "app-1a2b.js").write_text("console.log(1)")
+
+    app = create_app()
+    mount_frontend(app, tmp_path)
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+        asset = await ac.get("/assets/app-1a2b.js")
+        page = await ac.get("/saved")
+    assert "immutable" in asset.headers["cache-control"]
+    assert page.headers["cache-control"] == "no-cache"
+
+
+async def test_big_replies_are_compressed(client: AsyncClient, postings: list[Posting]) -> None:
+    res = await client.get("/api/postings", headers={"Accept-Encoding": "gzip"})
+    assert res.status_code == 200
+    assert res.headers.get("content-encoding") == "gzip"

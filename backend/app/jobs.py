@@ -4,8 +4,9 @@ Background jobs that run inside the web server, so there is no extra worker or q
 enqueue(job, *args)  starts a job without making the request wait and logs any error
 scheduler()          starts with the app. Every 10 minutes it imports each career board
                      that has not run in INGEST_INTERVAL_HOURS (6 by default), a few at a
-                     time, oldest first, and clears old sessions. On a brand new site the first pass
-                     imports every board so real jobs show up a minute or two after start.
+                     time, oldest first, and clears old sessions. The first pass waits
+                     INGEST_START_DELAY_SECONDS (60 by default) so a site that just woke up
+                     answers its first visitors quickly before the importer gets busy.
 
 Only three jobs run at once so a big import cannot hog the database connections
 that page requests need.
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 INGEST_INTERVAL = timedelta(hours=float(os.getenv("INGEST_INTERVAL_HOURS", "6")))
 _CHECK_EVERY_SECONDS = 600
+_START_DELAY_SECONDS = float(os.getenv("INGEST_START_DELAY_SECONDS", "60"))
 _MAX_CONCURRENT_JOBS = 3
 
 _tasks: set[asyncio.Task[None]] = set()  # keep running tasks so they are not garbage collected
@@ -110,6 +112,7 @@ async def run_due_sources() -> int:
 
 async def scheduler(store: object | None = None) -> None:
     """Runs until shutdown. Clears expired keys out of `store` every round."""
+    await asyncio.sleep(_START_DELAY_SECONDS)
     if get_settings().openai_api_key:
         await _backfill_embeddings()
     while True:

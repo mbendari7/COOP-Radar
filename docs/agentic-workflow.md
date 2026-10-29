@@ -413,3 +413,40 @@ Vitest passed; Playwright 9 of 9 against a local site. Screenshots checked at 13
 deploy, a full import of the new sources.
 
 **What I reviewed / changed**: _(fill in after reviewing the diff)_
+
+## 2026-10-29. Instant first load, Job Bank for every program, quieter scroll bars
+
+**What the AI assistant did**:
+- Asked: load faster, look cleaner (scroll bars), more jobs for every program that has co-ops, update every doc.
+- Found the slow first load is Render waking its sleeping server, made worse because every wake up reloaded 1,700
+  career boards one row at a time (about 3,400 round trips to Neon) before the server opened its port.
+- Instant first page: `GET /api/postings/snapshot` (first 25 co-op jobs, filter choices, first job's details, same
+  for everyone) with `Cache-Control: public, s-maxage=300, stale-while-revalidate=604800`; `vercel.json` lets only
+  that path be cached at the edge. The browser saves the last snapshot (`useSnapshot`), the jobs page uses it as
+  placeholder data and seeds the first job's details, and a note shows after 4 s if the server is waking.
+- Faster wake up: the seed keeps a fingerprint in `kv_store` and skips itself when unchanged (`SEED_FORCE`), boards
+  load in two `jsonb_to_recordset` statements, `--hosted` serves before seeding, the importer waits
+  `INGEST_START_DELAY_SECONDS` (60). Gzip for replies over 1 KB, a year of caching for hashed assets, `no-cache` on
+  index.html, React and TanStack in a `vendor` file, fonts no longer block the page, the snapshot is preloaded.
+- `refresh-jobs.yml` now pings the site every 10 minutes from 7 am to 1 am Eastern (about 560 of 750 free Render
+  hours). CI waits for the sample jobs since seeding now runs next to the server. `--forwarded-allow-ips=*` so
+  hosted mode also runs on Windows.
+- New source `jobbank` (migration 0016): Government of Canada Job Bank Atom feeds, student and apprentice filters
+  plus about 30 program searches (checked live one by one), 5 s apart per robots.txt, one retry per feed, titles
+  marked "(student)" or "(apprentice)", `rolling_window` of 21 days in the runner so jobs are not closed when they
+  age out of a two day feed. Live import: 113 jobs from three feeds.
+- New job type `hospitality` and wider health, education and business title patterns; new programs Hospitality /
+  Tourism / Culinary and Law / Paralegal / Justice, plus practical nursing, PSW and dental programs under health.
+- UI: one visible scroll bar (`scroll-quiet` panels, `scroll-none` tab rows, thin bars), removed the global
+  `tabular-nums` that spaced hyphens out ("Co - op"), one quiet resume link instead of two extra buttons on the
+  search row. New README screenshots.
+- Docs: README (new "Make it load fast"), both guides, PROJECT_GUIDE, DEPLOY, DESIGN, CLAUDE.md, render.yaml,
+  .env.example, progress.
+
+**Results (actual runs)**: ruff, mypy clean; backend 455 passed plus the perf budget; alembic upgrade, downgrade to
+0015, upgrade and `check` clean; frontend lint, tsc, build clean, 72 Vitest; Playwright 9 of 9 against a local site;
+hosted mode run locally (sample jobs ready in 12 s, seed skipped on restart); browser test with the API held back
+8 s showed jobs and details in about a second. Not run: Vercel's edge cache and the keep awake workflow on the real
+hosts, a full import of every Job Bank search on the hosted database.
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_

@@ -12,19 +12,21 @@
  *
  * The defaults are for students, co-op and internships in Canada. ?level=entry adds entry level
  * jobs and ?level=all shows everything. ?country=US or ?country=all adds US student roles.
+ *
+ * The unfiltered view opens at once from the snapshot (useSnapshot), then the real list takes
+ * over. If the server is still waking up a short note says so instead of a blank page.
  */
 
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import {
-  useFilterMeta, usePostings,
+  useFilterMeta, usePostings, useSnapshot,
   type CategoryKey, type PageSize, type PostingListParams, type ProgramKey, type SearchMode, type Season,
   type SortField, type SortOrder, type WorkMode,
 } from '../api/postings'
 import { useMe } from '../api/auth'
 import { usePublicConfig } from '../api/meta'
 import { useMatches } from '../api/resume'
-import DemoButton from '../components/DemoButton'
 import FilterBar, { ActiveFilterChips } from '../components/FilterBar'
 import { GetUpdates, NewSinceLastVisit } from '../components/JobUpdates'
 import {
@@ -50,7 +52,7 @@ const P = {
 const PAGE_SIZES: PageSize[] = [10, 25, 50, 100]
 const CATEGORY_KEYS: CategoryKey[] = [
   'software', 'data', 'design', 'product', 'hardware', 'it_security', 'business',
-  'sales_marketing', 'customer', 'health', 'public', 'trades',
+  'sales_marketing', 'customer', 'health', 'public', 'trades', 'hospitality',
 ]
 const SEASON_KEYS: Season[] = ['winter', 'spring', 'summer', 'fall']
 
@@ -146,17 +148,25 @@ export default function PostingsListPage() {
     search_mode,
   }
 
+  // The unfiltered first page is the same for everyone, so it comes ready made from the snapshot
+  const isDefaultView =
+    countActive(filters) === 0 && !q && !added_since && search_mode === 'keyword' &&
+    sort === 'posted_at' && order === 'desc' && page === 1 && page_size === 25
+  const { data: snapshot } = useSnapshot()
+
   // Get the jobs
-  const { data, isLoading, isError, refetch } = usePostings({
+  const { data, isLoading, isError, isPlaceholderData, isFetching, refetch } = usePostings({
     ...filterParams,
     added_since: added_since || undefined,
     sort,
     order,
     page,
     page_size,
-  })
+  }, { placeholder: isDefaultView ? snapshot?.postings : undefined })
 
-  const { data: meta, isLoading: metaLoading } = useFilterMeta()
+  const { data: meta, isLoading: metaLoading } = useFilterMeta(snapshot?.filters)
+  // A free server that was asleep takes up to a minute to answer the first time
+  const waking = useTakingLong(isFetching && (isPlaceholderData || !data), 4000)
 
   // Helpers that write to the URL
   const update = useCallback((patches: Record<string, string | string[] | null>) => {
@@ -261,7 +271,7 @@ export default function PostingsListPage() {
         <aside
           id="job-filters"
           aria-label="Filters"
-          className={`${filtersOpen ? 'block' : 'hidden'} rounded-xl border border-gray-200 bg-white px-4 py-3 lg:sticky lg:top-[4.5rem] lg:block lg:max-h-[calc(100vh-5.5rem)] lg:self-start lg:overflow-y-auto lg:rounded-none lg:border-0 lg:bg-transparent lg:px-0 lg:py-0`}
+          className={`${filtersOpen ? 'block' : 'hidden'} rounded-xl border border-gray-200 bg-white px-4 py-3 lg:sticky lg:top-[4.5rem] lg:block lg:max-h-[calc(100vh-5.5rem)] lg:self-start lg:overflow-y-auto scroll-quiet lg:pr-2 lg:rounded-none lg:border-0 lg:bg-transparent lg:px-0 lg:py-0`}
         >
           <FilterBar
             filters={filters}
@@ -320,6 +330,15 @@ export default function PostingsListPage() {
               </div>
             </div>
           </div>
+
+          {waking && (
+            <p className="mb-3 flex items-center gap-2 rounded-lg bg-air-50 px-3 py-2 text-sm text-air-900" role="status">
+              <span className="h-2 w-2 shrink-0 animate-pulse rounded-full bg-air-600" aria-hidden="true" />
+              {data
+                ? 'Getting the latest jobs. The server was asleep and takes up to a minute to wake up.'
+                : 'The server was asleep and is waking up. This takes up to a minute, only the first time.'}
+            </p>
+          )}
 
           {/* The sidebar already shows what is on, so the chips are only for phones */}
           <div className="pb-3 empty:hidden lg:hidden">
@@ -430,7 +449,7 @@ export default function PostingsListPage() {
             {view === 'cards' && items.length > 0 && (
               <aside
                 aria-label="Job details"
-                className="card hidden self-start xl:sticky xl:top-[4.5rem] xl:block xl:max-h-[calc(100vh-5.5rem)] xl:overflow-y-auto"
+                className="card hidden self-start xl:sticky xl:top-[4.5rem] xl:block xl:max-h-[calc(100vh-5.5rem)] xl:overflow-y-auto scroll-quiet"
               >
                 <PostingDetailPane id={selectedId} />
               </aside>
@@ -440,6 +459,20 @@ export default function PostingsListPage() {
       </div>
     </div>
   )
+}
+
+/** True once `active` has stayed true for `ms`, false again as soon as it stops. */
+function useTakingLong(active: boolean, ms: number): boolean {
+  const [long, setLong] = useState(false)
+  useEffect(() => {
+    if (!active) {
+      setLong(false)
+      return
+    }
+    const timer = setTimeout(() => setLong(true), ms)
+    return () => clearTimeout(timer)
+  }, [active, ms])
+  return long
 }
 
 /** What, Where and Find jobs, like a job board's search bar. */
@@ -517,22 +550,16 @@ function JobSearchForm({
   )
 }
 
-/** The resume shortcut on the search row. Match first, or jump back to the matches */
+/**
+ * The resume shortcut on the search row. One quiet link, since the top bar already has the
+ * Match my resume tab and Try the demo button
+ */
 function ResumeShortcut({ hasResume, fits }: { hasResume: boolean; fits: number }) {
-  if (hasResume) {
-    return (
-      <Link to="/resume" className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-air-700 hover:underline">
-        {fits.toLocaleString()} jobs fit your resume
-        <ArrowRightIcon className="h-4 w-4" />
-      </Link>
-    )
-  }
   return (
-    <div className="flex items-center gap-2">
-      <span className="hidden text-sm text-gray-700 2xl:inline">See which jobs fit you</span>
-      <Link to="/resume" className="btn-primary whitespace-nowrap px-3 py-1.5">Match my resume</Link>
-      <span className="hidden sm:inline-flex"><DemoButton variant="secondary" label="Try a sample" /></span>
-    </div>
+    <Link to="/resume" className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm font-semibold text-air-700 hover:underline">
+      {hasResume ? `${fits.toLocaleString()} jobs fit your resume` : 'See which jobs fit your resume'}
+      <ArrowRightIcon className="h-4 w-4" />
+    </Link>
   )
 }
 

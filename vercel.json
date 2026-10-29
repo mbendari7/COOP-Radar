@@ -16,11 +16,29 @@
   ],
   "headers": [
     {
-      "source": "/api/:path*",
+      "source": "/api/((?!postings/snapshot).*)",
       "headers": [
         {
           "key": "x-vercel-enable-rewrite-caching",
           "value": "0"
+        }
+      ]
+    },
+    {
+      "source": "/api/postings/snapshot",
+      "headers": [
+        {
+          "key": "x-vercel-enable-rewrite-caching",
+          "value": "1"
+        }
+      ]
+    },
+    {
+      "source": "/assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
         }
       ]
     }

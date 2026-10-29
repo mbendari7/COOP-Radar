@@ -136,7 +136,7 @@ export default function SavedPostingsPage() {
       {view === 'table' && (
         <>
           {/* Tabs for each stage */}
-          <div className="mb-2 flex gap-0 overflow-x-auto bg-gray-100" role="tablist">
+          <div className="mb-2 flex gap-0 overflow-x-auto scroll-none bg-gray-100" role="tablist">
             {STATUS_TABS.map((tab) => (
               <button
                 key={tab.label}

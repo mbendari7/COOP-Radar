@@ -9,8 +9,10 @@
 #                      not "pooled"; postgresql://...?sslmode=require is fine as it is)
 #   ANTHROPIC_API_KEY  leave blank: visitors bring their own AI key on the site's "AI key" page
 #   OPENAI_API_KEY     leave blank (only needed for smart search)
-# On first start the site imports real jobs from ~120 employers' career boards (a few minutes),
-# then refreshes them every 6 hours while it's awake. Plans and prices change over time:
+# On first start the site imports real jobs from ~1,700 career boards and job feeds (the first
+# jobs show within minutes, the full pass takes about an hour), then refreshes them every 6 hours
+# while it's awake. To keep it awake through the day, set the SITE_URL variable for
+# .github/workflows/refresh-jobs.yml (README "Make it load fast"). Plans and prices change over time:
 # review them on the Blueprint screen before applying.
 
 services:

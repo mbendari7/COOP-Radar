@@ -44,7 +44,7 @@ class IngestSource(Base):
         CheckConstraint(
             "adapter_type IN ('json_api','rss','csv','manual','greenhouse','lever','ashby',"
             "'smartrecruiters','workday','adzuna','workable','simplify','recruitee','bamboohr',"
-            "'rippling','github_list','oracle','themuse','himalayas')",
+            "'rippling','github_list','oracle','themuse','himalayas','jobbank')",
             name="ck_ingest_sources_adapter_type",
         ),
         Index("idx_ingest_sources_enabled", "enabled", "auto_paused"),

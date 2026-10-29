@@ -6,6 +6,7 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useEffect } from 'react'
 import { API_BASE, apiFetch } from './client'
 import type { components } from './types.gen'
 
@@ -24,6 +25,8 @@ export type SimilarPostingOut = Schemas['SimilarPostingOut']
 export type SimilarPostingsResponse = Schemas['SimilarPostingsResponse']
 export type PostingsPage = Schemas['Page_PostingListItem_']
 export type FilterMeta = Schemas['FilterMeta']
+/** The first page of jobs and the filter choices, the same for everyone so a CDN can keep it */
+export type PostingsSnapshot = Schemas['PostingsSnapshot']
 export type CategoryCount = Schemas['CategoryCount']
 /** Job type keys like software and data, worked out from job titles on the server */
 export type CategoryKey = CategoryCount['key']
@@ -140,6 +143,31 @@ const fetchSimilar = (postingId: string) =>
 
 const fetchFilterMeta = () => apiFetch<FilterMeta>('/api/postings/meta/filters')
 
+// The last snapshot this browser saw, so a returning visitor sees jobs before any reply comes back
+const SNAPSHOT_STORAGE_KEY = 'coopradar:snapshot'
+
+function readSavedSnapshot(): { data: PostingsSnapshot; savedAt: number } | undefined {
+  try {
+    const raw = localStorage.getItem(SNAPSHOT_STORAGE_KEY)
+    if (!raw) return undefined
+    const saved = JSON.parse(raw) as { data?: PostingsSnapshot; savedAt?: number }
+    if (!saved.data?.postings?.items || !saved.data.filters) return undefined
+    return { data: saved.data, savedAt: saved.savedAt ?? 0 }
+  } catch {
+    return undefined  // private windows and blocked storage just skip this
+  }
+}
+
+async function fetchSnapshot(): Promise<PostingsSnapshot> {
+  const data = await apiFetch<PostingsSnapshot>('/api/postings/snapshot')
+  try {
+    localStorage.setItem(SNAPSHOT_STORAGE_KEY, JSON.stringify({ data, savedAt: Date.now() }))
+  } catch {
+    // Full or blocked storage. The site works the same, only the next visit waits a little
+  }
+  return data
+}
+
 // Adding jobs with a CSV or by hand
 
 export interface RowError {
@@ -200,15 +228,49 @@ export function useCreatePosting() {
 // Hooks
 
 /**
- * One filtered and sorted page of jobs.
- * The old page stays on screen while the next one loads.
+ * The jobs page before any filter, ready at once. It starts from the copy saved in this browser,
+ * then asks /api/postings/snapshot, which the CDN answers right away even while a free server
+ * sleeps. The page shows it while the real list loads, so nobody stares at an empty page.
  */
-export function usePostings(params: PostingListParams, options: { enabled?: boolean } = {}) {
+export function useSnapshot(enabled = true) {
+  const qc = useQueryClient()
+  const snapshot = useQuery({
+    queryKey: ['snapshot'],
+    queryFn: fetchSnapshot,
+    enabled,
+    // Functions so the saved copy is only read once, when the query starts
+    initialData: () => readSavedSnapshot()?.data,
+    initialDataUpdatedAt: () => readSavedSnapshot()?.savedAt,
+    staleTime: 60_000,
+    retry: 0,  // it is only a head start, the real list has its own retries
+  })
+
+  // The first job's details come in the snapshot too, so the details pane fills right away.
+  // Dated like the snapshot, so an old saved copy still gets checked with the server
+  const first = snapshot.data?.first_job
+  useEffect(() => {
+    if (first && !qc.getQueryData(['posting', first.id])) {
+      qc.setQueryData(['posting', first.id], first, { updatedAt: snapshot.dataUpdatedAt })
+    }
+  }, [first, qc, snapshot.dataUpdatedAt])
+
+  return snapshot
+}
+
+/**
+ * One filtered and sorted page of jobs.
+ * The old page stays on screen while the next one loads. `placeholder` is shown before
+ * the first reply, like the snapshot for the unfiltered view.
+ */
+export function usePostings(
+  params: PostingListParams,
+  options: { enabled?: boolean; placeholder?: PostingsPage } = {},
+) {
   return useQuery({
     queryKey: ['postings', params],
     queryFn: () => fetchPostings(params),
     enabled: options.enabled ?? true,
-    placeholderData: (prev) => prev,   // keep the last page showing while loading
+    placeholderData: (prev) => prev ?? options.placeholder,   // keep the last page showing while loading
   })
 }
 
@@ -235,10 +297,11 @@ export function useSimilarPostings(postingId: string | undefined) {
  * The choices for the filters like cities, provinces, terms and skills.
  * Kept for 5 minutes since they only change when new jobs come in.
  */
-export function useFilterMeta() {
+export function useFilterMeta(placeholder?: FilterMeta) {
   return useQuery({
     queryKey: ['filterMeta'],
     queryFn: fetchFilterMeta,
     staleTime: 5 * 60 * 1000,
+    placeholderData: placeholder,
   })
 }

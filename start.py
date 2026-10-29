@@ -4,7 +4,7 @@ Start the whole CoopRadar website with one command.
 
     python start.py            sets things up the first time and opens http://localhost:8000
     python start.py --dev      same thing plus live reload while you edit code on http://localhost:5173
-    python start.py --hosted   what a host runs. Migrate, load data and serve on $PORT
+    python start.py --hosted   what a host runs. Migrate, serve on $PORT and load data alongside
 
 The first run takes a few minutes. It makes a Python environment in backend/.venv, installs
 the packages, builds the website and makes a private database in ~/.coopradar, or uses the
@@ -239,20 +239,29 @@ def main() -> None:
     py = sys.executable
     say("Updating the database tables")
     run([py, "-m", "alembic", "upgrade", "head"], cwd=BACKEND, env=env)
-    if env.get("SEED_ON_START", "true").lower() == "true":
+    seed_on_start = env.get("SEED_ON_START", "true").lower() == "true"
+    if seed_on_start and not args.hosted:
         say("Loading the skills list and career boards")
         run([py, "-m", "seed"], cwd=BACKEND, env=env)
 
     host = "0.0.0.0" if args.hosted else "127.0.0.1"
     server_cmd = [py, "-m", "uvicorn", "app.main:app", "--host", host, "--port", str(args.port)]
     if args.hosted:
-        # Trust X-Forwarded headers from the host's HTTPS proxy
-        server_cmd += ["--proxy-headers", "--forwarded-allow-ips", "*"]
+        # Trust X-Forwarded headers from the host's HTTPS proxy. Written with = so Windows
+        # never turns the * into a list of file names
+        server_cmd += ["--proxy-headers", "--forwarded-allow-ips=*"]
     if args.dev:
         server_cmd += ["--reload", "--reload-dir", "app"]
 
     say(f"Starting the server on port {args.port}")
     processes = [subprocess.Popen(server_cmd, cwd=BACKEND, env=env)]
+    seeding: subprocess.Popen[bytes] | None = None
+    if seed_on_start and args.hosted:
+        # A free host wakes the site up when someone visits and only sends them through once
+        # the server is up, so serve first and load the data next to it. The importer waits a
+        # minute before its first run (app/jobs.py), and the seed skips itself when unchanged
+        say("Loading the skills list and career boards")
+        seeding = subprocess.Popen([py, "-m", "seed"], cwd=BACKEND, env=env)
     site = f"http://localhost:{args.port}"
     if args.dev:
         vite_env = {**env, "API_PROXY_TARGET": f"http://127.0.0.1:{args.port}"}
@@ -279,6 +288,8 @@ def main() -> None:
         print("\nStopping CoopRadar...", flush=True)
     finally:
         exit_code = next((p.returncode for p in processes if p.returncode is not None), 0)
+        if seeding is not None and seeding.poll() is None:
+            seeding.terminate()
         for p in processes:
             if p.poll() is None:
                 p.terminate()

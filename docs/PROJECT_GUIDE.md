@@ -35,7 +35,10 @@ one PostgreSQL database**. No Docker, no Redis, no separate worker are required:
 | Vite dev server | port 5173, only with `python start.py --dev` | Hot reload while editing; **proxies `/api` to the API**, so the browser only ever talks to one origin. |
 
 `start.py` ties it together: it creates `backend/.venv`, installs packages, builds the site, starts the database,
-runs `alembic upgrade head` and the seed, then starts Uvicorn.
+runs `alembic upgrade head` and the seed, then starts Uvicorn. With `--hosted` it starts Uvicorn first and runs
+the seed next to it, so a free host that just woke up answers sooner; the seed skips itself when its files and
+settings have not changed (a fingerprint kept in `kv_store` under `seed:fingerprint`, `SEED_FORCE=true` to load
+anyway).
 
 Three external services are optional: **Anthropic** (Claude) for re-ranking, extraction, and Q&A; **OpenAI** for
 embeddings; and **public job feeds** for postings. Without API keys the app still works; the AI features degrade
@@ -169,16 +172,16 @@ career boards and cached insights, 0008 the `kv_store` session table, 0009 `resu
 | `app/store.py` | The `Store` protocol (`hget/hset/incr/expire/delete`), `PostgresStore` on the `kv_store` table, `create_store()` (Redis when `REDIS_URL` is set), and the `get_store` dependency. |
 | `app/deps.py` | `get_current_user` (cookie → store `session:<token>` → `users` row; refreshes the 7-day TTL; 401/503), `get_optional_user` (same, but `None` instead of 401), `get_admin_user` (403 unless `is_admin`). |
 | `app/llm.py` | `get_client()` builds the Anthropic client from settings; `response_text()` joins text blocks and skips thinking blocks; `parse_json()` tolerates code fences and prose. |
-| `app/jobs.py` | `enqueue(name, *args)` runs a registered job (`run_source`, `embed_posting`) as an asyncio task, at most 3 at a time; `scheduler()` imports due sources every 10 minutes, three at a time, never run first then oldest first (so a free host that sleeps halfway gets further each time), deletes imported jobs that closed or passed their deadline over 30 days ago unless someone saved them (`delete_old_closed`), and purges expired sessions. |
-| `app/api/postings.py` | List, detail, similar, filter metadata, CSV upload (rate-limited 3/hour per user via a store counter), manual create. |
+| `app/jobs.py` | `enqueue(name, *args)` runs a registered job (`run_source`, `embed_posting`) as an asyncio task, at most 3 at a time; `scheduler()` waits `INGEST_START_DELAY_SECONDS` (60) after start, then imports due sources every 10 minutes, three at a time, never run first then oldest first (so a free host that sleeps halfway gets further each time), deletes imported jobs that closed or passed their deadline over 30 days ago unless someone saved them (`delete_old_closed`), and purges expired sessions. |
+| `app/api/postings.py` | List, detail, similar, filter metadata, `snapshot` (first page + filter metadata + first job's details, the same for everyone, `Cache-Control: public, s-maxage=300, stale-while-revalidate=604800` so Vercel's CDN keeps it), CSV upload (rate-limited 3/hour per user via a store counter), manual create. |
 | `app/api/auth.py`, `me.py` | Register, login (5 failed attempts / 15 min → 429), logout, demo + guest temporary accounts, profile, change password, delete account, claim (keep) a temporary account. |
 | `app/api/saved.py` | Tracker CRUD, status changes (each one writes an event), CSV export. |
 | `app/api/resume.py` | Upload (AI optional)/get/delete a resume, list matches, AI re-rank, insights (GET free + cached / POST AI review), and the SSE assistant (`mode`: question · tailor · cover_letter). |
 | `app/api/admin.py` | Sources list, run history, trigger a run, enable/re-enable a source. |
 | `app/services/*.py` | The logic behind each router (see section 6). |
-| `app/ingest/` | `base.py` (`RawPosting`, `BaseAdapter`), `boards.py` (Greenhouse / Lever / Ashby adapters, location filter + parser, HTML to text), `json_api.py`, `rss.py`, `registry.py` (adapter_type → class), `runner.py` (one ingest pass, estimated deadlines), `dedup.py` (difflib title similarity), `skill_match.py` (context-aware skill detection), `extract.py` (skills/term/work mode, then Claude if the owner set a key), `embed.py` (OpenAI + backfill CLI; skipped without a key), `csv_validator.py`. |
+| `app/ingest/` | `base.py` (`RawPosting`, `BaseAdapter`), `boards.py` (Greenhouse / Lever / Ashby adapters, location filter + parser, HTML to text), `json_api.py`, `rss.py`, `registry.py` (adapter_type → class), `runner.py` (one ingest pass, estimated deadlines; adapters with a `rolling_window` like Job Bank keep jobs that left the feed open until they are that old), `jobbank.py` (Government of Canada Job Bank feeds), `dedup.py` (difflib title similarity), `skill_match.py` (context-aware skill detection), `extract.py` (skills/term/work mode, then Claude if the owner set a key), `embed.py` (OpenAI + backfill CLI; skipped without a key), `csv_validator.py`. |
 | `app/agent/resume_qa.py` | The streaming, citation-grounded Q&A. |
-| `seed/` | `python -m seed`: skills (always; aliases updated on re-run), `job_boards.py` (~170 employers; a board that moved systems is repointed), sample postings, and two fixture sources, each behind a `SEED_*` flag. Idempotent. |
+| `seed/` | `python -m seed`: skills (always; aliases updated on re-run), `job_boards.py` (~1,700 career boards and job feeds, loaded in two SQL statements with `jsonb_to_recordset`; a board that moved systems is repointed), sample postings, and two fixture sources, each behind a `SEED_*` flag. Idempotent, and skipped when nothing changed since the last run. |
 | `app/services/insights.py` | Free insights (skills found, in-demand skills missing via `unnest … GROUP BY`) and the cached AI review. |
 
 ---
@@ -249,6 +252,15 @@ internship level (about 10,000 roles, mostly US): the Internship tag counts as a
 ago are skipped since the API still lists old ones, and a 429 keeps what was read so far (500 calls an hour).
 `himalayas` (`ingest/himalayas.py`) searches Himalayas for remote jobs open to Canada (about 9,000) and keeps the ones
 whose country list names Canada, shown as Remote, Canada.
+Migration 0016 added `jobbank` (`ingest/jobbank.py`), one source that reads the Government of Canada's Job Bank
+Atom feeds: its student filter (`fjsf=1`) and apprentice filter (`fjap=1`), then about 30 searches for the programs
+that have co-ops (`DEFAULT_QUERIES`: nursing, personal support, early childhood education, teaching, social work,
+trades, cooking, engineering technology, labs, accounting, marketing...). Calls are 5 seconds apart as Job Bank's
+robots.txt asks, each feed is tried twice, and student or apprentice jobs whose title doesn't say so get
+"(student)" or "(apprentice)" added so `students_only` finds them. Feeds show only the newest two days, so the
+adapter sets `rolling_window = 21 days`. Job types gained `hospitality` (Hospitality, food & tourism) and wider
+health, education and business patterns for Job Bank's titles; programs gained Hospitality / Tourism / Culinary
+and Law / Paralegal / Justice.
 Two `simplify` sources (`ingest/simplify.py`, migration 0013) read Simplify's public internship and new grad lists on
 GitHub (`.github/scripts/listings.json`), thousands of roles from big companies and startups, each with its terms;
 `{summer}` in the repo name moves to next year's list on its own, and terms that are already over are dropped.
@@ -344,12 +356,13 @@ the visitor per posting. SQL narrows thousands of postings to 40, then one LLM c
 |---|---|---|
 | Providers | `src/main.tsx` | `BrowserRouter` plus `QueryClientProvider` (30 s staleTime, 1 retry). |
 | Routes | `src/App.tsx` | `/` jobs · `/postings/:id` detail · `/resume` Match my resume (upload, insights, matches, assistant) · `/saved` tracker · `/ai-key` bring-your-own-key · `/account` · `/add` CSV + manual entry · `/admin/sources` · `/matches` → `/resume`. Heavy pages are lazy-loaded. |
-| Look | `tailwind.config.ts`, `src/index.css`, `components/Postmark.tsx`, `components/postal.ts` | The postal design system: `post` (red) and `air` (blue) palettes, ink greys, square corners, Archivo with condensed widths, shared classes (`btn-primary`, `btn-secondary`, `field`, `chip`, `label-form`, `display`), and the postmark stamp on every job. Written up in `DESIGN.md`. |
+| Look | `tailwind.config.ts`, `src/index.css`, `components/Postmark.tsx`, `components/postal.ts` | The postal design system: `post` (red) and `air` (blue) palettes, ink greys, soft rounded corners, Archivo with condensed widths, shared classes (`btn-primary`, `btn-secondary`, `field`, `chip`, `label-form`, `display`), thin scroll bars (`scroll-quiet` panels only show theirs on hover, `scroll-none` tab rows show none), and the postmark stamp in the job details. Written up in `DESIGN.md`. |
 | Resume page | `pages/ResumePage.tsx` | A three part form (`StepCard`), `ResumeDropzone` (guest login if signed out, then upload), `MatchesTab` with `MatchCard` and its score stamp, `FeedbackTab`. |
 | Per-job assistant | `components/ConversationPanel.tsx`, `RichText.tsx` | Tailor / cover letter / ask buttons, streamed replies rendered from a safe Markdown subset (never HTML), copy button. |
 | Temporary accounts | `components/DemoBanner.tsx`, `ClaimAccountForm.tsx` | Banner with **Keep my account** → `POST /api/me/claim`. |
 | HTTP | `src/api/client.ts` | `apiFetch` (relative `/api` URLs, cookies, JSON, throws `ApiError {status, code}`) and `toApiError`. |
 | AI key | `src/api/aiKey.ts`, `pages/AiKeyPage.tsx` | Key kept in session/localStorage only; `aiHeaders()` attaches it to AI requests; provider how-to steps in `PROVIDER_GUIDES`. |
+| Fast first load | `src/api/postings.ts → useSnapshot`, `pages/PostingsListPage.tsx` | The snapshot starts from the copy saved in localStorage, then `/api/postings/snapshot`; the unfiltered view uses it as `placeholderData` for the list and the filters, and seeds the first job's details. `useTakingLong` shows the waking up note after 4 s. `index.html` preloads the snapshot and loads fonts without blocking; `vite.config.ts` puts React and TanStack in a `vendor` file that stays cached across releases. |
 | Hooks | `src/api/{postings,auth,saved,resume,ingest,meta,aiKey}.ts` | One TanStack Query hook per endpoint. Mutations invalidate affected keys (e.g. saving invalidates `['saved']` and `['postings']` so `is_saved` refreshes). |
 | URL state | `pages/PostingsListPage.tsx` | Reads every filter from `useSearchParams` and writes with `replace: true`, so links are shareable and Back works. |
 | Table | `components/PostingsTable.tsx` | TanStack Table in manual mode. It only shows things and sends sort changes back to the URL. Becomes the `PostingCard` list below `md`. |
@@ -397,8 +410,9 @@ installed browser).
 `alembic check` → pytest → perf for the backend, eslint → tsc → vitest → `vite build` for the frontend, then runs the
 Render build command and `python start.py --hosted` against a fresh Postgres with the sample postings,
 smoke-tests the site, the resume page, the API (incl. `students_only`), demo and guest accounts, and that a guest
-session works on the next request, then runs the Playwright tests against it. `refresh-jobs.yml` wakes the hosted
-site every 6 hours when the `SITE_URL` repository variable is set.
+session works on the next request, then runs the Playwright tests against it. `refresh-jobs.yml` pings the hosted
+site every 10 minutes from 7 am to 1 am Eastern when the `SITE_URL` repository variable is set, so it stays awake
+through the day and the importer keeps running.
 
 ---
 

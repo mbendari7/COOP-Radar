@@ -302,7 +302,8 @@
               "customer",
               "health",
               "public",
-              "trades"
+              "trades",
+              "hospitality"
             ],
             "title": "Key",
             "type": "string"
@@ -475,7 +476,9 @@
                   "social_sciences",
                   "environment",
                   "education",
-                  "engineering_technology"
+                  "engineering_technology",
+                  "hospitality",
+                  "law_justice"
                 ],
                 "type": "string"
               },
@@ -858,11 +861,12 @@
                 "customer",
                 "health",
                 "public",
-                "trades"
+                "trades",
+                "hospitality"
               ],
               "type": "string"
             },
-            "maxItems": 12,
+            "maxItems": 13,
             "title": "Categories",
             "type": "array"
           },
@@ -965,7 +969,9 @@
                   "social_sciences",
                   "environment",
                   "education",
-                  "engineering_technology"
+                  "engineering_technology",
+                  "hospitality",
+                  "law_justice"
                 ],
                 "type": "string"
               },
@@ -1709,6 +1715,33 @@
         "title": "PostingListItem",
         "type": "object"
       },
+      "PostingsSnapshot": {
+        "description": "The first page of the jobs page as nobody has filtered it yet, plus the filter choices.\nIt is the same for every visitor, so the CDN in front of the site can keep a copy and show\nit at once, even while a sleeping free server is still waking up.",
+        "properties": {
+          "filters": {
+            "$ref": "#/components/schemas/FilterMeta"
+          },
+          "first_job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PostingDetail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "postings": {
+            "$ref": "#/components/schemas/Page_PostingListItem_"
+          }
+        },
+        "required": [
+          "postings",
+          "filters"
+        ],
+        "title": "PostingsSnapshot",
+        "type": "object"
+      },
       "ProgramOption": {
         "properties": {
           "key": {
@@ -1731,7 +1764,9 @@
               "social_sciences",
               "environment",
               "education",
-              "engineering_technology"
+              "engineering_technology",
+              "hospitality",
+              "law_justice"
             ],
             "title": "Key",
             "type": "string"
@@ -3479,7 +3514,8 @@
                       "customer",
                       "health",
                       "public",
-                      "trades"
+                      "trades",
+                      "hospitality"
                     ],
                     "type": "string"
                   },
@@ -3593,7 +3629,9 @@
                     "social_sciences",
                     "environment",
                     "education",
-                    "engineering_technology"
+                    "engineering_technology",
+                    "hospitality",
+                    "law_justice"
                   ],
                   "type": "string"
                 },
@@ -4012,7 +4050,8 @@
                       "customer",
                       "health",
                       "public",
-                      "trades"
+                      "trades",
+                      "hospitality"
                     ],
                     "type": "string"
                   },
@@ -4126,7 +4165,9 @@
                     "social_sciences",
                     "environment",
                     "education",
-                    "engineering_technology"
+                    "engineering_technology",
+                    "hospitality",
+                    "law_justice"
                   ],
                   "type": "string"
                 },
@@ -4305,6 +4346,28 @@
           }
         },
         "summary": "Postings Filter Meta",
+        "tags": [
+          "postings"
+        ]
+      }
+    },
+    "/api/postings/snapshot": {
+      "get": {
+        "description": "The first page of jobs and the filter choices in one reply that is the same for everyone,\nso it can be cached. The site shows it the moment the page opens, then swaps in the\nvisitor's own list (with saved jobs marked) when that arrives.",
+        "operationId": "postings_snapshot_api_postings_snapshot_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PostingsSnapshot"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Postings Snapshot",
         "tags": [
           "postings"
         ]

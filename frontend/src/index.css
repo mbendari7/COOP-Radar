@@ -8,9 +8,15 @@
     -moz-osx-font-smoothing: grayscale;
     accent-color: #1e3a8a;
   }
+  /* On computers room for the scroll bar is always kept, so the page never jumps sideways.
+     Phones draw the bar over the page, so they keep the full width */
+  @media (min-width: 1024px) {
+    html {
+      scrollbar-gutter: stable;
+    }
+  }
   body {
     @apply bg-gray-50 text-gray-900;
-    font-variant-numeric: tabular-nums;
   }
   ::selection {
     background: #c3d0ee;
@@ -28,8 +34,23 @@
     outline: 2px solid #1e3a8a;
     outline-offset: 2px;
   }
+  /* Thin, soft scroll bars everywhere */
   * {
+    scrollbar-width: thin;
     scrollbar-color: #c4cbd8 transparent;
+  }
+  /* Safari still needs the older way */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: 9999px;
+    background: #c4cbd8 padding-box;
   }
 }
 
@@ -88,6 +109,29 @@
 }
 
 @layer utilities {
+  /* Panels that scroll on their own, like the filters and the job details. Their scroll bar
+     only shows while the pointer is over them, so the page shows one scroll bar at a time */
+  .scroll-quiet {
+    scrollbar-color: transparent transparent;
+    overscroll-behavior: contain;
+  }
+  .scroll-quiet:hover,
+  .scroll-quiet:focus-within {
+    scrollbar-color: #c4cbd8 transparent;
+  }
+  .scroll-quiet::-webkit-scrollbar-thumb {
+    background-color: transparent;
+  }
+  .scroll-quiet:hover::-webkit-scrollbar-thumb {
+    background-color: #c4cbd8;
+  }
+  /* Rows that scroll sideways on phones, like the tabs, with no bar at all */
+  .scroll-none {
+    scrollbar-width: none;
+  }
+  .scroll-none::-webkit-scrollbar {
+    display: none;
+  }
   .stretch-condensed {
     font-family: Archivo, Inter, ui-sans-serif, system-ui, sans-serif;
     font-stretch: 75%;

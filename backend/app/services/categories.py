@@ -17,7 +17,7 @@ from app.models.posting import Posting
 
 CategoryKey = Literal[
     "software", "data", "design", "product", "hardware", "it_security", "business",
-    "sales_marketing", "customer", "health", "public", "trades",
+    "sales_marketing", "customer", "health", "public", "trades", "hospitality",
 ]
 
 # key maps to the label people see and the title pattern
@@ -69,7 +69,8 @@ CATEGORIES: dict[str, tuple[str, str]] = {
         r"|analyste|investment|credit|risk|compliance|audit|tax|treasury|strategy"
         r"|strat[eé]gie|hr|rh|human resources|recruit\w*|talent|people|legal|counsel|juridiques?"
         r"|corporate development|executive assistant|facilities|supply chain|regulatory|grc"
-        r"|wealth|advisor|consultant|implementation|controls|revenue|op[eé]rations)\M",
+        r"|wealth|advisor|consultant|implementation|controls|revenue|op[eé]rations|paralegal"
+        r"|law clerk|legal assistant|bookkeep\w*|payroll|purchasing|buyer)\M",
     ),
     "sales_marketing": (
         "Sales & marketing",
@@ -92,14 +93,18 @@ CATEGORIES: dict[str, tuple[str, str]] = {
         r"|regulatory affairs"
         r"|quality control|qc|qa associate|biotech\w*|kinesiolog\w*|physiotherap\w*|dietitian"
         r"|therap\w+|epidemiolog\w*|public health|veterinar\w*|environmental|sant[eé]"
-        r"|infirmi\w+)\M",
+        r"|infirmi\w+|dental|dentist\w*|hygienist|paramedic\w*|personal support worker|psw"
+        r"|care aide|health care aide|caregiver|phlebotom\w*|x-ray|radiolog\w*|sonograph\w*"
+        r"|medical imaging|optician|audiolog\w*|massage therapist|pharmacist)\M",
     ),
     "public": (
         "Government, education & nonprofit",
         r"\m(policy|government|public service|municipal|city of|federal|provincial|teach\w*"
         r"|tutor|education\w*|instructor|librar\w+|museum|curat\w+|archiv\w+|social work\w*"
         r"|community|youth|counsell?or|nonprofit|non-profit|charity|program assistant"
-        r"|student affairs|academic|research associate|urban planning|planner|elections?)\M",
+        r"|student affairs|academic|research associate|urban planning|planner|elections?"
+        r"|educators?|early childhood|child ?care|daycare|educational assistant|recreation"
+        r"|social service worker|case worker|outreach)\M",
     ),
     "trades": (
         "Trades & technicians",
@@ -107,6 +112,13 @@ CATEGORIES: dict[str, tuple[str, str]] = {
         r"|apprentice|operator|machinist|hvac|tradesperson|trades|labou?rer|installer"
         r"|lineman|power line|instrumentation|warehouse|driver|logistics associate"
         r"|technicien\w*)\M",
+    ),
+    "hospitality": (
+        "Hospitality, food & tourism",
+        r"\m(hospitality|hotel|resort|tourism|travel|cook|cooks|chef|sous-chef|culinary|kitchen"
+        r"|baker|pastry|food service|food and beverage|restaurant|catering|banquet|bartender"
+        r"|barista|housekeep\w*|room attendant|night auditor|guest services|concierge"
+        r"|event planner|events? coordinator|event staff|cuisinier|h[oô]tellerie)\M",
     ),
 }
 

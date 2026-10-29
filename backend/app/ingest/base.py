@@ -2,7 +2,7 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -37,6 +37,9 @@ class BaseAdapter(ABC):
     """The base class every import source adapter builds on."""
 
     user_agent: str = "CoopRadar-Ingest/1.0 (+https://github.com/mbendari7/COOP-Radar)"
+    # Most sources list every open job, so a job that left the list has closed. Feeds that only
+    # show the newest few days set this, and their jobs stay open until they are this old
+    rolling_window: timedelta | None = None
 
     @abstractmethod
     async def fetch(self, source: "IngestSource") -> list[RawPosting]:

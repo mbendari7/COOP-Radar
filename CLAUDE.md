@@ -1,8 +1,8 @@
 # CoopRadar
 
 Co-op job board: imports real jobs (all of Canada, plus US student and early career roles) from ~1,700 employers'
-public career boards (Greenhouse, Lever, Ashby, SmartRecruiters, Workday), Workable, The Muse, Himalayas and Simplify's public student
-lists into Postgres, reading each description for the programs of study and
+public career boards (Greenhouse, Lever, Ashby, SmartRecruiters, Workday), Workable, The Muse, Himalayas, Simplify's public student
+lists and the Government of Canada's Job Bank feeds (student, apprentice and per program searches) into Postgres, reading each description for the programs of study and
 graduation years it asks for. A student drops in a resume (no sign-up: temporary account); their program, degree and
 graduation year are read from it, and open jobs are filtered and scored in SQL (skills, student role, program, grad
 year, term) with "why it fits" notes, plus bring-your-own-key AI (review, re-rank, tailor, cover letter, cited Q&A).
@@ -14,7 +14,8 @@ Docs: `README.md` (technical + free hosting), `guides/using-coopradar/` (simple:
 - Backend: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0 async (typed `Mapped[]`), Alembic
 - DB: PostgreSQL 16 + pgvector (optional embeddings). Locally `start.py` runs one from the `pgserver` pip package
 - Jobs: in-process asyncio background jobs (`app/jobs.py`: `enqueue(name, *args)`, max 3 concurrent,
-  6-hourly import scheduler started in the app lifespan). No separate worker or queue.
+  6-hourly import scheduler started in the app lifespan, first pass after `INGEST_START_DELAY_SECONDS`). No separate
+  worker or queue.
 - Auth: argon2id passwords, HTTP-only session cookie → `session:<token>` in the store (`app/store.py`:
   Postgres `kv_store` table by default, Redis if `REDIS_URL` is set; 7-day rolling TTL)
 - AI: **bring your own key**. Visitors' Claude / ChatGPT / Gemini keys via `app/ai.py` (official `anthropic`,
@@ -23,15 +24,15 @@ Docs: `README.md` (technical + free hosting), `guides/using-coopradar/` (simple:
 - Frontend: React 18 + TypeScript + Vite 6, TanStack Query/Table, React Router, Tailwind, dnd-kit; Playwright e2e
 - Infra: **no Docker**. `start.py` (one command: venv, packages, site build, DB, migrate, seed, serve),
   Render Blueprint (native Python runtime; database on Neon's free plan via `DATABASE_URL`), optional Vercel front
-  (`vercel.json`: CDN pages, `/api` proxied to Render), GitHub Actions CI + `refresh-jobs.yml` (wakes the free site
-  every 6 h when the `SITE_URL` variable is set)
+  (`vercel.json`: CDN pages, `/api` proxied to Render, only `/api/postings/snapshot` cached at the edge), GitHub
+  Actions CI + `refresh-jobs.yml` (pings the free site every 10 min, 7 am to 1 am ET, when `SITE_URL` is set)
 
 ## Layout
 - `backend/app/`: `api/` routers · `services/` business logic + SQL · `schemas/` Pydantic · `models/` ORM ·
   `ingest/` career-board + feed adapters, runner, dedup, skill matching, extraction, embeddings ·
   `agent/` streamed tailor / cover letter / Q&A · `llm.py` Claude helpers ·
   `deps.py` auth deps · `store.py` session store · `jobs.py` background jobs
-- `backend/alembic/versions/` migrations (0001 to 0015) · `backend/seed/` skills, ~1,700 career boards (`job_boards.py` +
+- `backend/alembic/versions/` migrations (0001 to 0016) · `backend/seed/` skills, ~1,700 career boards (`job_boards.py` +
   `discovered_boards.json`),
   sample postings (`SEED_*` flags) · `backend/tests/` pytest
 - `frontend/src/`: `api/` (`client.ts` + query hooks) · `pages/` · `components/` · `frontend/tests/` vitest ·
@@ -42,7 +43,8 @@ Docs: `README.md` (technical + free hosting), `guides/using-coopradar/` (simple:
 - `guides/`: using-coopradar (visitors), how-it-works (builder / interviews)
 - `docs/`: DEPLOY, PROJECT_GUIDE, images/, agentic-workflow, progress, speckit-prompts, history/
 - Production: `render.yaml` builds with `pip install -e backend && npm ci/build --prefix frontend`, starts with
-  `python start.py --hosted` (migrate → seed → uvicorn on $PORT). `app/main.py → mount_frontend` serves the built site.
+  `python start.py --hosted` (migrate → uvicorn on $PORT with the seed running next to it; the seed skips itself
+  when unchanged). `app/main.py → mount_frontend` serves the built site.
 
 ## Commands
 - Run the site: `python start.py` → http://localhost:8000 (first run sets up `backend/.venv`, builds the site,
@@ -67,6 +69,8 @@ Docs: `README.md` (technical + free hosting), `guides/using-coopradar/` (simple:
 - Secrets only from env vars (`.env`, never committed). Keep `.env.example` current.
 - Ingestion uses public job-board APIs/feeds first; respect robots.txt and site terms; no scraping behind logins.
 - Matching must work without any AI key (SQL skill coverage + student fit); AI only adds to it.
+- Only replies that are the same for every visitor may be cached by the CDN (today just `/api/postings/snapshot`).
+  Anything with `is_saved` or other per user data stays uncached.
 - Small commits with conventional messages (`feat:`, `fix:`, `test:`, `docs:`, `chore:`).
 - **Never add `Co-Authored-By` trailers or any AI attribution to commits or PRs** (also enforced in `.claude/settings.json`).
 - Keep `docs/agentic-workflow.md` updated: what the AI did, what I reviewed/changed (`/log-agentic-work`).

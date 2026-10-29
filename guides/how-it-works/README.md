@@ -149,14 +149,21 @@ The backend has four layers, the same for every feature:
 
 ### 4.1 Jobs come in (the importer)
 Files: `app/ingest/boards.py`, `app/ingest/runner.py`, list of employers in `backend/seed/job_boards.py`.
-1. On start-up and every 6 hours, the scheduler imports each employer's board, three at a time, the ones that
-   waited longest first. Jobs that closed over a month ago are deleted unless someone saved them, so the free
+1. A minute after start-up and then every 6 hours, the scheduler imports each employer's board, three at a time,
+   the ones that waited longest first. Jobs that closed over a month ago are deleted unless someone saved them, so the free
    database stays small.
 2. An **adapter** per job-board system downloads the company's public job list. These APIs exist so companies'
    jobs can be shown on other sites: no keys, no scraping, and every job links back to the employer.
    - Greenhouse: the list first, then descriptions only for the jobs we keep (one board, SpaceX, is 30 MB with
      every description, too much for a free server's memory).
    - SmartRecruiters: pages of 100 job summaries, then each kept job's description.
+   - Job Bank (`app/ingest/jobbank.py`): the Government of Canada's job site has a public Atom feed for every
+     search. CoopRadar reads its student and apprentice filters plus about 30 searches for the kinds of programs
+     that have co-ops (nursing, early childhood education, trades, cooking, engineering technology, accounting...),
+     5 seconds apart as its robots.txt asks. Job Bank does not mark student jobs in the title, so "Cook" from the
+     student filter is saved as "Cook (student)", which is how the rest of the site knows it is open to students.
+     Each feed only shows the last two days, so these jobs stay open for 21 days after they leave the feed
+     (`rolling_window`) instead of closing on the next run.
 3. **Which jobs are kept** (`choose_location`): every job in Canada; in the US, only co-op, intern, student and
    new-grad roles (setting `INGEST_US_JOBS`). "Vancouver, WA" is recognized as the US, and "London" (UK) is never
    mistaken for London, Ontario.
@@ -174,6 +181,13 @@ year, location, work mode, date, term, length, company, skills), then sorts and 
 types ("Software & web", "Data & AI"...) are regexes on the job title (`services/categories.py`). The page keeps
 every filter in the URL, shows a details panel next to the list on wide screens, and shows the role (Co-op,
 Internship, New grad), computed from the title on the server.
+
+**Opening fast.** `GET /api/postings/snapshot` is the unfiltered first page, the filter choices and the first
+job's details in one reply that is the same for every visitor, so it can be cached. Vercel's CDN keeps it
+(`Cache-Control: s-maxage=300, stale-while-revalidate=604800`) and the browser saves the last one in
+localStorage. The page shows it straight away as TanStack Query placeholder data, then swaps in the real list,
+with saved jobs marked, when the server answers. If that takes more than 4 seconds a note says the server is
+waking up.
 
 ### 4.3 Uploading a resume
 No account? The page first creates a **temporary account** (7 days, rate-limited per network) with a normal
@@ -258,8 +272,15 @@ About 2,800 open jobs take roughly 50 MB, so the free 0.5 GB database has plenty
 |---|---|---|
 | Web server (API + pages) | **Render** free web service | Runs Python with no Docker; `render.yaml` sets it up |
 | Database | **Neon** free Postgres | Doesn't expire (Render's free database is deleted after 30 days); 0.5 GB is ~10x what's needed; includes pgvector |
-| Keeping jobs fresh | **GitHub Actions** (`refresh-jobs.yml`) | Render's free plan sleeps after ~15 idle minutes, and the importer only runs while awake. A scheduled workflow wakes it every 6 hours |
-| Optional nicer address | **Vercel** (`vercel.json`) | Serves the pages fast from a CDN and forwards `/api` to Render |
+| Keeping it awake | **GitHub Actions** (`refresh-jobs.yml`) | Render's free plan sleeps after ~15 idle minutes and waking takes up to a minute; the importer only runs while awake. A scheduled workflow pings it every 10 minutes from 7 am to 1 am Eastern, about 560 of Render's 750 free hours a month |
+| Fast front | **Vercel** (`vercel.json`) | Serves the pages from a CDN, caches the job snapshot so the first page opens at once even while Render sleeps, and forwards `/api` to Render |
+
+Why was the first load slow, and what fixed it? It was never the database or the code: a sleeping free server
+takes 30 to 60 seconds to start. On top of that every wake up reloaded 1,700 career boards one row at a time
+(over a minute of round trips to Neon) before the server opened its port. Now the seed keeps a fingerprint of its
+files in `kv_store` and skips itself when nothing changed, loads the boards in two SQL statements when something
+did, runs next to the server instead of before it, and the importer waits a minute so the first visitors get the
+CPU. Replies are gzipped and the hashed JS and CSS are cached for a year.
 
 Why not Vercel alone? Vercel runs code only for a moment per request, but CoopRadar needs a server that keeps
 running to import jobs on a schedule, and a database. Step-by-step setup is in the
@@ -313,7 +334,7 @@ gets a web page back instead of job data, and the site says the jobs didn't load
 
 | Question | Answer |
 |---|---|
-| *Where do the jobs come from? Is it scraping?* | No. Greenhouse, Lever, Ashby, SmartRecruiters and Workday publish public JSON APIs so companies' jobs can be shown elsewhere. No logins, no HTML scraping, and every job links to the employer to apply. |
+| *Where do the jobs come from? Is it scraping?* | No. Greenhouse, Lever, Ashby, SmartRecruiters and Workday publish public JSON APIs so companies' jobs can be shown elsewhere, and Job Bank publishes a feed for every search. No logins, no HTML scraping, robots.txt respected, and every job links to the employer or Job Bank to apply. |
 | *How do you know a job wants Computer Science students?* | At import, the description is split into sentences; only sentences mentioning a degree ("pursuing a Bachelor's in...") are checked for fields of study, so "our engineering team" doesn't count but "a degree in Engineering" does. Stored as an array and matched with Postgres array overlap. |
 | *How is the graduation year used?* | Read from the resume, or set by the student. Jobs naming their year get points and a "like you" note. Jobs naming a different year stay in but rank lower with a "check before you apply" note, since students apply widely. Jobs that don't say are kept. |
 | *Why not LinkedIn, Indeed or Glassdoor?* | Their terms forbid automated collection and most of their listings are reposts of jobs on employers' own career sites. CoopRadar reads those career sites directly (Greenhouse, Lever, Ashby, SmartRecruiters and Workday cover most big employers in every field), plus Workable's public job search and boards found through Common Crawl's free URL index, which bring in thousands of small employers. |
@@ -326,6 +347,8 @@ gets a web page back instead of job data, and the site says the jobs didn't load
 | *How does "no sign-up" stay safe?* | A temporary account with a random password nobody knows, a normal HTTP-only session cookie, a rate limit per network, deleted after 7 days unless the user adds an email and password. |
 | *How do you stop the AI making things up?* | Context-only prompts, required citations or an exact "not enough information" answer, never inventing experience, discarding job IDs it invents, and treating resume and posting text as data, not instructions. |
 | *How would it scale?* | Search and matching are indexed SQL (p95 under 300 ms on 10,000 jobs in CI). AI costs sit with users. The importer could move to a separate worker and sessions to Redis by setting `REDIS_URL`. |
+| *The free site used to take a minute to open. How did you fix it?* | Measured first: the wait was Render waking a sleeping server, plus a startup that reloaded 1,700 boards row by row. I made the first page a cacheable snapshot (same for everyone) that the CDN keeps and serves stale while it refreshes, saved it in the browser for return visits, showed an honest "waking up" note, made startup skip unchanged seed data and serve before seeding, and kept the server awake through the day with a scheduled ping that stays inside the free hours. |
+| *How do you cover programs beyond tech?* | Workday brings banks, hospitals' suppliers, energy and retail, and the Government of Canada's Job Bank brings every field: its student and apprentice filters plus searches for nursing, early childhood education, trades, hospitality and more. Job types and programs (like Hospitality, Law / Paralegal, Practical Nursing) are title and resume regexes, so new fields are a pattern and a test, not new code paths. |
 | *What would you do next?* | Email alerts for new matches, more employers (including school job boards with public feeds), and a learning-to-rank step using which jobs students save. |
 
 ---

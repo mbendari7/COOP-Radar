@@ -469,3 +469,30 @@ async def test_filter_meta_counts_countries_and_work_modes(
         "onsite": 0, "hybrid": 1, "remote": 1,
     }
     assert {"key": "computer_science", "label": "Computer Science"} in body["programs"]
+
+
+# The snapshot the site shows while the full list loads
+
+async def test_snapshot_is_the_default_view_and_can_be_cached(
+    client: AsyncClient, db_session: AsyncSession
+) -> None:
+    await add(
+        db_session,
+        make_posting(title="Data Co-op"),
+        make_posting(title="Senior Engineer"),                      # not a student role
+        make_posting(title="Software Intern", country="US", city="Austin", province="TX"),
+    )
+
+    response = await client.get("/api/postings/snapshot")
+
+    assert response.status_code == 200
+    body = response.json()
+    assert [p["title"] for p in body["postings"]["items"]] == ["Data Co-op"]
+    assert body["postings"]["total"] == 1
+    assert body["filters"]["open_jobs"] == 3
+    assert all(p["is_saved"] is None for p in body["postings"]["items"])  # nothing personal
+    assert body["first_job"]["title"] == "Data Co-op"
+    assert body["first_job"]["description"] == "A great co-op role."
+    assert body["first_job"]["low_confidence_fields"] is None
+    cache = response.headers["cache-control"]
+    assert "public" in cache and "s-maxage" in cache and "stale-while-revalidate" in cache

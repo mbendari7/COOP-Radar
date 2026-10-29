@@ -247,6 +247,14 @@ HIMALAYAS_SOURCES: list[tuple[str, dict[str, str]]] = [
     ("Himalayas remote jobs (Canada)", {"pages": "150"}),
 ]
 
+# Job Bank, the Government of Canada's job site. Jobs in every field and province: its own
+# student and apprentice filters plus searches for each kind of program (DEFAULT_QUERIES in
+# app/ingest/jobbank.py, used when the config has no queries). One source so its calls stay
+# 5 seconds apart, like Job Bank asks. No key needed
+JOBBANK_SOURCES: list[tuple[str, dict[str, str]]] = [
+    ("Job Bank jobs (Government of Canada)", {}),
+]
+
 _DISCOVERED = Path(__file__).with_name("discovered_boards.json")
 
 
@@ -300,32 +308,36 @@ async def seed_job_boards() -> None:
     entries += [(name, "github_list", config) for name, config in GITHUB_LIST_SOURCES]
     entries += [(name, "themuse", config) for name, config in MUSE_SOURCES]
     entries += [(name, "himalayas", config) for name, config in HIMALAYAS_SOURCES]
+    entries += [(name, "jobbank", config) for name, config in JOBBANK_SOURCES]
     if adzuna_configured():
         entries += [(name, "adzuna", config) for name, config in ADZUNA_SOURCES]
 
+    # Two statements for all the boards instead of two per board, since the database can be
+    # far from the server and 1,700 round trips used to add a minute to every start
+    rows = json.dumps(
+        [{"name": n, "adapter_type": a, "config": c} for n, a, c in entries]
+    )
     async with AsyncSessionLocal() as db:
-        for name, adapter_type, config in entries:
-            params = {
-                "name": name,
-                "adapter_type": adapter_type,
-                "config": json.dumps(config),
-            }
-            await db.execute(
-                text(
-                    "INSERT INTO ingest_sources (id, name, adapter_type, config) "
-                    "SELECT gen_random_uuid(), :name, :adapter_type, CAST(:config AS jsonb) "
-                    "WHERE NOT EXISTS (SELECT 1 FROM ingest_sources WHERE name = :name)"
-                ),
-                params,
-            )
-            await db.execute(
-                text(
-                    "UPDATE ingest_sources SET adapter_type = :adapter_type, "
-                    "config = CAST(:config AS jsonb), auto_paused = false, consecutive_failures = 0 "
-                    "WHERE name = :name AND adapter_type <> :adapter_type"
-                ),
-                params,
-            )
+        await db.execute(
+            text(
+                "INSERT INTO ingest_sources (id, name, adapter_type, config) "
+                "SELECT gen_random_uuid(), r.name, r.adapter_type, r.config "
+                "FROM jsonb_to_recordset(CAST(:rows AS jsonb)) "
+                "AS r(name text, adapter_type text, config jsonb) "
+                "WHERE NOT EXISTS (SELECT 1 FROM ingest_sources s WHERE s.name = r.name)"
+            ),
+            {"rows": rows},
+        )
+        await db.execute(
+            text(
+                "UPDATE ingest_sources s SET adapter_type = r.adapter_type, config = r.config, "
+                "auto_paused = false, consecutive_failures = 0 "
+                "FROM jsonb_to_recordset(CAST(:rows AS jsonb)) "
+                "AS r(name text, adapter_type text, config jsonb) "
+                "WHERE s.name = r.name AND s.adapter_type <> r.adapter_type"
+            ),
+            {"rows": rows},
+        )
         await db.commit()
     print(f"Seeded {len(entries)} employer career boards and job feeds.")
 

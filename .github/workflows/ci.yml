@@ -169,8 +169,9 @@ jobs:
       - name: Start the site
         run: |
           python start.py --hosted > site.log 2>&1 &
+          # The host serves first and loads the sample jobs next to the server, so wait for both
           for i in $(seq 1 60); do
-            curl -fsS http://localhost:8080/api/health && exit 0
+            if curl -fsS http://localhost:8080/api/postings 2>/dev/null | grep -q '"total":[1-9]'; then exit 0; fi
             sleep 2
           done
           cat site.log
