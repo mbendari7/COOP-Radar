@@ -11,7 +11,7 @@ tailoring and cover letters.
 
 [![CI](https://github.com/mbendari7/COOP-Radar/actions/workflows/ci.yml/badge.svg)](https://github.com/mbendari7/COOP-Radar/actions/workflows/ci.yml)
 
-**Live site:** [coopradar-u7in.onrender.com](https://coopradar-u7in.onrender.com) ·
+**Live site:** [COOPRadar](https://coop-radar-qdrc.vercel.app/) ·
 **Students:** [Using CoopRadar](guides/using-coopradar/README.md) ·
 **Builders and interviews:** [How it works](guides/how-it-works/README.md) ·
 **Running the site:** [Owner's handbook](guides/owner-handbook/README.md)
