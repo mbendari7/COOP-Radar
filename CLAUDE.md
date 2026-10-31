@@ -8,7 +8,7 @@ graduation year are read from it, and open jobs are filtered and scored in SQL (
 year, term) with "why it fits" notes, plus bring-your-own-key AI (review, re-rank, tailor, cover letter, cited Q&A).
 Also job-board search (list + details panel, all filters) and an application tracker.
 
-Docs: `README.md` (technical + free hosting), `guides/using-coopradar/` (simple: for visitors), `guides/how-it-works/` (stack, flow, how to explain it), `docs/PROJECT_GUIDE.md` (every module), `docs/DEPLOY.md` (other hosts).
+Docs: `README.md` (front door: overview, screenshots, map of every doc, run, free hosting), `guides/using-coopradar/` (simple: for visitors), `guides/owner-handbook/` (running the live site, common changes), `guides/how-it-works/` (stack, flow, how to explain it), `docs/PROJECT_GUIDE.md` (every module), `docs/DEPLOY.md` (other hosts). Keep their numbers in step when sources, tests or migrations change.
 
 ## Stack
 - Backend: Python 3.12, FastAPI, Pydantic v2, SQLAlchemy 2.0 async (typed `Mapped[]`), Alembic
@@ -40,7 +40,7 @@ Docs: `README.md` (technical + free hosting), `guides/using-coopradar/` (simple:
 - `specs/NNN-*/` Spec Kit feature specs · `.specify/` Spec Kit config, templates, constitution
 - `.claude/skills/`: `speckit-*` workflow skills + project skills (api-conventions, frontend-tables,
   agent-tools, db-migration, log-agentic-work)
-- `guides/`: using-coopradar (visitors), how-it-works (builder / interviews)
+- `guides/`: using-coopradar (visitors), owner-handbook (running the site), how-it-works (builder / interviews)
 - `docs/`: DEPLOY, PROJECT_GUIDE, images/, agentic-workflow, progress, speckit-prompts, history/
 - Production: `render.yaml` builds with `pip install -e backend && npm ci/build --prefix frontend`, starts with
   `python start.py --hosted` (migrate → uvicorn on $PORT with the seed running next to it; the seed skips itself

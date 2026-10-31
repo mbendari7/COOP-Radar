@@ -10,7 +10,7 @@ web
 Canadian university and college students looking for co-op terms and internships. They usually sit at a laptop between classes, scan a lot of postings at once, and want to know quickly which ones they actually qualify for. The site is also a portfolio piece, so recruiters and interviewers looking at the builder's work are a second audience and need to get it within half a minute.
 
 ## Product Purpose
-CoopRadar pulls real open jobs from about 170 employers' public career boards (Greenhouse, Lever, Ashby, SmartRecruiters, Workday) across Canada, plus US student roles. It reads each description for the programs and graduation years it asks for. A student drops in a resume with no sign up, the site reads their program, degree and grad year, and shows matching jobs with plain notes on why each one fits. Success means a student finds roles they qualify for faster than on a general job board, and applies on the employer's own site.
+CoopRadar pulls real open jobs from about 1,700 employers' public career boards (Greenhouse, Lever, Ashby, SmartRecruiters, Workday and more) and public job feeds such as the Government of Canada's Job Bank, across Canada in every field, plus US student roles. It reads each description for the programs and graduation years it asks for. A student drops in a resume with no sign up, the site reads their program, degree and grad year, and shows matching jobs with plain notes on why each one fits. Success means a student finds roles they qualify for faster than on a general job board, and applies on the employer's own site.
 
 ## Positioning
 Matching runs in SQL against the student's real program, grad year and term, so it works with no AI at all. AI is optional and uses the visitor's own key. Jobs come straight from employer boards, not from a reposting aggregator.
@@ -25,7 +25,7 @@ Sorting, filtering and pagination happen on the server. Visitors' AI keys are ne
 Name: CoopRadar. Voice is plain and human: short sentences, simple words, minimal punctuation, no dashes, no emoji in the UI. Everything visual is open to change (confirmed 2026-10-13).
 
 ## Evidence on Hand
-Real postings from the live import (about 2,800 jobs). No testimonials, user counts, or partner schools exist, so none may be shown.
+Real postings from the live import (about 13,700 jobs in a full import). No testimonials, user counts, or partner schools exist, so none may be shown.
 
 ## Product Principles
 1. Show students what they qualify for, not just what exists.

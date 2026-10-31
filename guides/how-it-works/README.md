@@ -3,7 +3,8 @@
 This guide is for the person who built CoopRadar: what every technology does and why it's there, what happens
 step by step when someone uses the site, and how to talk about it with an employer or in an interview.
 
-> Using the site: [Using CoopRadar](../using-coopradar/README.md) · Every module in depth:
+> Using the site: [Using CoopRadar](../using-coopradar/README.md) · Running the live site:
+> [Owner's handbook](../owner-handbook/README.md) · Every module in depth:
 > [docs/PROJECT_GUIDE.md](../../docs/PROJECT_GUIDE.md) · Hosting details: [docs/DEPLOY.md](../../docs/DEPLOY.md)
 
 - [1. The short version](#1-the-short-version)
@@ -22,17 +23,19 @@ step by step when someone uses the site, and how to talk about it with an employ
 
 ## 1. The short version
 
-CoopRadar is a full-stack job site for co-op students. A background importer pulls real jobs from about 170
-employers' public career-board APIs (Greenhouse, Lever, Ashby, SmartRecruiters, Workday) into PostgreSQL: every job in
-Canada, plus US internships. While importing, it reads each job description for the programs of study and
-graduation years it asks for. A student uploads a resume (no sign-up); the app reads their program, degree and
-graduation year from it, then ranks open jobs in SQL by skills, student fit, program, graduation year and co-op
-term, and explains each match in plain words. An optional bring-your-own-key AI layer (Claude, ChatGPT or Gemini)
-adds resume reviews, tailoring and cover letters.
+CoopRadar is a full-stack job site for co-op students. A background importer pulls real jobs from about 1,700
+employers' public career board APIs (Greenhouse, Lever, Ashby, SmartRecruiters, Workday and a few more) and from
+public job feeds (the Government of Canada's Job Bank, Workable, Simplify's lists, The Muse, Himalayas) into
+PostgreSQL: every job in Canada, plus US student roles, about 13,700 open jobs in a full import. While importing,
+it reads each job description for the term, length, programs of study and graduation years it asks for. A student
+uploads a resume (no sign-up); the app reads their program, degree and graduation year from it, then ranks open
+jobs in SQL by skills, student fit, program, graduation year, term and length, and explains each match in plain
+words. An optional bring-your-own-key AI layer (Claude, ChatGPT or Gemini) adds resume reviews, tailoring and cover
+letters.
 
 **Stack in one line:** React + TypeScript (Vite, Tailwind, TanStack) on a Python FastAPI backend with PostgreSQL,
 SQLAlchemy and Alembic, tested with pytest, Vitest and Playwright, run by one `python start.py`, hosted free on
-Render + Neon, with GitHub Actions for CI.
+Render + Neon with an optional Vercel front, with GitHub Actions for CI.
 
 ---
 
@@ -85,8 +88,8 @@ are in `PRODUCT.md` and the finished design system is written down in `DESIGN.md
 | **Pydantic v2** | Data validation | Every request and response has a schema; bad input becomes a clean 422 error | `backend/app/schemas/` |
 | **SQLAlchemy 2.0** (async) | The database toolkit / ORM | Typed models and safe, composable SQL queries (every filter is a bound parameter, never string-built SQL) | `backend/app/models/`, `services/` |
 | **asyncpg** | Postgres driver | Fast async connection to the database | used by SQLAlchemy |
-| **Alembic** | Database migrations | Every schema change is a numbered, reversible script (0001 to 0014) | `backend/alembic/versions/` |
-| **httpx** | Async HTTP client | Calls the employers' career-board APIs | `backend/app/ingest/boards.py` |
+| **Alembic** | Database migrations | Every schema change is a numbered, reversible script (0001 to 0016) | `backend/alembic/versions/` |
+| **httpx** | Async HTTP client | Calls the employers' career board APIs and the job feeds | `backend/app/ingest/` |
 | **asyncio background jobs** | Python's built-in concurrency | Runs the importer every 6 hours inside the web server, so there's no separate worker to host | `backend/app/jobs.py` |
 | **argon2** | Password hashing | The current recommended way to store passwords | `backend/app/services/auth.py` |
 | **pypdf, python-docx** | Read PDF and Word files | Pull the text out of uploaded resumes | `backend/app/services/resume.py` |
@@ -130,8 +133,9 @@ flowchart LR
     end
     API --> DB[("PostgreSQL<br/>jobs · users · resumes · sessions")]
     JOBS --> DB
-    JOBS -->|"public JSON APIs"| BOARDS["~1,700 employer career boards<br/>Greenhouse · Lever · Ashby · SmartRecruiters · Workday"]
+    JOBS -->|"public JSON APIs and feeds"| BOARDS["~1,700 employer career boards + job feeds<br/>Greenhouse · Lever · Workday · Job Bank · Workable · ..."]
     API -->|"only with the visitor's own key"| AI["Claude · ChatGPT · Gemini"]
+    CDN["Vercel CDN<br/>pages + job snapshot"] -.->|"first page while Render wakes"| B
 ```
 
 The backend has four layers, the same for every feature:
@@ -148,7 +152,15 @@ The backend has four layers, the same for every feature:
 ## 4. What happens, step by step
 
 ### 4.1 Jobs come in (the importer)
-Files: `app/ingest/boards.py`, `app/ingest/runner.py`, list of employers in `backend/seed/job_boards.py`.
+Files: `app/ingest/` (one adapter per source, plus `runner.py`), the sources in `backend/seed/job_boards.py` and
+`discovered_boards.json`.
+
+| Kind of source | Adapters |
+|---|---|
+| Employer career boards (about 1,700) | `boards.py` (Greenhouse, Lever, Ashby, SmartRecruiters), `workday.py`, `ats.py` (Recruitee, BambooHR, Rippling), `oracle.py` |
+| Job feeds and searches | `jobbank.py` (Government of Canada), `workable.py`, `themuse.py`, `himalayas.py`, `adzuna.py` (optional key) |
+| Public student lists on GitHub | `simplify.py`, `github_lists.py` |
+
 1. A minute after start-up and then every 6 hours, the scheduler imports each employer's board, three at a time,
    the ones that waited longest first. Jobs that closed over a month ago are deleted unless someone saved them, so the free
    database stays small.
@@ -172,8 +184,13 @@ Files: `app/ingest/boards.py`, `app/ingest/runner.py`, list of employers in `bac
    Bachelor's in Computer Science, Engineering or a related field") are scanned for fields of study, and text after
    "graduating" or "class of" for years ("graduating in December 2027 or spring 2028" gives 2027 and 2028). These
    are stored on the job as `fields_of_study` and `grad_years`.
-6. Skills are tagged from a 106-skill list, duplicates are skipped, jobs that disappeared are closed, and a board
-   that fails three times in a row pauses itself.
+6. **Term and length** (`app/ingest/terms.py`): "Summer 2027", "Fall '27", "May to August", "4 month co-op" and
+   similar are read from the title and description. Postgres turns the term into a season and a start date with
+   generated columns, so filters and sorts stay in SQL.
+7. Skills are tagged from the skills list in `seed/skills.py`, duplicates are skipped, jobs that disappeared are
+   closed, and a source that fails three times in a row pauses itself.
+8. To keep the free database's monthly data transfer low, a re-import never reads the stored descriptions back
+   (the feed brings a fresh copy), and the skills list is read at most once an hour.
 
 ### 4.2 Browsing jobs
 `GET /api/postings` builds **one SQL query** from the filters (job type, level, country, program, graduation
@@ -204,11 +221,10 @@ Anything the student picked themselves wins; blanks are filled from the resume.
 
 ### 4.5 Matching (free, in SQL, no AI)
 `app/services/resume.py`:
-1. **Filters**: only open jobs that fit the student. Job types are the ones they picked or, if none, the ones
-   their program leads to (Business leads to business, product and marketing roles). Countries, location (remote
-   always counts), work mode, level, and graduation year: a job asking for a *different* year is dropped; jobs that
-   don't say stay in.
-2. **Score** (out of 100), all in one SQL expression:
+1. **Filters** (only the hard choices): open jobs of the job types they picked or, if none, the ones their program
+   leads to (Business leads to business, product and marketing roles), in their countries, location (remote always
+   counts), work mode and level. Everything else ranks instead of hiding, because students apply widely.
+2. **Score** (out of 100), all in one SQL expression (`_W_*` constants in `resume.py`):
 
    | Part | Points |
    |---|---|
@@ -216,15 +232,21 @@ Anything the student picked themselves wins; blanks are filled from the resume.
    | Co-op, intern, student or new-grad title | 15 |
    | The description names the student's field of study | 10 |
    | It names their graduation year | 5 |
-   | It's for the co-op term they want | 5 |
+   | It's for the co-op term or season they want | 5 |
+   | It's the length they want | 5 |
    | Matches the keywords they typed | +20 |
+   | It asks for a *different* graduation year | minus 10 |
 
-   Only a job that fits on every count reaches 100.
+   Capped at 100, so only a job that fits on almost every count reaches it.
 3. **Why it fits**: each match gets plain reasons built from the same data: "Internship", "Asks for Computer
    Science / Software, which fits your program", "For students graduating in 2028, like you", "Summer 2027 term,
-   the one you want", "For students still in school", "4 of 5 listed skills on your resume".
-4. The top 20 are stored. With the student's AI key, **Re-rank with my AI** sends the ~40 best to their AI to
+   the one you want", "4 of 5 listed skills on your resume", or a warning like "Asks for 2026 grads. You finish
+   in 2028, so check before you apply".
+4. Up to 60 are stored. With the student's AI key, **Re-rank with my AI** sends a shortlist to their AI to
    re-score; invented job IDs are dropped and it falls back to the free ranking if the reply is unusable.
+5. **Make your resume fit this job** (`services/align.py`, `GET /api/resume/align/{id}`): free checks (skills,
+   program, grad year, an availability line, numbers in bullets), the edits to make in order, and the job's own
+   words split into ones the resume has and ones worth adding if true.
 
 ### 4.6 The AI extras (bring your own key)
 The key stays in the browser and is sent as headers only on AI requests. `app/ai.py` wraps the three official SDKs
@@ -247,18 +269,19 @@ cite their sources. Tailoring and cover letters stream word by word (Server-Sent
 | `kv_store` | login sessions and rate-limit counters |
 | `posting_embeddings` | optional vectors for smart search |
 
-About 2,800 open jobs take roughly 50 MB, so the free 0.5 GB database has plenty of room.
+The free Neon database has 0.5 GB. It stays small because US jobs are limited to student roles, jobs that closed
+over 30 days ago are deleted (unless someone saved them), and only resume text is kept, never the file.
 
 ---
 
 ## 6. How it's tested
 
-- **Backend: about 290 pytest tests.** Every API endpoint, the importers (with recorded API responses, never the
-  real internet), education reading, matching and scoring, a check that `vercel.json` forwards `/api` with its
-  path, and a speed test: p95 under 300 ms on 10,000 jobs.
-- **Frontend: 45 Vitest tests** for the filters, job list, resume page and date handling.
-- **End-to-end: 7 Playwright tests** that open the real site in a browser: search, quick filters, the All filters
-  panel, the details panel, uploading a resume and seeing "We read your resume: Computer Science...", and the phone
+- **Backend: 457 pytest tests.** Every API endpoint, every importer (with recorded API responses, never the
+  real internet), education, term and length reading, matching and scoring, the snapshot, a check that
+  `vercel.json` forwards `/api` with its path, and a speed test: p95 under 300 ms on 10,000 jobs.
+- **Frontend: 72 Vitest tests** for the filters, job rows and details, resume page, AI key and date handling.
+- **End-to-end: 9 Playwright tests** that open the real site in a browser: search, the filter sidebar, the details
+  panel, uploading a resume and seeing "We read your resume: Computer Science...", file checks, and the phone
   layout.
 - **CI** (`.github/workflows/ci.yml`) runs on every push: lint, types, migrations up, down and up again, a check
   that the models match the migrations, all tests, then builds and starts the real site exactly like the host does
@@ -297,28 +320,30 @@ gets a web page back instead of job data, and the site says the jobs didn't load
 ### 30 seconds (to a student)
 > "Upload your resume and CoopRadar shows you the co-op jobs you're actually a fit for. It reads your program and
 > graduation year from your resume, checks what each job description asks for, and tells you why each job fits and
-> which skills you're missing. About 2,800 real jobs from 120 employers, refreshed every few hours. Free, no
-> sign-up."
+> which skills you're missing. Over 13,000 real jobs from about 1,700 employers and the government's Job Bank,
+> in every field, refreshed every few hours. Free, no sign-up."
 
 ### 30 seconds (to an engineer or employer)
 > "It's a full-stack app: React and TypeScript on FastAPI and PostgreSQL. A background importer pulls jobs from
-> about 170 employers' public job-board APIs every six hours and extracts structured data from the descriptions,
-> like the programs and graduation years each job wants. Matching runs entirely in SQL: one query filters and scores
-> every open job by skill coverage, student fit, program, graduation year and term, and the app explains each
-> match. There's an optional bring-your-own-key AI layer. It's one command to run locally, hosted free on Render and
-> Neon, and CI runs about 340 tests including Playwright in a real browser."
+> about 1,700 employers' public job-board APIs and government job feeds every six hours and extracts structured
+> data from the descriptions, like the term, length, programs and graduation years each job wants. Matching runs
+> entirely in SQL: one query filters and scores every open job by skill coverage, student fit, program, graduation
+> year, term and length, and the app explains each match. There's an optional bring-your-own-key AI layer. It's
+> one command to run locally, hosted free on Render and Neon with a CDN snapshot so it opens instantly, and CI runs
+> over 500 tests including Playwright in a real browser."
 
 ### 2 minutes (follow the data)
-1. **Data in.** Adapters for four applicant-tracking systems, with location rules (Canada; US internships only) and
-   memory-aware fetching. Descriptions are parsed for fields of study and graduation years.
+1. **Data in.** Adapters for nine hiring systems and seven public feeds and lists, with location rules (Canada; US student
+   roles only) and memory-aware fetching. Descriptions are parsed for term, length, fields of study and graduation
+   years.
 2. **Search.** Every filter is a SQL clause; the frontend keeps them in the URL; the job board layout shows the list
    and the details side by side.
 3. **Resume in.** No sign-up: a temporary account. Education is read from the resume.
-4. **Matching.** One SQL query: filters, a weighted score, top 20, with plain "why it fits" reasons. No AI needed,
-   so it's free and instant.
+4. **Matching.** One SQL query: hard filters, a weighted score, up to 60 results, with plain "why it fits"
+   reasons and a free "make your resume fit" check per job. No AI needed, so it's free and instant.
 5. **AI, optional.** The visitor's own key; prompts treat documents as data; results are validated and streamed.
-6. **Quality.** Strict types on both sides, about 340 tests, CI that boots the real site, free hosting with a
-   scheduled job to keep it fresh.
+6. **Quality.** Strict types on both sides, over 500 tests, CI that boots the real site, free hosting with a
+   cached first page and a scheduled job to keep it awake.
 
 ### What you can say you learned
 - Designing a data pipeline around real, messy external data (locations, missing deadlines, duplicates, huge
@@ -336,11 +361,11 @@ gets a web page back instead of job data, and the site says the jobs didn't load
 |---|---|
 | *Where do the jobs come from? Is it scraping?* | No. Greenhouse, Lever, Ashby, SmartRecruiters and Workday publish public JSON APIs so companies' jobs can be shown elsewhere, and Job Bank publishes a feed for every search. No logins, no HTML scraping, robots.txt respected, and every job links to the employer or Job Bank to apply. |
 | *How do you know a job wants Computer Science students?* | At import, the description is split into sentences; only sentences mentioning a degree ("pursuing a Bachelor's in...") are checked for fields of study, so "our engineering team" doesn't count but "a degree in Engineering" does. Stored as an array and matched with Postgres array overlap. |
-| *How is the graduation year used?* | Read from the resume, or set by the student. Jobs naming their year get points and a "like you" note. Jobs naming a different year stay in but rank lower with a "check before you apply" note, since students apply widely. Jobs that don't say are kept. |
+| *How is the graduation year used?* | Read from the resume, or set by the student. Jobs naming their year get 5 points and a "like you" note. Jobs naming a different year lose 10 points and get a "check before you apply" note, but stay in, since students apply widely. Jobs that don't say are treated as open. |
 | *Why not LinkedIn, Indeed or Glassdoor?* | Their terms forbid automated collection and most of their listings are reposts of jobs on employers' own career sites. CoopRadar reads those career sites directly (Greenhouse, Lever, Ashby, SmartRecruiters and Workday cover most big employers in every field), plus Workable's public job search and boards found through Common Crawl's free URL index, which bring in thousands of small employers. |
 | *How do you know the term and length?* | `app/ingest/terms.py` reads them with plain rules: "Summer 2027", "Fall '27", "S27", "(January 2027)" in a title, "May to August", "4 month co-op", "12 week internship", "one year contract". Lengths round to the usual co-op lengths. Months next to "experience" or "graduation" are ignored. Postgres turns the term into a season and a start date with generated columns so filters and sorts stay in SQL. |
-| *Why match in SQL before AI?* | SQL scores every open job in one query, instantly and for free, and works for users without a key. AI is slower and costs money, so it only re-ranks a 40-job shortlist when the user asks. |
-| *Why are the weights 65 / 15 / 10 / 5 / 5?* | Skills matter most, but a student should see co-op roles and roles for their program above a senior job they happen to match. Earlier versions added bonuses on top and too many jobs hit 100, which made scores meaningless; now only a job that fits on every count reaches 100. There are tests pinning the numbers. |
+| *Why match in SQL before AI?* | SQL scores every open job in one query, instantly and for free, and works for users without a key. AI is slower and costs money, so it only re-ranks a shortlist when the user asks. |
+| *Why are the weights 65 / 15 / 10 / 5 / 5 / 5?* | Skills matter most, but a student should see co-op roles and roles for their program above a senior job they happen to match. Earlier versions added bonuses on top and too many jobs hit 100, which made scores meaningless; now only a job that fits on every count reaches 100. There are tests pinning the numbers. |
 | *Why include US jobs?* | Many Canadian co-op students do a US term. Only student roles are imported from the US (configurable), so the database stays small and focused. |
 | *A board's API returned 30 MB. What did you do?* | For Greenhouse I switched to fetching the list without descriptions, filtering it, then fetching descriptions only for kept jobs, a few at a time. Memory stays low on a 512 MB free server. |
 | *What if a job board changes or goes down?* | Only that source fails. The run is logged, it pauses itself after three failures, and the others keep working. Adapters are tested against recorded responses. |
@@ -357,7 +382,10 @@ gets a web page back instead of job data, and the site says the jobs didn't load
 
 | I want to change... | Look in |
 |---|---|
-| Which employers are imported | `backend/seed/job_boards.py` |
+| Which employers are imported | `backend/seed/job_boards.py` (hand picked), `discovered_boards.json` (found by `discover_boards.py`) |
+| Job Bank searches | `DEFAULT_QUERIES` in `backend/app/ingest/jobbank.py` |
+| How term and length are read | `backend/app/ingest/terms.py` |
+| Make your resume fit | `backend/app/services/align.py`, `frontend/src/components/ResumeFitPanel.tsx` |
 | Canada-only, or which US jobs | `INGEST_LOCATION_FILTER`, `INGEST_US_JOBS` (`backend/app/config.py`) |
 | Programs, fields of study, graduation year rules | `backend/app/services/education.py` |
 | Job types and their title patterns | `backend/app/services/categories.py` |

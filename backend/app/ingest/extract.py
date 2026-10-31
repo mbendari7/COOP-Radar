@@ -6,6 +6,7 @@ Two steps
   2. If we are less than 0.6 sure, ask Claude (FAST_MODEL) for the fields
 """
 
+import time
 from dataclasses import dataclass, field
 from typing import Any
 
@@ -26,6 +27,30 @@ class ExtractedFields:
     confidence_map: dict[str, float] = field(default_factory=dict)
 
 
+# The skills list only changes when the seed runs, but this used to read it once per new job.
+# An hour old is fine, and saves the free database's monthly transfer
+_TAXONOMY_TTL = 3600.0
+_taxonomy_cache: tuple[float, list[tuple[str, list[str]]]] | None = None
+
+
+def clear_skill_taxonomy_cache() -> None:
+    global _taxonomy_cache
+    _taxonomy_cache = None
+
+
+async def _skill_taxonomy(db: AsyncSession) -> list[tuple[str, list[str]]]:
+    """Every skill and its aliases, from the database at most once an hour."""
+    from app.models.skill import Skill
+
+    global _taxonomy_cache
+    if _taxonomy_cache is not None and time.monotonic() - _taxonomy_cache[0] < _TAXONOMY_TTL:
+        return _taxonomy_cache[1]
+    rows = (await db.execute(select(Skill.name, Skill.aliases))).all()
+    taxonomy = [(row[0], row[1]) for row in rows]
+    _taxonomy_cache = (time.monotonic(), taxonomy)
+    return taxonomy
+
+
 async def extract_fields(db: AsyncSession, text: str) -> ExtractedFields:
     """
     Pull structured fields out of raw job text.
@@ -33,12 +58,7 @@ async def extract_fields(db: AsyncSession, text: str) -> ExtractedFields:
     Step 1 matches words against the skills list
     Step 2 asks Claude (FAST_MODEL) when we are less than 0.6 sure
     """
-    from app.models.skill import Skill
-
-    # Load the skills list from the database
-    stmt = select(Skill.name, Skill.aliases)
-    rows = (await db.execute(stmt)).all()
-    taxonomy: list[tuple[str, list[str]]] = [(row[0], row[1]) for row in rows]
+    taxonomy = await _skill_taxonomy(db)
 
     # Step 1 is plain matching
     matched_skills = match_skills(taxonomy, text)

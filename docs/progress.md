@@ -1,6 +1,6 @@
 # CoopRadar — Progress Log
 
-## Current status (2026-10-10)
+## Current status (2026-10-31)
 
 | Feature | Status |
 |---|---|
@@ -93,13 +93,20 @@ Vitest, lint, tsc, build; hosted mode run locally; a live Job Bank import; a bro
 8 s showed the jobs and details in about a second; Playwright 9 of 9 against a local site. Not verified: the Vercel CDN caching and the keep awake
 workflow on the real hosts.
 
+2026-10-31: lighter on Neon's free data transfer (job lists and re-imports skip descriptions, `search_vector` is
+deferred, filter menus cached 2 minutes, the skills list an hour). Docs brought up to date: the README is now the
+front door with a map of every doc, a sources table, new screenshots (jobs, matches, resume fit, tracker, phone)
+and current numbers (about 1,700 sources, about 13,700 jobs, 457 + 72 + 9 tests, migrations to 0016). New
+`guides/owner-handbook/` for running the live site. Both guides, PROJECT_GUIDE, DEPLOY and PRODUCT corrected
+(matching is lenient: up to 60 matches, length weight, other grad years lose 10 points instead of being hidden).
+
 ## Open work
 
 1. ~~Merge everything into `main`~~ (done 2026-10-10).
 2. First live run with real API keys; run `python -m app.ingest.embed` so matching has vectors to search.
 3. Add a real public job-board source (check its terms + robots.txt; document it in the plan).
 4. Remaining spec-004 scope: agent tools + MCP server + `agent_runs` + YAML eval runner (see the agent-tools skill).
-5. Deploy it (README "Host it for free": Render + Neon) and put the live link at the top of the README.
+5. ~~Deploy it and put the live link at the top of the README~~ (done: Render + Neon + Vercel).
 6. Observability: error tracking and a small usage dashboard.
 
 ## History

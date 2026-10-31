@@ -450,3 +450,31 @@ hosted mode run locally (sample jobs ready in 12 s, seed skipped on restart); br
 hosts, a full import of every Job Bank search on the hosted database.
 
 **What I reviewed / changed**: _(fill in after reviewing the diff)_
+
+## 2026-10-31. Docs brought up to date, new screenshots, owner's handbook
+
+**What the AI assistant did**:
+- Asked: update the README with new screenshots and current information, update every guide for new users and for
+  the owner, make the README the main, organised document, and go through all the files and the architecture.
+- Read every doc against the code and found them out of step: guides still said 120 to 170 employers, 2,800 jobs,
+  290 to 340 tests, migrations to 0014, "top 20" matches, and that jobs for another grad year are hidden. The code
+  now has about 1,700 sources, 457 + 72 + 9 tests, migrations to 0016, up to 60 matches, a length weight, and other
+  grad years lose 10 points but stay in.
+- New screenshots taken in Edge with Playwright against a local site (13,688 open jobs): jobs page with the
+  details panel, matches, Make your resume fit, the tracker board, and the phone layout.
+- README rewritten as the front door: contents, a "which document do I read" table, features, a new "where the jobs
+  come from" sources table, architecture, corrected scoring table, stack, run, host, load fast (with the new data
+  transfer savings), configuration, a fuller API table, an updated project tree, testing, security, roadmap.
+- New `guides/owner-handbook/`: what runs where, a weekly check, making yourself admin, free plan limits, common
+  changes (employers, discovered boards, Job Bank searches, job types, scoring, design, migrations), before you
+  push, when something breaks, refreshing the screenshots.
+- Updated `guides/README.md`, `using-coopradar` (sidebar term filters, Get new jobs for this search, 60 matches,
+  lenient grad year, screenshots), `how-it-works` (sources, term reading, scoring, align, numbers, pitches),
+  PROJECT_GUIDE (adapter types, migrations 0012 to 0016, new modules and components, page sizes, tests),
+  DEPLOY (start order, job counts, env table), PRODUCT, progress, CLAUDE.md.
+
+**Results (actual runs)**: test counts from `pytest --collect-only` (457) and the test files (72 Vitest, 9
+Playwright); job counts from the local `/api/postings/meta/filters`. Docs only, no code changed in this session.
+Not run: the test suites themselves, and the live site was not checked for its current job count.
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_

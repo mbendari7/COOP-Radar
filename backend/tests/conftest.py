@@ -111,10 +111,12 @@ def mock_redis() -> MockRedis:
 
 @pytest.fixture(autouse=True)
 def fresh_category_counts() -> None:
-    """Each test adds its own jobs so do not reuse job type counts between tests."""
+    """Each test adds its own jobs and skills, so do not reuse cached counts between tests."""
+    from app.ingest.extract import clear_skill_taxonomy_cache
     from app.services.postings import clear_category_counts_cache
 
     clear_category_counts_cache()
+    clear_skill_taxonomy_cache()
 
 
 @pytest.fixture(autouse=True)

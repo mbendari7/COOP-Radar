@@ -21,8 +21,8 @@ matched to your program, your graduation year and your skills, using what each j
 
 ## 1. Open the site
 
-If someone shared a link with you, just open it. That's all. There's nothing to install and you don't need an
-account.
+Open **[coopradar-u7in.onrender.com](https://coopradar-u7in.onrender.com)**, or the link someone shared with you.
+That's all. There's nothing to install and you don't need an account. It works on a phone too.
 
 > The newest co-op jobs show up right away. On the free hosting plan the server can be asleep (mostly late at
 > night). Then a small blue note says it is waking up: you can already scroll the jobs, and searching or opening
@@ -34,6 +34,8 @@ account.
 
 The **Find jobs** page works like Indeed or LinkedIn. The look is borrowed from a Canadian post office: a red bar
 at the top, plain white rows split by thin lines, and a round **postmark** on the job you're reading.
+
+![The Find jobs page: search row, filters on the left, the list in the middle and the picked job on the right](../../docs/images/jobs.png)
 
 **Search bar.** Type a job title, keyword or company in the first box ("data analyst", "React", "Shopify"), pick a
 province or state in the second, and click **Find jobs**.
@@ -76,16 +78,17 @@ CoopRadar never applies for you. You always apply on the employer's own website.
 
 Every job shows its work term, when it runs and how long it is, like **Summer 2027 · May to Aug · 4 months**, with
 a small coloured dot for the season (blue for Winter, amber for Summer, orange for Fall). The length is what the job
-says, so a 6 month job shows 6 months. Use the **Any term** and **Any length** menus in the strip above the results,
-or **All filters**, to pick seasons and lengths. "About 8 months" also finds 6 to 9 month jobs. **Sort by** can put
-the soonest term first (terms that already started go to the bottom), or the shortest or longest first. Jobs that
-don't say their term or length show "Not stated".
+says, so a 6 month job shows 6 months. Pick seasons under **Work term** and lengths under **Length** at the top of
+the filters; each one shows how many jobs it has. "About 8 months" also finds 6 to 9 month jobs. The sort menu can
+put the soonest term first (terms that already started go to the bottom), or the shortest or longest first. Jobs
+that don't say their term or length show "Not stated". To pick one exact term, like Summer 2027, open **More** at
+the bottom of the filters.
 
 Most employers never write the term in the post, so picking **Winter** would hide most real co-op jobs. When you
-pick a term or a length, **Also show jobs that don't say their term or length** is on: jobs that say Winter come
-first, then the jobs that don't say, so you still see everything you could apply to. Untick it to see only the jobs
-that name the term. A term that already started, like Winter 2026 in October 2026, never counts as Winter. Pick
-**100** under **Per page** at the bottom to go through lots of jobs quickly.
+pick a term or a length, **Also show jobs that don't say** is ticked: jobs that say Winter come first, then the jobs
+that don't say, so you still see everything you could apply to. Untick it to see only the jobs that name the term.
+A term that already started, like Winter 2026 in October 2026, never counts as Winter. Pick **100** per page at the
+bottom of the list to go through lots of jobs quickly.
 
 **Work term and graduation year are different things.** The work term is when you'd work, like Summer 2027. The
 graduation year is when you finish school, like 2029. A job that asks for a graduation year shows **Grad year 2029**
@@ -94,8 +97,9 @@ on its own, and the **Graduation year** filter only hides jobs that ask for a di
 ### Get new jobs as they come in
 
 CoopRadar checks every employer every 6 hours. When you come back, a blue bar says how many jobs for your search are
-new since your last visit, with a button to show only those. **Sort by: Newly added to CoopRadar** lists the newest
-first. To get new jobs without opening the site, set your filters, click **Get updates** and copy the feed link into
+new since your last visit, with a button to show only those. Sorting by **Newly added to CoopRadar** lists the newest
+first. To get new jobs without opening the site, set your filters, open **Get new jobs for this search** at the
+bottom of the filters and copy the feed link into
 a feed reader (like Feedly or Inoreader) or a feed to email service (like Blogtrottr). New jobs for that exact search
 then come to you.
 
@@ -124,7 +128,7 @@ You don't need to sign up. The site makes you a **private temporary account** th
 click **Keep my account** in the light blue strip under the top bar and add an email and password.
 
 ### Your results
-**Jobs that fit your resume** shows your 20 best matches, best first. Each one has:
+**Jobs that fit your resume** shows up to 60 matches, best first. Each one has:
 - a **score out of 100**, shown in a round stamp (red for a strong match). Skills count the most. The rest comes from the job being a co-op or internship, naming
   your program, wanting your graduation year, and being for the term you picked. Only a job that fits on every
   count gets 100.
@@ -134,8 +138,11 @@ click **Keep my account** in the light blue strip under the top bar and add an e
 - **On your resume**: the job's skills you already show. **Worth adding, if you have it**: the ones you don't.
 - **View job and apply**, and **Save to tracker**.
 
-Jobs that ask for a *different* graduation year are left out, so you don't waste time on them. Jobs that don't
-mention a year stay in.
+![Matches with a score stamp, why each job fits, and the skills on your resume or worth adding](../../docs/images/matches.png)
+
+Jobs that ask for a *different* graduation year still show, lower down, with a note to check before you apply.
+Matching is lenient on purpose: most students land a co-op by applying widely. Jobs that don't mention a year are
+treated as open to you.
 
 Change anything in steps 1 or 2 and click **Update my matches**. It's free and takes a second.
 
@@ -151,8 +158,9 @@ Open any job, or any match, and look for **Make your resume fit this job**. It's
 - the edits to make, in order, such as adding "Available for a 4 month Summer 2027 co-op term" near the top
 - the job's skills and words, split into ones already on your resume and ones worth adding if they're true for you
 
-Only add things you've really done. Matching is lenient on purpose: jobs that aren't a perfect fit still show up
-lower down, because applying widely is how most students land a co-op.
+![Make your resume fit this job: checks, the edits to make, and skills you have or could add](../../docs/images/fit.png)
+
+Only add things you've really done.
 
 ## 4. Keep track of applications
 
@@ -160,6 +168,11 @@ Click the bookmark on any job (or **Save to tracker**). The **Tracker** page let
 *Applying, Applied, Interview, Offer*, add notes and dates, see deadlines coming up this week, and export
 everything to a spreadsheet. Switch between **List** and **Board**. On the board you drag a job from one column
 to the next.
+
+![The tracker board: a column for each stage and the deadlines coming up this week](../../docs/images/tracker.png)
+
+Want to see it before you add anything? Click **Try the demo** at the top for a private sample account with a filled
+tracker.
 
 ---
 
@@ -199,7 +212,8 @@ Then:
    ```
 4. The first time takes a few minutes: it installs everything, builds the site and creates a private database in
    a `.coopradar` folder in your home folder. Then your browser opens **http://localhost:8000**. Real jobs appear a
-   few minutes later and keep coming in for about an hour (it pulls them from about 1,700 employers and Job Bank).
+   few minutes later and keep coming in for about an hour (it pulls them from about 1,700 employers, Job Bank and
+   other public job lists, over 13,000 jobs in all).
 
 Next time, `python start.py` starts in seconds. To stop it, press **Ctrl + C** in the terminal. To start over with
 empty data, delete the `.coopradar` folder in your home folder.

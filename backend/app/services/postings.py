@@ -15,6 +15,7 @@ from uuid import UUID
 from fastapi import HTTPException
 from sqlalchemy import SmallInteger, case, false, func, literal, or_, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.ingest.terms import LENGTH_BUCKETS
 from app.models.posting import Posting, WorkMode
@@ -87,8 +88,9 @@ async def list_postings(
     instead of filtering in a subquery or in Python.
     """
 
-    # The base query. WHERE clauses get added below
-    stmt = select(Posting)
+    # The base query. WHERE clauses get added below. List items leave out the description,
+    # so don't pull it from the database either
+    stmt = select(Posting).options(defer(Posting.description))
 
     # Filters
 
@@ -348,8 +350,12 @@ async def get_filter_meta(db: AsyncSession) -> FilterMeta:
     The choices for each filter menu.
 
     They come from the real jobs table so the site never offers a
-    city or skill with no jobs behind it.
+    city or skill with no jobs behind it. Kept as long as the job counts, since each call
+    scans the whole table five times and every visitor asks for it.
     """
+    global _filter_meta_cache
+    if _filter_meta_cache is not None and time.monotonic() - _filter_meta_cache[0] < _COUNTS_TTL:
+        return _filter_meta_cache[1]
 
     cities_result = await db.execute(
         select(Posting.city).distinct().order_by(Posting.city)
@@ -382,13 +388,15 @@ async def get_filter_meta(db: AsyncSession) -> FilterMeta:
     companies = [r for (r,) in companies_result.all() if r]
 
     counts = await _open_counts(db)
-    return FilterMeta(
+    meta = FilterMeta(
         cities=cities, provinces=provinces, terms=terms, skills=skills,
         companies=companies, categories=counts.categories, open_jobs=counts.open_jobs,
         countries=counts.countries, work_modes=counts.work_modes,
         seasons=counts.seasons, durations=counts.durations,
         programs=[ProgramOption(key=key, label=p.label) for key, p in PROGRAMS.items()],
     )
+    _filter_meta_cache = (time.monotonic(), meta)
+    return meta
 
 
 @dataclass
@@ -405,11 +413,13 @@ class _OpenCounts:
 # jobs only change every few hours, so we keep the result for a couple of minutes
 _COUNTS_TTL = 120.0
 _counts_cache: tuple[float, _OpenCounts] | None = None
+_filter_meta_cache: tuple[float, FilterMeta] | None = None
 
 
 def clear_category_counts_cache() -> None:
-    global _counts_cache
+    global _counts_cache, _filter_meta_cache
     _counts_cache = None
+    _filter_meta_cache = None
 
 
 async def _open_counts(db: AsyncSession) -> _OpenCounts:

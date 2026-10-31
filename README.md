@@ -1,176 +1,242 @@
 # CoopRadar
 
-**A job board for co-op students that knows who you are.** CoopRadar imports real co-op, internship and
-entry-level jobs in every field from about 1,700 employers' own career pages and the Government of Canada's Job
-Bank, reads what each job description asks for (programs of study, graduation years, skills), and matches them to a
-student's resume: their program, graduation year, wanted term and skills. Every match says why it fits. Matching runs in SQL, so it's free and instant; an optional
-bring-your-own-key AI layer (Claude, ChatGPT or Gemini) adds resume reviews, tailoring and cover letters.
+**A free job board for co-op students that reads your resume and tells you which jobs fit, and why.**
+
+CoopRadar imports real co-op, internship, student and entry level jobs in every field from about 1,700 employers'
+own career pages and the Government of Canada's Job Bank. It reads each job description for the programs of study,
+graduation years, work term and skills it asks for. A student drops in a resume (no sign up) and gets the jobs that
+fit their program, graduation year, term and skills, each with plain "why it fits" notes. Matching runs in SQL, so
+it is free and instant. An optional bring your own key AI layer (Claude, ChatGPT or Gemini) adds resume reviews,
+tailoring and cover letters.
 
 [![CI](https://github.com/mbendari7/COOP-Radar/actions/workflows/ci.yml/badge.svg)](https://github.com/mbendari7/COOP-Radar/actions/workflows/ci.yml)
 
-**Live site:** _add your link after deploying_ ·
-**Not a developer?** Read [Using CoopRadar](guides/using-coopradar/README.md) ·
-**How it's built and how to explain it:** [How it works](guides/how-it-works/README.md)
+**Live site:** [coopradar-u7in.onrender.com](https://coopradar-u7in.onrender.com) ·
+**Students:** [Using CoopRadar](guides/using-coopradar/README.md) ·
+**Builders and interviews:** [How it works](guides/how-it-works/README.md) ·
+**Running the site:** [Owner's handbook](guides/owner-handbook/README.md)
 
 ```bash
 python start.py      # sets everything up the first time, then opens http://localhost:8000
 ```
 
-![Jobs page: search bar, quick filters, the results list and the selected job's details](docs/images/jobs.png)
+![Find jobs: search row, filter sidebar, the results list and the picked job's details with its postmark](docs/images/jobs.png)
 
-| Matches that explain themselves | On a phone |
+| Matches that explain themselves | Make your resume fit a job (free, no AI) |
 |---|---|
-| ![Resume matches with "why it fits" reasons and skills](docs/images/matches.png) | ![Jobs page on a phone](docs/images/phone.png) |
+| ![Resume matches with a score stamp, why it fits, and skills on the resume or worth adding](docs/images/matches.png) | ![Checks, edits to make in order, and skills split into ones you have and ones worth adding](docs/images/fit.png) |
+| **Application tracker** | **On a phone** |
+| ![Tracker board with a column per stage and deadlines this week](docs/images/tracker.png) | <img src="docs/images/phone.png" alt="Jobs page on a phone" width="260"> |
 
 ---
 
-## Features
+## Contents
+
+1. [Which document do I read?](#which-document-do-i-read)
+2. [What it does](#what-it-does)
+3. [Where the jobs come from](#where-the-jobs-come-from)
+4. [How it works](#how-it-works)
+5. [Tech stack](#tech-stack)
+6. [Run it on your computer](#run-it-on-your-computer)
+7. [Host it for free](#host-it-for-free)
+8. [Make it load fast](#make-it-load-fast)
+9. [Configuration](#configuration)
+10. [API](#api)
+11. [Project structure](#project-structure)
+12. [Testing and quality](#testing-and-quality)
+13. [Security and privacy](#security-and-privacy)
+14. [Built with Spec Kit and Claude Code](#built-with-spec-kit-and-claude-code)
+15. [Roadmap](#roadmap)
+
+---
+
+## Which document do I read?
+
+This README is the front door. Everything else is one click away.
+
+| You are... | Read | What's in it |
+|---|---|---|
+| A student or anyone who just wants to use it | [Using CoopRadar](guides/using-coopradar/README.md) | Find jobs, match your resume, the tracker, a free AI key, tips, fixes. No code |
+| The owner keeping the site running | [Owner's handbook](guides/owner-handbook/README.md) | Weekly checks, free plan limits, adding employers, updating, before you commit, fixing a broken site |
+| Learning the build or preparing for an interview | [How it works](guides/how-it-works/README.md) | The stack piece by piece, the flow step by step, how to explain it, interview answers |
+| Changing or debugging the code | [Project guide](docs/PROJECT_GUIDE.md) | Every module, the database, feature deep dives, recipes, testing |
+| Hosting somewhere other than Render | [Deploy](docs/DEPLOY.md) | Render + Neon in detail, Vercel in front, other hosts, your own server |
+| Looking at the design | [DESIGN.md](DESIGN.md) · [PRODUCT.md](PRODUCT.md) | The postal look and why · who it is for |
+| Curious how AI helped build it | [Agentic workflow log](docs/agentic-workflow.md) · [Progress](docs/progress.md) | What the AI did each session, what was checked |
+
+All guides are also listed in [guides/README.md](guides/README.md).
+
+---
+
+## What it does
 
 | | |
 |---|---|
-| **Opens fast** | The first page of jobs comes from a copy a CDN keeps and the browser saves, so it shows in under a second even while the free server is waking up. A short note says when fresher jobs are on the way. A free GitHub workflow keeps the server awake through the day. See [Make it load fast](#make-it-load-fast). |
-| **Real jobs, every field** | Jobs from ~1,700 employers' own career sites via the public Greenhouse, Lever, Ashby, SmartRecruiters and Workday job-board APIs, plus Workable's job search, The Muse's internships, Himalayas' remote jobs open to Canada, Simplify's public internship and new grad lists and the Government of Canada's **Job Bank** (its student and apprentice jobs, and searches for each kind of program: nursing, personal support, teaching, early childhood education, social work, trades, hospitality, engineering technology, accounting, marketing and more), imported every 6 hours: tech, banks, insurers, energy, health and pharma, aerospace, accounting, food, retail, universities, hospitals, cities and small local employers. Every job in Canada, plus US co-op, internship, new grad and entry level roles. Each job shows its work term, when it runs and how long it is, kept apart from the graduation year it asks for. New jobs since your last visit, and an RSS feed for any search. Optional Adzuna key adds student jobs it gathers from employer sites in every field. |
-| **Term and length** | Each job's term season (Winter, Spring, Summer, Fall) and length (4, 8, 12 or 16 months) are read from its title and description. Filter by season and length, sort by term start or by length, and see both on every row. Jobs that don't say are marked "Not stated" instead of guessed. |
-| **Job-board search** | What / Where search and a filter sidebar that is always in view (it folds open in place on phones): level, country, on-site / hybrid / remote, job type, program or major, graduation year, province or state, city, date posted, term, length, company, skills. Results list beside a details panel; everything lives in the URL. |
-| **Reads the job description** | At import, each description is parsed for the programs of study it names ("Bachelor's in Computer Science, Engineering...") and the graduation years it wants ("graduating in December 2027 or 2028"). |
-| **Reads the resume** | Upload a PDF or Word file with no sign-up. CoopRadar finds the student's program, degree and graduation year in the education section; the student can correct them. |
-| **Co-op matching, lenient** | Students apply to lots of co-ops, so matching only filters on hard choices (picked job types, place, country, level). Program, graduation year, term and length move jobs up or down instead of hiding them. Up to 60 matches, each with plain "why it fits" reasons, and a fair warning when a job asks for another graduation year. |
-| **Make your resume fit** | For any job, free and with no AI: yes or no checks (program, grad year, availability line, French, numbers in bullets), the edits to make in order, and the job's skills and words split into ones the resume has and ones worth adding if true. |
-| **Resume feedback** | Skills employers can see on the resume, and the most-requested skills it's missing. Free. |
-| **AI, bring your own key** | Resume review, AI re-ranking, per-job tailoring plans, cover letter openers and cited Q&A, streamed. The key stays in the visitor's browser. |
-| **Tracker** | Save jobs, move them through statuses with dated notes, deadlines this week, CSV export. List or drag and drop board. |
+| **Opens fast** | The first page of jobs comes from a copy a CDN keeps and the browser saves, so it shows in about a second even while the free server wakes up. A short note says when fresher jobs are on the way. See [Make it load fast](#make-it-load-fast). |
+| **Real jobs, every field** | About 13,700 open jobs in a full import: every job in Canada that the sources list (about 5,400), plus US co-op, internship, new grad and entry level roles (about 8,300). Software and engineering, but also nursing, teaching, early childhood education, trades, hospitality, business, banks, hospitals, cities and small local employers. Refreshed every 6 hours. |
+| **Job search** | A What / Where search row and a filter sidebar that is always in view (it folds open in place on phones): work term, length, level, country, province or state, city, work mode, job type, program, graduation year, date posted, company and skills. Results list beside a details panel. Every filter lives in the URL, so a search is a link you can share. |
+| **Term and length** | Each job's term season (Winter, Spring, Summer, Fall) and length (4, 8, 12 or 16 months) are read from its title and description and shown on every row. Jobs that don't say are marked "Not stated", never guessed, and still shown unless you ask for only exact matches. |
+| **Reads the job description** | At import, each description is read for the programs of study it names ("Bachelor's in Computer Science, Engineering...") and the graduation years it wants ("graduating in December 2027 or 2028"). |
+| **Reads the resume** | Upload a PDF or Word file with no sign up. The student's program, degree and graduation year come from the education section; they can correct them. |
+| **Lenient co-op matching** | Students apply widely, so matching only filters on hard choices (job types, place, country, level). Program, graduation year, term and length move jobs up or down instead of hiding them. Up to 60 matches, each with a score stamp and "why it fits" reasons. |
+| **Make your resume fit** | For any job, free and with no AI: yes or no checks (program, grad year, availability line, numbers in bullets), the edits to make in order, and the job's skills and words split into ones the resume has and ones worth adding if true. |
+| **Resume feedback** | The skills employers can see on the resume, and the most requested skills it is missing. Free. |
+| **AI, bring your own key** | Resume review, AI re-ranking, per job tailoring plans, cover letter openers and cited answers to questions, streamed word by word. The key stays in the visitor's browser. |
+| **New jobs and alerts** | "New since your last visit" for any search, a "Newly added" sort, and an RSS feed for any search that a feed reader or feed to email service can follow. |
+| **Tracker** | Save jobs, move them through stages with dated notes, see deadlines this week, export to CSV. List view or drag and drop board. |
 
-## Design
+---
 
-CoopRadar looks like a Canadian post office, not a template job board, kept clean and modern: a postal red top bar,
-airmail blue for links and anything picked, soft rounded corners, pill shaped chips, white cards on a light grey
-page, Inter for reading and Archivo for titles. Every job's details wear a round **postmark** with its city and the
-day it was posted, which stamps red when you pick the job. Match scores use the same stamp, and the time left to
-apply is drawn as a bar to scale.
+## Where the jobs come from
 
-The tokens live in `frontend/tailwind.config.ts`, the shared buttons, fields and chips in `frontend/src/index.css`,
-and the reasons behind each choice in [`DESIGN.md`](DESIGN.md). Product facts the design worked from are in
-[`PRODUCT.md`](PRODUCT.md).
+Only public job board APIs and feeds that exist so jobs can be shown on other sites. No logins, no scraping of
+pages, robots.txt respected, and every job links to the employer (or Job Bank) to apply.
+
+| Source | What it brings | Code |
+|---|---|---|
+| **Employer career boards** on Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Recruitee, BambooHR, Rippling and Oracle Cloud | About 1,700 employers: 185 hand picked (`job_boards.py`) plus about 1,500 found through Common Crawl's free URL index (`discovered_boards.json`). Workday covers most big employers outside tech: banks, insurers, energy, health, retail, universities | `ingest/boards.py`, `workday.py`, `ats.py`, `oracle.py` |
+| **Government of Canada Job Bank** | Its student and apprentice jobs, plus about 30 searches for programs with co-ops: nursing, personal support, early childhood education, teaching, social work, trades, cooking, engineering technology, accounting, marketing and more | `ingest/jobbank.py` |
+| **Workable** job search | Every Canadian job and US student roles from thousands of small employers | `ingest/workable.py` |
+| **Simplify** and other public GitHub lists | Thousands of internship and new grad roles, each with its terms | `ingest/simplify.py`, `github_lists.py` |
+| **The Muse** | Internships (mostly US), up to 90 days old | `ingest/themuse.py` |
+| **Himalayas** | Remote jobs open to people in Canada | `ingest/himalayas.py` |
+| **Adzuna** (optional, paid key) | Student jobs Adzuna gathers from employer sites | `ingest/adzuna.py` |
+
+LinkedIn, Indeed, Glassdoor and Google Jobs are not used: their terms forbid automated collection, and most of
+their listings are reposts of jobs on the employers' own career pages, which CoopRadar reads directly.
+
+---
 
 ## How it works
 
 ```mermaid
 flowchart LR
     B["Browser<br/>React + TypeScript"] -->|"/api (JSON, HTTP-only cookie)"| API
+    CDN["Vercel CDN<br/>pages + job snapshot"] -.->|"cached copy while the server sleeps"| B
     subgraph Server["One Python process (python start.py)"]
       API["FastAPI<br/>routers → services → SQL"]
-      JOBS["Background importer<br/>every 6 h"]
+      JOBS["Background importer<br/>every 6 h, 3 sources at a time"]
     end
     API --> DB[("PostgreSQL 16<br/>full-text · arrays · JSONB · pgvector")]
     JOBS --> DB
-    JOBS -->|"public JSON APIs and feeds"| BOARDS["~1,700 career boards + job feeds<br/>Greenhouse · Lever · Ashby · Workday · Job Bank · ..."]
-    CDN["Vercel CDN<br/>pages + job snapshot"] -.->|"cached copy while the server sleeps"| B
+    JOBS -->|"public JSON APIs and feeds"| SRC["~1,700 career boards + job feeds<br/>Greenhouse · Lever · Workday · Job Bank · ..."]
     API -->|"visitor's own key, per request"| AI["Claude · ChatGPT · Gemini"]
 ```
 
-1. **Import** (`backend/app/ingest/`): one adapter per job-board system or feed. Keeps Canadian jobs and US student roles,
-   parses locations ("Hybrid - New York" → New York, NY; "Vancouver, WA" is not Canada), fetches descriptions only
-   for kept jobs (some boards are 30 MB), de-duplicates, tags skills, and extracts `fields_of_study` and
-   `grad_years` from degree and graduation sentences (`backend/app/services/education.py`). Feeds that only show
-   the newest days, like Job Bank's, keep their jobs open for 21 days after they leave the feed.
-2. **Search** (`GET /api/postings`): every filter is a SQL clause in one query, sorted and paged in Postgres. Job
-   types are constant title regexes; programs use array overlap; graduation year keeps jobs that name it or don't
-   say. `GET /api/postings/snapshot` gives the unfiltered first page, the filter choices and the first job's
-   details in one reply that is the same for everyone, so a CDN can cache it.
-3. **Resume**: text extracted with pypdf / python-docx; program, degree and graduation year detected from the
-   education lines; the student's own choices override them.
-4. **Matching** (`backend/app/services/resume.py`), one SQL expression out of 100:
+1. **Import** (`backend/app/ingest/`). One adapter per job board system or feed. Keeps every Canadian job and US
+   student roles, reads locations ("Hybrid - New York" is New York, NY; "Vancouver, WA" is not Canada), fetches
+   descriptions only for kept jobs (some boards are 30 MB), skips duplicates, tags skills, and reads the term,
+   length, programs and graduation years. Feeds that only show the newest days, like Job Bank's, keep their jobs
+   open for 21 days after they leave the feed.
+2. **Search** (`GET /api/postings`). Every filter is a SQL clause in one query, sorted and paged in Postgres. Job
+   types are title patterns; programs use array overlap; graduation year keeps jobs that name it or don't say.
+   `GET /api/postings/snapshot` is the unfiltered first page in one reply that is the same for everyone, so a CDN
+   can cache it.
+3. **Resume**. Text comes out with pypdf or python-docx; the program, degree and graduation year are read from the
+   education lines. The student's own choices win over what was read.
+4. **Matching** (`backend/app/services/resume.py`). One SQL expression scores every open job out of 100:
 
-   | Skills on the resume (senior titles count half) | Co-op / intern / new-grad title | Names their field | Names their grad year | Their term | Their keywords |
-   |---|---|---|---|---|---|
-   | 65 | 15 | 10 | 5 | 5 | +20 |
+   | Skills on the resume (senior titles count half) | Co-op, intern or new grad title | Names their program | Names their grad year | Their term | Their length | Their keywords | Asks for another grad year |
+   |---|---|---|---|---|---|---|---|
+   | 65 | 15 | 10 | 5 | 5 | 5 | +20 | minus 10 |
 
-   Plus filters: their job types (or their program's), countries, location (remote always counts), work mode,
-   level, and no jobs asking for a different graduation year. Each match gets "why it fits" notes built from the
-   same data.
-5. **AI (optional)**: `backend/app/ai.py` wraps the official Anthropic, OpenAI and Google GenAI SDKs behind
-   `complete()` and `stream()`. Prompts treat documents as data, never invent experience, and cite sources.
+   Capped at 100. Only hard choices filter (job types, countries, location with remote always counting, work mode,
+   level); everything else moves a job up or down. Each match gets "why it fits" notes built from the same data.
+   The weights are the `_W_*` constants at the top of `resume.py`.
+5. **AI (optional)**. `backend/app/ai.py` wraps the official Anthropic, OpenAI and Google GenAI SDKs behind
+   `complete()` and `stream()`. Prompts treat the resume and posting as data, never invent experience, and cite
+   their sources.
 
-The full walkthrough is in **[How it works](guides/how-it-works/README.md)**.
+The full walkthrough is in **[How it works](guides/how-it-works/README.md)**; every module is in the
+**[Project guide](docs/PROJECT_GUIDE.md)**.
+
+---
 
 ## Tech stack
 
 | Layer | Technology |
 |---|---|
-| Frontend | **React 18**, **TypeScript**, **Vite**, **Tailwind CSS**, **TanStack Query** and **TanStack Table**, **React Router**, dnd-kit, types generated from the API's OpenAPI schema |
-| Backend | **Python 3.12**, **FastAPI**, **Pydantic v2**, **SQLAlchemy 2.0** (async, typed), asyncpg, httpx, argon2, pypdf, python-docx |
-| Database | **PostgreSQL 16**: generated `tsvector` + GIN full-text search, array overlap, title regex, JSONB, **pgvector** (optional smart search); **Alembic** migrations `0001` to `0016` |
-| Background work | asyncio tasks inside the web process with a 6-hourly scheduler (3 boards at a time, oldest first, starting a minute after the server, old closed jobs deleted after 30 days); no separate worker or queue |
-| AI | Bring your own key: Claude, ChatGPT or Gemini via their official SDKs; Server-Sent Events streaming |
-| Testing | **pytest** (~440 tests, incl. a p95 < 300 ms budget on 10,000 jobs), **Vitest** + Testing Library (69), **Playwright** end-to-end in a real browser (7) |
-| Quality | ruff, mypy `--strict`, ESLint, `tsc`; OpenAPI types checked for drift |
-| Delivery | **GitHub Actions** CI (lint, types, migration round-trip, tests, then boots the real site and runs Playwright against it); **Render** + **Neon** free hosting; optional **Vercel** front |
+| Frontend | **React 18**, **TypeScript**, **Vite 6**, **Tailwind CSS**, **TanStack Query** and **TanStack Table**, **React Router**, dnd-kit; API types generated from the OpenAPI schema |
+| Backend | **Python 3.12**, **FastAPI**, **Pydantic v2**, **SQLAlchemy 2.0** (async, typed `Mapped[]`), asyncpg, httpx, argon2, pypdf, python-docx |
+| Database | **PostgreSQL 16**: generated `tsvector` + GIN full-text search, array overlap, title regex, generated term columns, JSONB, **pgvector** (optional smart search); **Alembic** migrations `0001` to `0016` |
+| Background work | asyncio tasks inside the web process (`app/jobs.py`): a scheduler imports 3 sources at a time, oldest first, starting a minute after the server, and deletes jobs closed over 30 days ago. No separate worker or queue |
+| Sessions | HTTP-only cookie → a Postgres `kv_store` table (or Redis if `REDIS_URL` is set), 7 day rolling expiry |
+| AI | Bring your own key: Claude, ChatGPT or Gemini through their official SDKs; Server-Sent Events streaming |
+| Testing | **pytest** (457 tests, including a p95 under 300 ms budget on 10,000 jobs), **Vitest** + Testing Library (72), **Playwright** in a real browser (9) |
+| Quality | ruff, mypy `--strict`, ESLint, `tsc`; OpenAPI types checked for drift; `alembic check` |
+| Delivery | **GitHub Actions** CI; **Render** web service + **Neon** Postgres, both free; optional **Vercel** front; a scheduled workflow keeps the free site awake |
 
-## Run it yourself
+---
+
+## Run it on your computer
 
 You need **Python 3.12+** and **Node.js 20+**. No Docker and no database to install.
 
 ```bash
-git clone https://github.com/mbendari7/COOP-Radar.git && cd COOP-Radar
-python start.py          # first run takes a few minutes, then → http://localhost:8000
+git clone https://github.com/mbendari7/COOP-Radar.git
+cd COOP-Radar
+python start.py          # first run takes a few minutes, then opens http://localhost:8000
 ```
 
 The first run creates `backend/.venv`, installs packages (with [uv](https://docs.astral.sh/uv/) if you have it),
 builds the React site, and starts a private PostgreSQL 16 + pgvector in `~/.coopradar` using the
 [`pgserver`](https://pypi.org/project/pgserver/) package. Then it migrates, seeds, serves the site and API on one
-port, and imports real jobs in the background (the first full pass over ~1,700 boards takes about an hour).
+port, and imports real jobs in the background (the first jobs show within minutes; a full pass over every source
+takes about an hour). Next time it starts in seconds.
 
 | Task | Command |
 |---|---|
 | Develop with live reload | `python start.py --dev` → site on :5173 (Vite HMR), API on :8000 (docs at `/docs`) |
+| Start without importing jobs | `BACKGROUND_JOBS=false python start.py --no-browser --port 8123` |
 | Run like a host does | `python start.py --hosted` (needs `DATABASE_URL`; serves on `$PORT`) |
-| Backend checks | in `backend/` with the venv active and `pip install -e ".[dev]"`: `ruff check . && mypy app && pytest -q -m "not perf"` (needs `DATABASE_URL` for a throwaway database) |
+| Backend checks | in `backend/`, venv active, `pip install -e ".[dev]"`, `DATABASE_URL` = a throwaway Postgres with pgvector: `ruff check . && mypy app && pytest -q -m "not perf" && alembic check` |
 | Speed budget | `pytest -q -m perf -s` |
 | Frontend checks | `cd frontend && npm run lint && npm run typecheck && npm test && npm run build` |
-| Browser tests | start the site, then `cd frontend && npx playwright install chromium && npm run test:e2e` (`E2E_BASE_URL` if not on :8000) |
+| Browser tests | start the site, then `cd frontend && npx playwright install chromium && npm run test:e2e` (`E2E_BASE_URL` if not on :8000, `E2E_CHANNEL=msedge` to use Edge) |
+| New database migration | the `/db-migration` skill in Claude Code (autogenerate, review, round trip, `alembic check`) |
 | Reset local data | stop the site and delete `~/.coopradar` |
 
-## Host it for free
+---
 
-The best free setup, at no cost and with no credit card:
+## Host it for free
 
 | Piece | Service (free plan) | Why this one |
 |---|---|---|
 | Website + API | **[Render](https://render.com)** web service | Runs Python directly; `render.yaml` configures everything |
-| Database | **[Neon](https://neon.tech)** Postgres | Doesn't expire (Render's free database is deleted after 30 days), 0.5 GB is about 10x what CoopRadar needs, includes pgvector |
-| Awake and fresh | **GitHub Actions** (`.github/workflows/refresh-jobs.yml`) | Render's free server sleeps after ~15 idle minutes, takes up to a minute to wake and only imports while awake; this pings it every 10 minutes from 7 am to 1 am Eastern |
+| Database | **[Neon](https://neon.tech)** Postgres | Doesn't expire (Render's free database is deleted after 30 days), includes pgvector |
+| Awake and fresh | **GitHub Actions** (`refresh-jobs.yml`) | Render's free server sleeps after about 15 idle minutes and only imports while awake; this pings it every 10 minutes from 7 am to 1 am Eastern |
 | Fast front (recommended) | **[Vercel](https://vercel.com)** | Serves the pages from a CDN, keeps a copy of the first page of jobs so it opens at once, and forwards `/api` to Render (`vercel.json`) |
 
-**Steps (about 15 minutes, all in the browser):**
+**Steps (about 15 minutes, all in the browser, no credit card):**
 
-1. **Database.** Sign up at [neon.tech](https://neon.tech) and create a project (any name, the region nearest
-   you). On the dashboard click **Connect** and copy the connection string (turn *Connection pooling* off). It
-   looks like `postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require`.
+1. **Database.** Sign up at [neon.tech](https://neon.tech) and create a project in the region nearest you. Click
+   **Connect**, turn *Connection pooling* off and copy the connection string
+   (`postgresql://user:password@ep-xxx.region.aws.neon.tech/neondb?sslmode=require`).
 2. **Website.** Sign up at [render.com](https://render.com) with GitHub. Click **New**, then **Blueprint**, and pick
    your copy of this repo. Render reads `render.yaml`.
-3. When it asks for settings, paste the Neon string into **`DATABASE_URL`**. Leave `ANTHROPIC_API_KEY` and
-   `OPENAI_API_KEY` blank: visitors bring their own AI key. Click **Apply**.
-4. Wait about 5 to 10 minutes for the first build. Your site is at `https://coopradar-xxxx.onrender.com`. Within a few
-   minutes it imports ~2,800 jobs.
-5. **Keep it awake and fresh.** On GitHub: your repo, **Settings**, **Secrets and variables**, **Actions**,
-   **Variables**, **New repository variable**: name `SITE_URL`, value your Render address (no trailing slash). The
-   *Keep the site awake* workflow then pings it every 10 minutes through the day. Free for public repositories; for
-   a private one use [UptimeRobot](https://uptimerobot.com) or [cron-job.org](https://cron-job.org) on
-   `https://<your-site>.onrender.com/api/health` every 10 minutes instead.
-6. **Vercel (recommended, it makes the first load instant).** In `vercel.json`, change the `/api` `destination` to your Render address **and keep
-   `/api/:path*` on the end**, for example `"destination": "https://coopradar-xxxx.onrender.com/api/:path*"`.
-   Commit and push. At [vercel.com](https://vercel.com), **Add New**, **Project**, import the repo, **Deploy**.
-   Visitors use the `*.vercel.app` address and `/api` is forwarded to Render, so logins keep working.
+3. Paste the Neon string into **`DATABASE_URL`**. Leave `ANTHROPIC_API_KEY` and `OPENAI_API_KEY` blank: visitors
+   bring their own AI key. Click **Apply**.
+4. Wait 5 to 10 minutes for the first build. Your site is at `https://coopradar-xxxx.onrender.com`. The first jobs
+   arrive within minutes.
+5. **Keep it awake.** On GitHub: your repo, **Settings**, **Secrets and variables**, **Actions**, **Variables**,
+   **New repository variable**: name `SITE_URL`, value your Render address (no trailing slash). Free for public
+   repositories; for a private one point [UptimeRobot](https://uptimerobot.com) or
+   [cron-job.org](https://cron-job.org) at `https://<your-site>.onrender.com/api/health` every 10 minutes.
+6. **Vercel (recommended).** In `vercel.json`, set the `/api` `destination` to your Render address **and keep
+   `/api/:path*` on the end**, like `"https://coopradar-xxxx.onrender.com/api/:path*"`. Push, then at
+   [vercel.com](https://vercel.com): **Add New**, **Project**, import the repo, **Deploy**.
 7. **Check it.** Open `https://<your-project>.vercel.app/api/postings?page_size=10`. You should see JSON with
-   `items`. If you see a web page instead, the `/api/:path*` ending is missing and the jobs page will say the jobs
-   didn't load.
+   `items`. A web page instead means the `/api/:path*` ending is missing.
 
-**What "free" means here:** overnight, or without the workflow, Render puts the server to sleep and waking it takes
-about a minute. With the Vercel front visitors still see jobs at once (see below); only searching and opening other
-jobs waits for the server. For an always-on site, Render's paid instance is a few dollars a month. Why not Vercel
-alone? Vercel runs code only for a moment per request, but
-CoopRadar needs a server that keeps running to import jobs and a database. Other hosts and a VPS setup are in
+**What "free" means here.** Overnight Render puts the server to sleep and waking it takes about a minute; with the
+Vercel front visitors still see jobs at once. Neon's free plan has 0.5 GB of storage, a monthly compute allowance
+and 5 GB of data transfer a month, so check its usage page now and then (the
+[Owner's handbook](guides/owner-handbook/README.md) says what to do if it gets close). For an always on site,
+Render's paid instance is a few dollars a month. Why not Vercel alone? Vercel runs code only for a moment per
+request, but CoopRadar needs a server that keeps running to import jobs. Other hosts and a VPS are in
 [docs/DEPLOY.md](docs/DEPLOY.md).
+
+---
 
 ## Make it load fast
 
@@ -179,104 +245,163 @@ the code. CoopRadar works around it in layers, all free:
 
 | Layer | What it does | Where |
 |---|---|---|
-| Ready made first page | `GET /api/postings/snapshot` is the same for every visitor: the first 25 co-op jobs, the filter choices and the first job's details. Vercel's CDN keeps it for 5 minutes and then keeps serving its copy for up to a week while it fetches a new one, so a sleeping server never holds up the first page | `backend/app/api/postings.py`, `vercel.json` |
+| Ready made first page | `GET /api/postings/snapshot` is the same for everyone: the first 25 co-op jobs, the filter choices and the first job's details. Vercel's CDN keeps it for 5 minutes, then keeps serving its copy for up to a week while it fetches a new one | `backend/app/api/postings.py`, `vercel.json` |
 | Saved in the browser | Each visit saves the snapshot, so a returning visitor sees jobs before any reply comes back | `frontend/src/api/postings.ts` (`useSnapshot`) |
-| Honest waiting | If the server still hasn't answered after 4 seconds, a short note says it is waking up instead of showing a blank page | `frontend/src/pages/PostingsListPage.tsx` |
-| Awake through the day | The *Keep the site awake* workflow pings it every 10 minutes from 7 am to 1 am Eastern. That is about 560 hours a month, inside Render's 750 free hours, and it sleeps at night so the importer leaves room in Neon's free database time | `.github/workflows/refresh-jobs.yml` |
-| Fast wake up | Startup skips reloading the 1,700 career boards when nothing changed (a fingerprint in `kv_store`), loads them in two SQL statements when it does, serves visitors before seeding, and waits a minute before importing | `start.py`, `backend/seed/__main__.py`, `backend/app/jobs.py` |
-| Small, cached files | Replies over 1 KB are gzipped (a page of jobs is about 6 times smaller), the hashed JS and CSS are cached for a year with React in its own file, and fonts load without blocking the page | `backend/app/main.py`, `frontend/vite.config.ts`, `frontend/index.html` |
+| Honest waiting | If the server hasn't answered after 4 seconds, a short note says it is waking up | `frontend/src/pages/PostingsListPage.tsx` |
+| Awake through the day | Pinged every 10 minutes from 7 am to 1 am Eastern: about 560 of Render's 750 free hours a month | `.github/workflows/refresh-jobs.yml` |
+| Fast wake up | Startup skips reloading the career boards when nothing changed (a fingerprint in `kv_store`), loads them in two SQL statements when it does, serves visitors before seeding, and waits a minute before importing | `start.py`, `backend/seed/__main__.py`, `backend/app/jobs.py` |
+| Small replies | Replies over 1 KB are gzipped, hashed JS and CSS are cached for a year, fonts don't block the page | `backend/app/main.py`, `frontend/vite.config.ts`, `frontend/index.html` |
+| Light on the database | Job lists and imports leave out descriptions and the search column they don't show, filter menus are cached for 2 minutes, and the skills list for an hour, which keeps Neon's free data transfer low | `services/postings.py`, `ingest/runner.py`, `ingest/extract.py` |
 
-If Neon's dashboard shows the database close to its monthly compute limit, set `INGEST_INTERVAL_HOURS=12` on
-Render so the importer runs half as often.
+---
 
 ## Configuration
 
-Environment variables (or a `.env` file), documented in [`.env.example`](.env.example). None are required on your
-own computer.
+Environment variables (or a `.env` file), all documented in [`.env.example`](.env.example). None are needed on
+your own computer.
 
 | Variable | Default | Purpose |
 |---|---|---|
 | `DATABASE_URL` | local database from `start.py` | Postgres. `postgres://`, `?sslmode=` and Neon's `channel_binding` are handled. Required on a host |
-| `INGEST_US_JOBS` | `students` | US jobs to import: `students` (co-op, intern, new grad, junior, entry level), `all` (can be tens of thousands), or `none` |
-| `INGEST_LOCATION_FILTER` | Canada | Regex for the Canadian locations to keep |
-| `INGEST_INTERVAL_HOURS` | `6` | How often each board is re-imported |
-| `INGEST_START_DELAY_SECONDS` | `60` | Wait after the server starts before the first import, so a site that just woke up answers quickly |
-| `SEED_FORCE` | `false` | Load the skills and career boards on start even when nothing changed |
+| `INGEST_US_JOBS` | `students` | US jobs to import: `students` (co-op, intern, new grad, junior, entry level), `all` (tens of thousands, too big for a free database), or `none` |
+| `INGEST_LOCATION_FILTER` | Canada | Regex for the locations to keep (`.*` = everywhere) |
+| `INGEST_INTERVAL_HOURS` | `6` | How often each source is re-imported. `12` halves the database work |
+| `INGEST_START_DELAY_SECONDS` | `60` | Wait after start before the first import, so a site that just woke up answers quickly |
+| `BACKGROUND_JOBS` | `true` | Run the importer inside the web server |
+| `SEED_ON_START` · `SEED_FORCE` | `true` · `false` | Load skills and sources at start (skipped when nothing changed) · load even if unchanged |
+| `SEED_JOB_BOARDS` · `SEED_SAMPLE_POSTINGS` · `SEED_DEV_SOURCES` | `true` · `false` · `false` | Real sources · about 55 made up jobs (handy offline) · two Admin page fixtures |
 | `DEMO_ENABLED` | `true` | "Try the demo" and uploading without an account (temporary accounts, 7 days) |
-| `ANTHROPIC_API_KEY` · `OPENAI_API_KEY` | empty | Optional owner keys: shared Claude fallback (capped by `AI_DAILY_LIMIT`) · smart search |
+| `ANTHROPIC_API_KEY` · `OPENAI_API_KEY` | empty | Optional owner keys: shared Claude fallback (capped by `AI_DAILY_LIMIT`, models from `AGENT_MODEL` / `FAST_MODEL`) · smart search and similar jobs |
+| `ADZUNA_APP_ID` · `ADZUNA_APP_KEY` | empty | Optional, paid: also import Adzuna's student jobs |
 | `REDIS_URL` | empty | Optional: sessions and rate limits in Redis instead of Postgres |
-| `SEED_JOB_BOARDS` · `SEED_SAMPLE_POSTINGS` | `true` · `false` | Real career boards · made-up sample postings |
 | `COOKIE_SECURE` | `true` | Keep on for HTTPS (`start.py` turns it off locally) |
+
+---
 
 ## API
 
-| Method & path | Auth | Purpose |
-|---|---|---|
-| `GET /api/postings` | optional | Search, filter, sort, paginate: `q`, `category`, `country`, `program`, `grad_year`, `province`, `city`, `work_mode`, `posted_within`, `term`, `duration`, `company`, `skills`, `students_only`, `hide_senior`, `show_expired`, `sort`, `order`, `page`, `page_size` → `{items, total, page, page_size}`; each item has `role`, `country`, `grad_years`, `fields_of_study` |
-| `GET /api/postings/{id}` · `/{id}/similar` · `/meta/filters` | | Detail · similar · filter values with counts (job types, countries, work modes, programs) |
-| `GET /api/postings/snapshot` | | The unfiltered first page, filter values and the first job's details in one cacheable reply |
-| `POST /api/auth/register` · `login` · `logout` · `demo` · `guest` | | Sessions; `demo` = pre-filled temporary account, `guest` = empty one |
-| `POST/GET/DELETE /api/resume` | user | Upload (`preferences` JSON form field) / metadata / delete |
-| `PUT /api/resume/preferences` | user | Save program, degree, graduation year, term, countries, job types, location, work mode, level, keywords and re-match (free) |
-| `GET /api/resume/matches` · `POST /api/resume/rematch` | user | Stored matches with `fit_notes` and the detected `education` · AI re-rank |
-| `GET/POST /api/resume/insights` | user | Free insights + cached AI review · generate the AI review |
-| `POST /api/resume/matches/{id}/ask` | user | SSE stream: `question` · `tailor` · `cover_letter` |
-| `GET/POST /api/saved…` · `/api/me…` · `/api/admin/sources…` | user / admin | Tracker · account · import sources |
+Interactive docs at `/docs` on any running copy.
 
-Errors are always `{"detail": "...", "code": "SNAKE_CASE"}`. AI routes read `X-AI-Provider`, `X-AI-Key` and
-`X-AI-Model`.
+| Method and path | Auth | Purpose |
+|---|---|---|
+| `GET /api/postings` | optional | Search, filter, sort, page: `q`, `category`, `country`, `program`, `grad_year`, `province`, `city`, `work_mode`, `posted_within`, `term`, `season`, `duration`, `include_unstated`, `company`, `skills`, `students_only`, `hide_senior`, `show_expired`, `sort`, `order`, `page`, `page_size` → `{items, total, page, page_size}` |
+| `GET /api/postings/{id}` · `/{id}/similar` · `/meta/filters` | | Detail · similar jobs · filter choices with counts |
+| `GET /api/postings/snapshot` | | Unfiltered first page, filter choices and first job's details in one cacheable reply |
+| `GET /api/postings/feed.rss` | | RSS feed of new jobs for any search |
+| `POST /api/auth/register` · `login` · `logout` · `demo` · `guest` | | Sessions; `demo` = pre-filled temporary account, `guest` = empty one |
+| `GET/DELETE /api/me` · `PATCH /api/me/password` · `POST /api/me/claim` | user | Account and delete · change password · keep a temporary account |
+| `POST/GET/DELETE /api/resume` | user | Upload (with `preferences`) / details / delete |
+| `PUT /api/resume/preferences` | user | Save program, degree, grad year, term, countries, job types, place, work mode, level, keywords and re-match (free) |
+| `GET /api/resume/matches` · `POST /api/resume/rematch` | user | Stored matches with `fit_notes` · AI re-rank |
+| `GET /api/resume/align/{id}` | user | Make your resume fit this job (free, no AI) |
+| `GET/POST /api/resume/insights` | user | Free feedback + cached AI review · make the AI review |
+| `POST /api/resume/matches/{id}/ask` | user | SSE stream: `question` · `tailor` · `cover_letter` |
+| `POST /api/ai/check` | | Check a visitor's AI key and list the models it can use |
+| `/api/saved…` | user | Tracker: list, save, unsave, change status, events, CSV export |
+| `/api/admin/sources…` | admin | Import sources, run history, run now, turn on or off |
+| `GET /api/health` · `/api/config` | | Health check · public settings |
+
+Errors are always `{"detail": "...", "code": "SNAKE_CASE"}`. AI routes read the `X-AI-Provider`, `X-AI-Key` and
+`X-AI-Model` headers.
+
+---
 
 ## Project structure
 
 ```
 COOP-Radar/
-├── README.md                     This file
-├── PRODUCT.md · DESIGN.md        Who it's for · the postal design system
+├── README.md                    You are here: the overview and map of every doc
+├── CLAUDE.md                    Rules and commands for Claude Code sessions
+├── PRODUCT.md · DESIGN.md       Who it's for · the postal design system
+├── start.py                     One command: set up, migrate, seed, serve (local, --dev, --hosted)
+├── render.yaml · vercel.json    Free hosting: Render Blueprint · Vercel front
+├── .env.example                 Every setting, explained
 ├── guides/
-│   ├── using-coopradar/          For visitors: use it, run it, troubleshoot
-│   └── how-it-works/             For the builder: stack, flow, testing, hosting, interview prep
-├── docs/                         DEPLOY (other hosts) · PROJECT_GUIDE (every module) · images · logs
-├── start.py                      One command: set up, migrate, seed, serve (local, --dev, --hosted)
-├── render.yaml · vercel.json · .env.example
-├── .github/workflows/            ci.yml (all checks + Playwright) · refresh-jobs.yml (keeps the free site awake and fresh)
+│   ├── using-coopradar/         For students and visitors
+│   ├── owner-handbook/          For the owner: keep the site running and change it safely
+│   └── how-it-works/            For builders and interviews: stack, flow, how to explain it
+├── docs/
+│   ├── PROJECT_GUIDE.md         Every module, recipes, testing, troubleshooting
+│   ├── DEPLOY.md                Hosting in detail and other hosts
+│   ├── agentic-workflow.md      Log of what AI did each session
+│   ├── progress.md · speckit-prompts.md · history/
+│   └── images/                  README screenshots
+├── .github/workflows/           ci.yml (every check + Playwright) · refresh-jobs.yml (keeps the site awake)
+├── .claude/skills/              Spec Kit skills + project skills (api-conventions, frontend-tables, ...)
+├── .specify/ · specs/           Spec Kit config, constitution and the feature specs 001 to 004
 ├── backend/
 │   ├── app/
-│   │   ├── api/                  Routers
-│   │   ├── services/             postings, resume (matching), education, categories, insights, auth, ...
-│   │   ├── ingest/               boards.py (Greenhouse/Lever/Ashby/SmartRecruiters), workday.py, jobbank.py, workable, themuse, himalayas, simplify, adzuna, terms.py (term and length), runner, dedup, skill_match
-│   │   ├── schemas/ · models/ · agent/ · ai.py · jobs.py · store.py
-│   ├── alembic/versions/         0001 to 0016
-│   ├── seed/                     skills · job_boards (~1,700 employers + job feeds) · sample postings
-│   └── tests/                    api/ · ingest/ · resume/ · eval/ · perf/
+│   │   ├── main.py · config.py · db.py · deps.py · store.py · jobs.py · ai.py · llm.py
+│   │   ├── api/                 Routers: postings, resume, auth, me, saved, ai, admin, meta
+│   │   ├── services/            Logic + SQL: postings, resume (matching), align (resume fit), education,
+│   │   │                        categories, insights, feed, saved_postings, auth, demo, usage, ingest
+│   │   ├── ingest/              Adapters (boards, workday, ats, oracle, jobbank, workable, simplify,
+│   │   │                        github_lists, themuse, himalayas, adzuna), runner, terms, dedup,
+│   │   │                        skill_match, extract, embed
+│   │   ├── agent/               Streamed tailor, cover letter and Q&A
+│   │   ├── schemas/ · models/   Pydantic schemas · SQLAlchemy tables
+│   ├── alembic/versions/        Migrations 0001 to 0016
+│   ├── seed/                    skills · job_boards.py + discovered_boards.json · discover_boards.py · samples
+│   └── tests/                   api/ · ingest/ · resume/ · eval/ · perf/
 └── frontend/
-    ├── src/                      pages/ · components/ · api/ (client + TanStack Query hooks)
-    ├── tests/                    Vitest
-    └── e2e/                      Playwright
+    ├── src/
+    │   ├── pages/               Jobs, job details, resume, tracker, AI key, account, sign in, add, admin
+    │   ├── components/          Filter sidebar, job row, details, postmark, resume fit, tracker board, ...
+    │   └── api/                 client.ts + one TanStack Query hook per endpoint
+    ├── tests/                   Vitest
+    └── e2e/                     Playwright (*.e2e.ts)
 ```
+
+---
+
+## Testing and quality
+
+| Level | What | Count |
+|---|---|---|
+| Backend | Every endpoint, every importer (recorded responses, never the live internet), education reading, term reading, matching and scoring, hosting config, plus a speed test: p95 under 300 ms on 10,000 jobs | 457 pytest |
+| Frontend | Filters, job rows and details, resume page, AI key, dates, the API client | 72 Vitest |
+| End to end | A real browser on the running site: search, filters, details panel, upload a resume and see the program read from it, phone layout | 9 Playwright |
+
+**CI** (`.github/workflows/ci.yml`) runs on every push: ruff, mypy `--strict`, migrations up, down and up again,
+`alembic check`, pytest and the speed budget; ESLint, `tsc`, Vitest and the build; then it builds and starts the
+real site exactly like Render does, smoke tests it, and runs Playwright against it.
+
+---
 
 ## Security and privacy
 
 - Visitors' AI keys stay in their browser and are forwarded per request only: never stored, logged or echoed.
-- Resumes are stored as text in the user's account and can be deleted any time. Temporary accounts expire after 7 days.
-- Passwords use argon2id; sessions are HTTP-only Secure cookies; login, account creation, CSV uploads and key checks are rate-limited.
-- SQL takes only bound parameters and whitelisted sort columns. Prompts treat resume and posting text as data.
-- Jobs come only from public job-board APIs and feeds meant for sharing: no logins, no scraping, robots.txt respected (Job Bank's 5 second pause included), every job links to the employer or Job Bank.
+- Resumes are stored as text only, in the user's account, and can be deleted any time. Temporary accounts expire
+  after 7 days.
+- Passwords use argon2id; sessions are HTTP-only Secure cookies; sign in, account creation, uploads and key checks
+  are rate limited.
+- SQL uses only bound parameters and whitelisted sort columns. Prompts treat resume and posting text as data, not
+  instructions.
+- Jobs come only from public job board APIs and feeds meant for sharing, with robots.txt respected (including Job
+  Bank's 5 second pause).
 
-## Built with Spec Kit + Claude Code
+---
 
-Features were specified and built with the [Spec Kit](https://github.com/github/spec-kit) loop in Claude Code,
-governed by `.specify/memory/constitution.md` (filter in SQL, every endpoint has schemas and tests, p95 under
-300 ms on 10,000 postings, AI cites sources or says it doesn't know, secrets only in env vars). Project skills in
-`.claude/skills/` encode the conventions; the log is in `docs/agentic-workflow.md`.
+## Built with Spec Kit and Claude Code
+
+Features were specified and built with the [Spec Kit](https://github.com/github/spec-kit) loop in Claude Code
+(`specs/001` to `004`), governed by `.specify/memory/constitution.md`: filter in SQL, every endpoint has schemas
+and tests, p95 under 300 ms on 10,000 jobs, AI cites sources or says it doesn't know, secrets only in environment
+variables. Project skills in `.claude/skills/` hold the conventions, and every session is logged in
+[docs/agentic-workflow.md](docs/agentic-workflow.md).
+
+---
 
 ## Roadmap
 
-- [x] Search and tracker · ingestion · resume matching · bring-your-own-key AI
-- [x] One command to run (`python start.py`), free hosting (Render + Neon + GitHub Actions), optional Vercel front
-- [x] Job-board redesign; co-op matching by program, graduation year and term; ~170 employers; US internships; Playwright
-- [x] Postal look (postmarks, no card boxes, Archivo), plain language comments across the code
-- [x] Instant first load (CDN snapshot, browser copy, keep awake), Job Bank jobs for every program, quieter scroll bars
-- [ ] Email alerts for new matches · school job boards with public feeds · learning from which jobs students save
+- [x] Search, tracker, importing, resume matching, bring your own key AI
+- [x] One command to run, free hosting (Render + Neon + GitHub Actions), optional Vercel front
+- [x] Matching by program, graduation year, term and length; resume fit; about 1,700 employers; US student roles
+- [x] Postal look, full width jobs page with a filter sidebar, no popups
+- [x] Instant first load, Job Bank jobs for every program, new jobs and RSS feeds, lighter database use
+- [ ] Email alerts for new matches
+- [ ] School job boards with public feeds
+- [ ] Learning from which jobs students save; a tool using assistant and evals (spec 004)
 
 ## License
 

@@ -19,6 +19,7 @@ from uuid import UUID
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import defer
 
 from app.db import AsyncSessionLocal
 from app.ingest.base import AdapterError, RawPosting
@@ -79,11 +80,15 @@ async def _execute_run(
 
     seen_refs: set[str] = set()
     # Every job we already have from this source in one query, instead of one query per job.
-    # Big lists like Simplify's have thousands of rows and the database can be far away
+    # Big lists like Simplify's have thousands of rows and the database can be far away.
+    # Descriptions stay in the database: the feed brings a fresh copy, and reading every stored
+    # one on every run used up the free plan's monthly transfer
     known: dict[str, Posting] = {}
     if raw_postings:
         rows = await db.execute(
-            select(Posting).where(Posting.source_id == source_id, Posting.source_ref.is_not(None))
+            select(Posting)
+            .options(defer(Posting.description))
+            .where(Posting.source_id == source_id, Posting.source_ref.is_not(None))
         )
         known = {p.source_ref: p for p in rows.scalars() if p.source_ref}
 
@@ -176,8 +181,13 @@ def _apply_updates(existing: Posting, raw: RawPosting) -> None:
     if raw.province is not None:
         existing.province = raw.province
     existing.country = raw.country
-    _set_education(existing)
-    _refresh_term(existing, raw)
+    # The stored description isn't loaded (see _execute_run), so only read the text again when
+    # the feed sent it. Without new text, what we read last time still stands
+    if raw.description:
+        _set_education(existing)
+        _refresh_term(existing, raw)
+    elif raw.term:
+        existing.term = raw.term
 
 
 def _refresh_term(posting: Posting, raw: RawPosting) -> None:

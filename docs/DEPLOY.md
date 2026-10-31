@@ -16,13 +16,16 @@ runs one command.
 
 `start.py --hosted` then:
 1. applies database migrations (`alembic upgrade head`)
-2. seeds the skills list and the **~120 employer career boards** (safe to repeat)
-3. starts the web server on `$PORT`, serving the React site and the API from one address
-4. inside that server, a background scheduler imports real jobs from the boards right away, then every 6 hours
+2. starts the web server on `$PORT`, serving the React site and the API from one address
+3. next to it, seeds the skills list and the **~1,700 career boards and job feeds** (skipped when nothing changed
+   since the last start)
+4. inside that server, a background scheduler starts importing jobs a minute later
+   (`INGEST_START_DELAY_SECONDS`), 3 sources at a time, then refreshes each one every 6 hours
 
 It needs **PostgreSQL 16 with the `pgvector` extension available** (Neon, Supabase, Render, Railway and most
 managed Postgres hosts have it). Redis is **optional**: without `REDIS_URL`, login sessions and rate limits are
-kept in a small Postgres table. The database is about 50 MB with ~2,800 open jobs.
+kept in a small Postgres table. A full import is about 13,700 open jobs (Canada plus US student roles), which fits
+Neon's free 0.5 GB; jobs closed over 30 days ago are deleted on their own.
 
 ---
 
@@ -40,7 +43,8 @@ expire (Render's free Postgres is deleted 30 days after it's created).
    bring their own AI key. Click **Apply**.
 4. The first build takes about 5 to 10 minutes. Your site is at `https://coopradar-xxxx.onrender.com`. Add your own
    domain under **Settings → Custom Domains** if you like.
-5. Within a few minutes of going live, about 2,800 jobs are imported. Refresh **Find jobs** to see them.
+5. The first jobs are imported within a few minutes of going live, and the rest keep coming in over the next
+   hours while the site is awake (a full pass is about 13,700 jobs). Refresh **Find jobs** to see them.
 6. **Keep it awake and fresh**: in GitHub, **Settings → Secrets and variables → Actions → Variables**, add
    `SITE_URL` with your Render address. `.github/workflows/refresh-jobs.yml` then pings the site every 10 minutes
    from 7 am to 1 am Eastern, so visitors rarely meet a sleeping server and the importer keeps going. It's free for
@@ -52,7 +56,8 @@ expire (Render's free Postgres is deleted 30 days after it's created).
   awake workflow covers the day (about 560 of the 750 free hours a month). With the Vercel front (Option A2) the
   first page still opens at once while it wakes, from the cached job snapshot. Logins survive the sleep because
   sessions are stored in the database.
-- Neon's free plan has 0.5 GB of storage and a monthly compute allowance; its database also sleeps after 5 idle
+- Neon's free plan has 0.5 GB of storage, a monthly compute allowance and 5 GB of data transfer a month (every
+  byte the app reads counts, so job queries skip descriptions and search columns they don't show); its database also sleeps after 5 idle
   minutes and wakes in about a second. Keeping the site awake means the importer runs more of the day, so check
   Neon's usage page in the first week. If it gets close to the limit, set `INGEST_INTERVAL_HOURS=12` on Render.
 - For a pitch or interview at night, open the site a minute early, or upgrade the Render service to a paid
@@ -144,17 +149,25 @@ repo and `Environment=PORT=8000`.
 | `AI_DAILY_LIMIT` | | `20` | AI actions per user per day on *your* key (visitors' own keys are never limited) |
 | `ANTHROPIC_API_KEY` | | empty | *Optional:* shared Claude key for visitors without one (daily-limited) |
 | `OPENAI_API_KEY` | | empty | *Optional:* turns on smart (semantic) search and similar postings |
-| `SEED_ON_START` | | `true` | Run the seed on every start (idempotent) |
-| `SEED_JOB_BOARDS` / `SEED_SAMPLE_POSTINGS` / `SEED_DEV_SOURCES` | | `true` / `false` / `false` | What the seed loads: real boards, made-up postings, Admin-page fixtures |
-| `INGEST_INTERVAL_HOURS` | | `6` | How often each career board is re-imported |
+| `AGENT_MODEL` / `FAST_MODEL` / `EMBED_MODEL` | | see `.env.example` | Models used with *your* keys (visitors pick their own) |
+| `SEED_ON_START` | | `true` | Run the seed on start (skipped by itself when nothing changed) |
+| `SEED_FORCE` | | `false` | Load the seed even when nothing changed |
+| `SEED_JOB_BOARDS` / `SEED_SAMPLE_POSTINGS` / `SEED_DEV_SOURCES` | | `true` / `false` / `false` | What the seed loads: real sources, made-up postings, Admin-page fixtures |
+| `INGEST_INTERVAL_HOURS` | | `6` | How often each source is re-imported. `12` halves the database work |
+| `INGEST_START_DELAY_SECONDS` | | `60` | Wait after start before the first import |
 | `INGEST_LOCATION_FILTER` | | Canada | Regex on job location. Empty means Canada; `.*` means everywhere. |
-| `INGEST_US_JOBS` | | `students` | US jobs: `students` (co-op / intern / new grad titles), `all`, or `none` |
+| `INGEST_US_JOBS` | | `students` | US jobs: `students` (co-op, intern, new grad, junior, entry level titles), `all` (too big for a free database), or `none` |
+| `ADZUNA_APP_ID` / `ADZUNA_APP_KEY` | | empty | *Optional, paid:* also import Adzuna's student jobs |
 | `BACKGROUND_JOBS` | | `true` | Run the importer inside the web server |
+| `DB_STATEMENT_TIMEOUT_MS` | | `10000` | Cancel any single query that runs longer than this |
 | `COOKIE_SECURE` | | `true` | Keep `true` on HTTPS |
+| `CORS_ORIGINS` | | empty | Only when the site and API live on different domains |
 | `PORT` | | `8000` | Port to listen on (hosts set this) |
 
-**Adding or removing employers:** edit `backend/seed/job_boards.py` (company,
-`greenhouse`/`lever`/`ashby`/`smartrecruiters`, board name from the careers URL) and redeploy. Admins can also pause sources on the **Admin** page.
+**Adding or removing employers:** edit `backend/seed/job_boards.py` (company, adapter type such as `greenhouse`,
+`lever`, `ashby`, `smartrecruiters` or `workday`, and the board name from the careers URL) and redeploy. Admins can
+also pause sources on the **Admin** page. The [Owner's handbook](../guides/owner-handbook/README.md#5-common-changes)
+has the steps for this and other common changes.
 
 ---
 
@@ -162,8 +175,8 @@ repo and `Environment=PORT=8000`.
 
 1. Open the site in a **private window**. **Find jobs** lists real postings; clicking one shows its details beside
    the list.
-2. Go to **Match my resume** and drop in a resume. Its program and graduation year are read, and 20 matches with
-   "why it fits" notes appear with no key.
+2. Go to **Match my resume** and drop in a resume. Its program and graduation year are read, and up to 60 matches
+   with "why it fits" notes appear with no key. Open one and check **Make your resume fit this job**.
 3. Click **AI key** and add a free Gemini key. Then click **Review my resume** (Resume feedback tab) and, on a match, **Tailor my resume**.
 4. Click **Keep my account**, add an email and password, sign out, and sign back in. Your resume should still be there.
 5. Click **Try the demo** in another private window. You should see a filled tracker and resume page.

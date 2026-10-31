@@ -326,3 +326,41 @@ async def test_length_stays_unknown_when_the_job_does_not_say(db_session: AsyncS
     ).scalar_one()
     assert posting.duration_months is None
     assert posting.term == "Open"
+
+
+@pytest.mark.asyncio
+async def test_rerun_without_description_keeps_stored_text(db_session: AsyncSession):
+    """
+    Reruns don't load stored descriptions (it used up the database's monthly transfer). A
+    feed that sends no description must not crash the run or wipe what we read before.
+    """
+    source = await _create_source(db_session)
+    first = RawPosting(
+        title="Audit Co-op", company="Maple", city="Toronto", term="",
+        description="A 4 month co-op term for 2027 graduates.", source_ref="job-3",
+        skills=["Excel"], work_mode="onsite",
+    )
+    later = RawPosting(
+        title="Audit Co-op", company="Maple", city="Toronto", term="", description="",
+        source_ref="job-3", skills=["Excel"], work_mode="onsite",
+    )
+    for raw in (first, later):
+        with patch("app.ingest.runner.adapter_for") as mock_af:
+            mock_a = AsyncMock()
+            mock_a.fetch = AsyncMock(return_value=[raw])
+            mock_af.return_value = mock_a
+            await _execute_run(db_session, source.id)
+        db_session.expunge_all()  # a fresh read next run, like separate scheduled runs
+
+    run = (
+        await db_session.execute(
+            select(IngestRun).where(IngestRun.source_id == source.id)
+            .order_by(IngestRun.started_at.desc()).limit(1)
+        )
+    ).scalar_one()
+    assert run.errors == 0 and run.updated == 1
+    posting = (
+        await db_session.execute(select(Posting).where(Posting.source_ref == "job-3"))
+    ).scalar_one()
+    assert posting.description == "A 4 month co-op term for 2027 graduates."
+    assert posting.duration_months == 4

@@ -116,7 +116,8 @@ class Posting(Base):
         ARRAY(Text), nullable=False, server_default=text("'{}'::text[]")
     )
 
-    # Weights are A for title, B for company and skills, C for description. Title hits rank highest
+    # Weights are A for title, B for company and skills, C for description. Title hits rank highest.
+    # Deferred: only SQL reads it, and loading it with every row costs database transfer
     search_vector: Mapped[str | None] = mapped_column(
         TSVECTOR,
         Computed(
@@ -128,6 +129,7 @@ class Posting(Base):
             persisted=True,
         ),
         nullable=True,
+        deferred=True,
     )
 
     # Where the job was imported from
