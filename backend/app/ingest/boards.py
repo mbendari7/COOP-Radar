@@ -23,6 +23,7 @@ Anywhere else, like Dublin or London UK, gets skipped.
 import asyncio
 import html
 import re
+from collections.abc import Callable
 from datetime import UTC, date, datetime
 from typing import Any
 
@@ -85,9 +86,21 @@ _US_LOCATION = re.compile(
 # A US state code after a comma like "Vancouver, WA" means the US even if the city sounds Canadian
 _US_STATE_SUFFIX = re.compile(r"(?-i:,\s*(?:" + "|".join(sorted(_US_CODES - {"CA"})) + r")\b)")
 
+# Words after "student" that mean a job serving students, like "Student Success Manager",
+# not a job for one. The SQL pattern and the role badge use this same list
+STUDENT_SUBJECT_WORDS = (
+    "success|support|services?|affairs|recruitment|recruiter|life|development|leadership"
+    "|engagement|experience|academic|advising|advisor|enrol+ment|housing|wellness|wellbeing"
+    "|retention|financial|accounts|records|conduct|transitions?"
+)
 # Python copy of STUDENT_TITLE_PATTERN in app/services/postings.py
 STUDENT_TITLE = re.compile(
-    r"(?i)\b(intern|interns|internship|co-?op|student|new grad(uate)?|apprentice|stagiaire)\b"
+    r"(?i)\b(intern|interns|internship|co-?op|student(?!s?\s+(?:" + STUDENT_SUBJECT_WORDS
+    + r")\b)|new grad(uate)?|apprentice|stagiaire)\b"
+)
+# Recruiters who hire students, like "University Recruiter", are not student jobs themselves
+_RECRUITER_TITLE = re.compile(
+    r"(?i)\b(recruit\w*|talent acquisition|university relations|campus relations)\b"
 )
 
 # Roles open to students and people early in their career, any year of study. Used for US jobs
@@ -149,6 +162,22 @@ def _tokens(location: str) -> list[str]:
     return [t for t in parts if not _MODE_WORDS.match(t)]
 
 
+# Store codes some big retailers use, like "(CAN) ON FERGUS 01130 WM SUPERCENTER"
+_STORE_CODE = re.compile(r"^\((?:CAN|USA)\)\s+([A-Z]{2})\s+(.+?)(?:\s+\d{3,}\b.*)?$")
+# A place that ends in a province code, like "Store 3005388 Elmira ON"
+_TRAILING_PROVINCE = re.compile(
+    r"(?i)^(?:store\s+\d+\s+)?(.+?)\s+(?-i:(ON|BC|AB|QC|MB|SK|NS|NB|NL|PE))$"
+)
+
+
+def _store_place(loc: str, code_ok: Callable[[str], str]) -> tuple[str, str] | None:
+    """City and province or state from a retail store code, when it has one."""
+    m = _STORE_CODE.match(loc)
+    if m and code_ok(m[1]):
+        return tidy_place(m[2]), code_ok(m[1])
+    return None
+
+
 def parse_location(location: str) -> tuple[str, str]:
     """
     Our best guess at city and province from the free text location a board gives us
@@ -159,10 +188,14 @@ def parse_location(location: str) -> tuple[str, str]:
       "Calgary, Canada; Vancouver, Canada"  gives Calgary AB
       "Remote Canada"                       gives Remote with no province
       "Ontario, Canada"                     gives no city and ON
+      "(CAN) ON FERGUS 01130 WM SUPERCENTER" gives Fergus ON
     """
     loc = (location or "").strip()
     if not loc:
         return "", ""
+    store = _store_place(loc, _province)
+    if store:
+        return store
     tokens = _tokens(loc)
     if not tokens:
         return ("Remote", "") if "remote" in loc.lower() else ("", "")
@@ -182,6 +215,9 @@ def parse_location(location: str) -> tuple[str, str]:
             return "", _province(token)
     if "remote" in loc.lower():
         return "Remote", ""
+    trailing = _TRAILING_PROVINCE.match(tokens[0])
+    if trailing:
+        return tidy_place(trailing[1]), trailing[2]
     if "canada" in loc.lower():
         return "Canada", ""
     return tokens[0], ""
@@ -205,6 +241,9 @@ def parse_us_location(location: str) -> tuple[str, str]:
     loc = (location or "").strip()
     if re.search(r"(?i)washington,?\s*d\.?\s?c\b", loc):
         return "Washington", "DC"
+    store = _store_place(loc, _state)
+    if store:
+        return store
     tokens = _tokens(loc)
     if len(tokens) >= 2 and _state(tokens[1]) and not _state(tokens[0]):
         return tokens[0], _state(tokens[1])
@@ -248,8 +287,16 @@ def _pick_location(*locations: str) -> str | None:
     return next((loc for loc in locations if _is_canadian(loc)), None)
 
 
+def early_career_title(title: str) -> bool:
+    """Open to students or recent grads, but not a recruiter who hires them."""
+    title = title or ""
+    if not EARLY_CAREER_TITLE.search(title):
+        return False
+    return bool(STUDENT_TITLE.search(title)) or not _RECRUITER_TITLE.search(title)
+
+
 def choose_location(
-    title: str, *locations: str, early_career: bool = False
+    title: str, *locations: str, early_career: bool = False, us_only: bool = False
 ) -> tuple[str, str] | None:
     """
     The location to show and the country for a job, or None to skip it. Canadian places win,
@@ -257,12 +304,14 @@ def choose_location(
     A US place is only used when settings.ingest_us_jobs allows this job, where "students"
     means the title is open to students or recent grads (EARLY_CAREER_TITLE), or early_career
     says the whole source is, like Simplify's student lists.
+    us_only is for boards that tell us the job is in the US. Then a place name like
+    "Ontario, CA" (California) or a store called "05139 ON Coral Ridge" never makes it Canadian.
     """
-    canadian = _pick_location(*locations)
+    canadian = None if us_only else _pick_location(*locations)
     if canadian is not None:
         return canadian, "CA"
     us_policy = get_settings().ingest_us_jobs
-    student_role = early_career or bool(EARLY_CAREER_TITLE.search(title or ""))
+    student_role = early_career or early_career_title(title)
     if us_policy == "none" or (us_policy == "students" and not student_role):
         return None
     us = next((loc for loc in locations if loc and _US_LOCATION.search(loc)), None)
@@ -417,10 +466,12 @@ class LeverAdapter(_BoardAdapter):
             location = (job.get("categories") or {}).get("location") or ""
             country = job.get("country") or ""
             title = job.get("text", "")
-            picked = choose_location(title, location, *(
-                [f"{location}, Canada"] if country == "CA" else
-                [f"{location}, United States"] if country == "US" else []
-            ))
+            if country == "US":  # Lever says where it is, so "Ontario, CA" stays in California
+                picked = choose_location(title, f"{location}, United States", us_only=True)
+            else:
+                picked = choose_location(title, location, *(
+                    [f"{location}, Canada"] if country == "CA" else []
+                ))
             if picked is None:
                 continue
             out.append(self._posting(
@@ -497,7 +548,9 @@ class SmartRecruitersAdapter(_BoardAdapter):
             if code == "ca":
                 picked = choose_location(job.get("name", ""), f"{place}, Canada")
             elif code == "us":
-                picked = choose_location(job.get("name", ""), f"{place}, United States")
+                picked = choose_location(
+                    job.get("name", ""), f"{place}, United States", us_only=True
+                )
             else:
                 picked = None
             if picked is not None:

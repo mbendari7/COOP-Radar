@@ -33,6 +33,7 @@ from app.ingest.boards import (
     _details,
     _is_canadian,
     _parse_dt,
+    _pick_location,
     _work_mode,
     choose_location,
     html_to_text,
@@ -40,6 +41,8 @@ from app.ingest.boards import (
 
 _PAGE = 20  # Workday will not send more than 20 at a time
 _MAX_JOBS = 3000
+# The most jobs Workday lists for one search, whatever the site really has
+_LIST_LIMIT = 2000
 _PAGE_CONCURRENCY = 4
 _AUTO_ALL_UP_TO = 300
 # Workday sorts jobs into groups like "Campus" or "Interns & Associates". These mean students
@@ -101,7 +104,15 @@ def posting_from_detail(
     hinted = [f"{primary}, Canada"] if country == "CA" else (
         [f"{primary}, United States"] if country == "US" else []
     )
-    picked = choose_location(title, *hinted, primary, *extra)
+    if country == "US":
+        # Workday says the main place is in the US, so the city of Ontario, California or a
+        # Gap store called "05139 ON Coral Ridge" never counts as Ontario, Canada
+        in_canada = _pick_location(*extra)
+        picked = (in_canada, "CA") if in_canada else choose_location(title, *hinted, us_only=True)
+    elif country and country != "CA":
+        picked = choose_location(title, *extra)  # the main place is in another country
+    else:
+        picked = choose_location(title, *hinted, primary, *extra)
     if picked is None:
         return None
     # Show the plain place, not our hint, and keep the country we were told when there is one
@@ -139,16 +150,19 @@ class WorkdayAdapter(BaseAdapter):
             headers={"User-Agent": self.user_agent, "Accept": "application/json"},
             transport=transport,
         ) as client:
-            jobs, total = await self._list(client, api)
+            jobs, total, canada = await self._list(client, api)
             if scope not in ("all", "students"):
                 scope = "all" if total <= _AUTO_ALL_UP_TO else "students"
             kept = [
                 j for j in jobs
-                if j.get("externalPath") and (wanted_by_scope(j, scope) or listed_in_canada(j))
+                if j.get("externalPath") and (
+                    wanted_by_scope(j, scope) or listed_in_canada(j)
+                    or j["externalPath"] in canada
+                )
             ]
             if scope == "all":
-                kept = [j for j in kept if _maybe_ours(str(j.get("title") or ""),
-                                                       str(j.get("locationsText") or ""))]
+                kept = [j for j in kept if j["externalPath"] in canada or _maybe_ours(
+                    str(j.get("title") or ""), str(j.get("locationsText") or ""))]
             paths = [str(j["externalPath"]) for j in kept]
             details = await _details(client, [f"{api}{p}" for p in paths])
 
@@ -160,28 +174,106 @@ class WorkdayAdapter(BaseAdapter):
 
     async def _list(
         self, client: httpx.AsyncClient, api: str
-    ) -> tuple[list[dict[str, Any]], int]:
-        """Every job summary on the site, up to _MAX_JOBS, and how many the site says it has."""
-        first = await _search(client, api, 0)
-        reported = int(first.get("total") or 0)
-        total = min(reported, _MAX_JOBS)
-        jobs = list(first.get("jobPostings") or [])
+    ) -> tuple[list[dict[str, Any]], int, set[str]]:
+        """
+        Every job summary on the site, how many the site says it has, and the paths of the
+        jobs Workday's own country filter puts in Canada.
+        Workday never lists more than 2,000 jobs for one search, so on a big site like Walmart's
+        (19,000 jobs) most Canadian ones never show up. When the site has a Canada filter and the
+        list missed some of its jobs, we also list Canada on its own, and each province on its
+        own when Canada alone is over the limit.
+        """
         gate = asyncio.Semaphore(_PAGE_CONCURRENCY)
+        first, jobs = await _all_pages(client, api, gate)
+        reported = int(first.get("total") or 0)
 
-        async def page(offset: int) -> list[dict[str, Any]]:
-            async with gate:
-                try:
-                    return list((await _search(client, api, offset)).get("jobPostings") or [])
-                except AdapterError:
-                    return []
+        canada: set[str] = set()
+        facet = _facet(first.get("facets"), "locationCountry", "Canada")
+        listed = sum(1 for j in jobs if listed_in_canada(j))
+        if facet and int(facet.get("count") or 0) > listed:
+            country = {"locationCountry": [facet["id"]]}
+            ca_first, ca_jobs = await _all_pages(client, api, gate, country)
+            if int(ca_first.get("total") or 0) >= _LIST_LIMIT:
+                ca_jobs = []
+                for region in _facet_values(ca_first.get("facets"), "locationRegionStateProvince"):
+                    _r, region_jobs = await _all_pages(
+                        client, api, gate, {**country, "locationRegionStateProvince": [region]}
+                    )
+                    ca_jobs.extend(region_jobs)
+            known = {str(j.get("externalPath")) for j in jobs}
+            for job in ca_jobs:
+                path = str(job.get("externalPath") or "")
+                if path:
+                    canada.add(path)
+                    if path not in known:
+                        known.add(path)
+                        jobs.append(job)
+        return jobs, reported, canada
 
-        for chunk in await asyncio.gather(*(page(o) for o in range(_PAGE, total, _PAGE))):
-            jobs.extend(chunk)
-        return jobs, reported
+
+async def _all_pages(
+    client: httpx.AsyncClient, api: str, gate: asyncio.Semaphore,
+    facets: dict[str, list[str]] | None = None,
+) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """The first reply and every job summary for one search, up to _MAX_JOBS."""
+    first = await _search(client, api, 0, facets)
+    total = min(int(first.get("total") or 0), _MAX_JOBS)
+    jobs = list(first.get("jobPostings") or [])
+
+    async def page(offset: int) -> list[dict[str, Any]]:
+        async with gate:
+            try:
+                return list(
+                    (await _search(client, api, offset, facets)).get("jobPostings") or []
+                )
+            except AdapterError:
+                return []
+
+    for chunk in await asyncio.gather(*(page(o) for o in range(_PAGE, total, _PAGE))):
+        jobs.extend(chunk)
+    return first, jobs
 
 
-async def _search(client: httpx.AsyncClient, api: str, offset: int) -> dict[str, Any]:
-    body = {"appliedFacets": {}, "limit": _PAGE, "offset": offset, "searchText": ""}
+def _facet_groups(facets: Any) -> list[dict[str, Any]]:
+    """Every filter group in a reply. Some sites nest them, like Location > Country."""
+    out: list[dict[str, Any]] = []
+    for group in facets or []:
+        if not isinstance(group, dict):
+            continue
+        out.append(group)
+        values = group.get("values") or []
+        if values and isinstance(values[0], dict) and "facetParameter" in values[0]:
+            out.extend(_facet_groups(values))
+    return out
+
+
+def _facet_values(facets: Any, parameter: str) -> list[str]:
+    """The ids of every choice in one filter group."""
+    return [
+        str(v["id"])
+        for g in _facet_groups(facets) if g.get("facetParameter") == parameter
+        for v in g.get("values") or [] if isinstance(v, dict) and v.get("id")
+    ]
+
+
+def _facet(facets: Any, parameter: str, descriptor: str) -> dict[str, Any] | None:
+    """One choice in a filter group, like Canada in locationCountry."""
+    for group in _facet_groups(facets):
+        if group.get("facetParameter") != parameter:
+            continue
+        for value in group.get("values") or []:
+            if not isinstance(value, dict) or not value.get("id"):
+                continue
+            if value.get("descriptor") == descriptor:
+                return value
+    return None
+
+
+async def _search(
+    client: httpx.AsyncClient, api: str, offset: int,
+    facets: dict[str, list[str]] | None = None,
+) -> dict[str, Any]:
+    body = {"appliedFacets": facets or {}, "limit": _PAGE, "offset": offset, "searchText": ""}
     try:
         response = await client.post(f"{api}/jobs", json=body)
     except httpx.HTTPError as exc:

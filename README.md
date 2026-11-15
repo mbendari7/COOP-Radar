@@ -162,7 +162,7 @@ The full walkthrough is in **[How it works](guides/how-it-works/README.md)**; ev
 | Background work | asyncio tasks inside the web process (`app/jobs.py`): a scheduler imports 3 sources at a time, oldest first, starting a minute after the server, and deletes jobs closed over 30 days ago. No separate worker or queue |
 | Sessions | HTTP-only cookie → a Postgres `kv_store` table (or Redis if `REDIS_URL` is set), 7 day rolling expiry |
 | AI | Bring your own key: Claude, ChatGPT or Gemini through their official SDKs; Server-Sent Events streaming |
-| Testing | **pytest** (457 tests, including a p95 under 300 ms budget on 10,000 jobs), **Vitest** + Testing Library (72), **Playwright** in a real browser (9) |
+| Testing | **pytest** (476 tests, including a p95 under 300 ms budget on 10,000 jobs), **Vitest** + Testing Library (72), **Playwright** in a real browser (9) |
 | Quality | ruff, mypy `--strict`, ESLint, `tsc`; OpenAPI types checked for drift; `alembic check` |
 | Delivery | **GitHub Actions** CI; **Render** web service + **Neon** Postgres, both free; optional **Vercel** front; a scheduled workflow keeps the free site awake |
 
@@ -358,7 +358,7 @@ COOP-Radar/
 
 | Level | What | Count |
 |---|---|---|
-| Backend | Every endpoint, every importer (recorded responses, never the live internet), education reading, term reading, matching and scoring, hosting config, plus a speed test: p95 under 300 ms on 10,000 jobs | 457 pytest |
+| Backend | Every endpoint, every importer (recorded responses, never the live internet), education reading, term reading, matching and scoring, hosting config, plus a speed test: p95 under 300 ms on 10,000 jobs | 476 pytest |
 | Frontend | Filters, job rows and details, resume page, AI key, dates, the API client | 72 Vitest |
 | End to end | A real browser on the running site: search, filters, details panel, upload a resume and see the program read from it, phone layout | 9 Playwright |
 

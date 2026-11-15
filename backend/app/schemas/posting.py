@@ -14,6 +14,7 @@ from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, computed_field, field_validator
 
+from app.ingest.boards import STUDENT_SUBJECT_WORDS
 from app.models.posting import WorkMode
 from app.services.categories import CategoryKey
 from app.services.education import ProgramKey
@@ -24,7 +25,10 @@ RoleType = Literal["coop", "internship", "new_grad", "job"]
 
 # Python copies of the title patterns in app/services/postings.py, used for the role badge
 _COOP_TITLE = re.compile(r"(?i)\b(co-?op|stagiaire)\b")
-_INTERN_TITLE = re.compile(r"(?i)\b(intern|interns|internship|student|apprentice)\b")
+_INTERN_TITLE = re.compile(
+    r"(?i)\b(intern|interns|internship|student(?!s?\s+(?:" + STUDENT_SUBJECT_WORDS
+    + r")\b)|apprentice)\b"
+)
 _NEW_GRAD_TITLE = re.compile(
     r"(?i)\b(new grad(uate)?|university grad(uate)?|early career|graduate program)\b"
 )

@@ -478,3 +478,25 @@ Playwright); job counts from the local `/api/postings/meta/filters`. Docs only, 
 Not run: the test suites themselves, and the live site was not checked for its current job count.
 
 **What I reviewed / changed**: _(fill in after reviewing the diff)_
+
+## 2026-11-15. Live health check, missing Walmart Canada jobs, US jobs shown as Canadian
+
+**What the AI assistant did**:
+- Asked: check the live site works, new jobs come in, Render, Neon and Vercel all work; then whether there should be
+  more jobs, whether what comes in fits, and whether any jobs are missed.
+- Checked the live site: Render and Vercel answer, the Vercel /api proxy and snapshot cache headers are right, both
+  serve the same build, 30,840 open jobs, new ones added minutes before. Found the keep awake workflow is skipped on
+  every run because the SITE_URL repo variable is not set.
+- Ran the real importers on 30 random seeded boards and compared with the live site: in step. Only 31 of 1,671
+  seeded employers had no jobs, each with 1 to 6 on their board.
+- Found and fixed: Workday lists at most 2,000 jobs per search, so Walmart (19,000 jobs, 4,525 in Canada) showed only
+  223 Canadian jobs. The adapter now lists Canada through the site's own country filter, and each province when
+  Canada is over 2,000. US jobs saved as Canadian (Gap stores named "ON ...", Walmart in Ontario OH and Hamilton AL):
+  Workday, Lever and SmartRecruiters now trust the country they give. Store codes read as a city ("Can" became
+  Fergus, ON). Spaces around employer names stripped. "Student Success Manager" type jobs and US recruiter roles no
+  longer count as student jobs.
+
+**Results (actual runs)**: ruff, mypy, 475 pytest passed (1 perf deselected), alembic check clean, on a scratch
+pgserver. Live adapter run against Walmart, Gap and TD recorded in the summary to the owner.
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_

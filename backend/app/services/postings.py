@@ -17,6 +17,7 @@ from sqlalchemy import SmallInteger, case, false, func, literal, or_, select, te
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import defer
 
+from app.ingest.boards import STUDENT_SUBJECT_WORDS
 from app.ingest.terms import LENGTH_BUCKETS
 from app.models.posting import Posting, WorkMode
 from app.schemas.posting import (
@@ -47,8 +48,10 @@ COUNTRY_LABELS = {"CA": "Canada", "US": "United States"}
 # A dict means user input never gets pasted into SQL, and Pydantic already
 # turned away anything we do not know before we get here.
 # In Postgres regex \m means start of word and \M means end of word
+# "student" counts unless a word like "success" follows (STUDENT_SUBJECT_WORDS)
 STUDENT_TITLE_PATTERN = (
-    r"\m(intern|interns|internship|co-?op|student|new grad(uate)?|apprentice|stagiaire)\M"
+    r"\m(intern|interns|internship|co-?op|student(?!s?\s+(" + STUDENT_SUBJECT_WORDS
+    + r")\M)|new grad(uate)?|apprentice|stagiaire)\M"
 )
 # Titles that are clearly not for students
 SENIOR_TITLE_PATTERN = (

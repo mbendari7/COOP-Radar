@@ -93,6 +93,9 @@ async def _execute_run(
         known = {p.source_ref: p for p in rows.scalars() if p.source_ref}
 
     for raw in raw_postings:
+        # Some lists send names like "Atari " and the space split one employer in two
+        raw.company = (raw.company or "").strip()
+        raw.title = (raw.title or "").strip()
         try:
             # We already have this job from this source so update it and never duplicate.
             # This has to come before the fuzzy duplicate check or every run would

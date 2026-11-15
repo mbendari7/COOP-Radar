@@ -140,6 +140,98 @@ async def test_students_scope_skips_us_jobs_that_are_not_for_students() -> None:
     assert [p.title for p in out] == ["Junior Analyst"]
 
 
+def test_detail_trusts_workday_country_over_names_that_look_canadian() -> None:
+    """A Gap store "05139 ON Coral Ridge" and the city of Ontario, California stay in the US."""
+    us = "United States of America"
+    assert posting_from_detail(
+        detail("General Manager", "05139 ON Coral Ridge", us), "Gap", "https://x/C", "/job/g"
+    ) is None
+    raw = posting_from_detail(
+        detail("Summer Intern", "Ontario, CA", us), "Walmart", "https://x/C", "/job/o"
+    )
+    assert raw is not None
+    assert (raw.city, raw.province, raw.country) == ("Ontario", "CA", "US")
+
+
+def test_detail_reads_store_codes() -> None:
+    raw = posting_from_detail(
+        detail("Produce Stocker", "(CAN) ON FERGUS 01130 WM SUPERCENTER", "Canada"),
+        "Walmart", "https://x/C", "/job/w",
+    )
+    assert raw is not None
+    assert (raw.city, raw.province, raw.country) == ("Fergus", "ON", "CA")
+
+
+CANADA_ID = "ca-id"
+ONTARIO_ID = "on-id"
+
+
+def _facets(canada_count: int, provinces: bool = False) -> list[dict[str, object]]:
+    groups: list[dict[str, object]] = [
+        {"facetParameter": "locationCountry", "values": [
+            {"descriptor": "United States of America", "id": "us-id", "count": 15000},
+            {"descriptor": "Canada", "id": CANADA_ID, "count": canada_count},
+        ]},
+    ]
+    if provinces:
+        groups.append({"facetParameter": "locationRegionStateProvince", "values": [
+            {"descriptor": "Ontario", "id": ONTARIO_ID, "count": 2},
+        ]})
+    return [{"facetParameter": "locationMainGroup", "values": groups}]
+
+
+@respx.mock
+async def test_big_sites_list_canada_on_its_own() -> None:
+    """
+    Workday lists at most 2,000 jobs per search, so on a big site the Canadian ones fall off
+    the end. We ask for Canada, then each province when Canada alone hits the limit.
+    """
+    us_page = [{"title": "Cashier", "externalPath": f"/job/us{i}", "locationsText": "Austin, Texas"}
+               for i in range(20)]
+    ontario = [
+        {"title": "Produce Stocker", "externalPath": "/job/ca1",
+         "locationsText": "(CAN) ON FERGUS 01130 WM SUPERCENTER"},
+        # Nothing in the text says Canada, but Workday's own filter does
+        {"title": "Stylist", "externalPath": "/job/ca2", "locationsText": "01073 OUTL Niagara"},
+    ]
+
+    def search(request: object) -> Response:
+        body = json.loads(request.content)  # type: ignore[attr-defined]
+        applied = body["appliedFacets"]
+        if applied.get("locationRegionStateProvince") == [ONTARIO_ID]:
+            return Response(200, json={"total": 2, "jobPostings": ontario if body["offset"] == 0 else []})
+        if applied.get("locationCountry") == [CANADA_ID]:
+            return Response(200, json={"total": 2000, "jobPostings": [],
+                                       "facets": _facets(4500, provinces=True)})
+        return Response(200, json={"total": 2000, "facets": _facets(4500),
+                                   "jobPostings": us_page if body["offset"] == 0 else []})
+
+    route = respx.post(f"{API}/jobs").mock(side_effect=search)
+    respx.get(f"{API}/job/ca1").mock(return_value=Response(200, json=detail(
+        "Produce Stocker", "(CAN) ON FERGUS 01130 WM SUPERCENTER", "Canada")))
+    respx.get(f"{API}/job/ca2").mock(return_value=Response(200, json=detail(
+        "Stylist", "01073 OUTL Niagara", "Canada")))
+
+    out = await WorkdayAdapter().fetch(make_source())
+    assert sorted((p.title, p.country) for p in out) == [("Produce Stocker", "CA"), ("Stylist", "CA")]
+    applied = [json.loads(c.request.content)["appliedFacets"] for c in route.calls]
+    assert {"locationCountry": [CANADA_ID], "locationRegionStateProvince": [ONTARIO_ID]} in applied
+
+
+@respx.mock
+async def test_small_sites_skip_the_canada_search_when_the_list_has_them_all() -> None:
+    jobs = [{"title": "Analyst", "externalPath": "/job/t", "locationsText": "Toronto, Ontario"}]
+    route = respx.post(f"{API}/jobs").mock(
+        return_value=Response(200, json={"total": 1, "jobPostings": jobs, "facets": _facets(1)})
+    )
+    respx.get(f"{API}/job/t").mock(
+        return_value=Response(200, json=detail("Analyst", "Toronto, Ontario", "Canada"))
+    )
+    out = await WorkdayAdapter().fetch(make_source())
+    assert [p.title for p in out] == ["Analyst"]
+    assert route.call_count == 1
+
+
 @respx.mock
 async def test_adapter_raises_when_the_site_is_down() -> None:
     respx.post(f"{API}/jobs").mock(return_value=Response(500))

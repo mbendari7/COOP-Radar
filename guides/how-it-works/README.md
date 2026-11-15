@@ -276,7 +276,7 @@ over 30 days ago are deleted (unless someone saved them), and only resume text i
 
 ## 6. How it's tested
 
-- **Backend: 457 pytest tests.** Every API endpoint, every importer (with recorded API responses, never the
+- **Backend: 476 pytest tests.** Every API endpoint, every importer (with recorded API responses, never the
   real internet), education, term and length reading, matching and scoring, the snapshot, a check that
   `vercel.json` forwards `/api` with its path, and a speed test: p95 under 300 ms on 10,000 jobs.
 - **Frontend: 72 Vitest tests** for the filters, job rows and details, resume page, AI key and date handling.

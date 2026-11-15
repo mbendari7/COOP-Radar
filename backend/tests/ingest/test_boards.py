@@ -13,6 +13,7 @@ from httpx import Response
 from app.config import get_settings
 from app.ingest.base import AdapterError
 from app.ingest.boards import (
+    STUDENT_TITLE,
     AshbyAdapter,
     GreenhouseAdapter,
     LeverAdapter,
@@ -26,6 +27,7 @@ from app.ingest.boards import (
 )
 from app.ingest.dedup import titles_match
 from app.ingest.registry import adapter_for
+from app.schemas.posting import role_of
 
 
 def make_source(board: str, company: str = "Acme") -> object:
@@ -51,6 +53,10 @@ def make_source(board: str, company: str = "Acme") -> object:
         ("Hybrid - Toronto", ("Toronto", "ON")),
         ("US / Canada", ("Canada", "")),
         ("", ("", "")),
+        # Retail store codes, like Walmart's and Circle K's
+        ("(CAN) ON FERGUS 01130 WM SUPERCENTER", ("Fergus", "ON")),
+        ("(CAN) AB ROCKY VIEW 06080 DISTRIBUTION CENTRE", ("Rocky View", "AB")),
+        ("Store 3005388 Elmira ON", ("Elmira", "ON")),
     ],
 )
 def test_parse_location(location: str, expected: tuple[str, str]) -> None:
@@ -84,10 +90,40 @@ def test_vancouver_washington_is_not_canada() -> None:
         ("Remote - US", ("Remote", "")),
         ("Hybrid - New York", ("New York", "NY")),
         ("United States", ("United States", "")),
+        ("(USA) OH ONTARIO 06407 SAMS CLUB", ("Ontario", "OH")),
     ],
 )
 def test_parse_us_location(location: str, expected: tuple[str, str]) -> None:
     assert parse_us_location(location) == expected
+
+
+def test_boards_that_say_us_never_turn_into_canada() -> None:
+    """Ontario, California and a Gap store named "ON Coral Ridge" stay in the US."""
+    assert choose_location("Store Intern", "Ontario, CA, United States", us_only=True) == (
+        "Ontario, CA, United States", "US"
+    )
+    assert choose_location("General Manager", "05139 ON Coral Ridge, United States",
+                           us_only=True) is None
+    # Without the hint the same text reads as Ontario, which is why boards pass it
+    assert choose_location("General Manager", "05139 ON Coral Ridge") is not None
+
+
+def test_recruiters_are_not_early_career_roles() -> None:
+    assert choose_location("University Recruiter (Contract)", "Austin, TX") is None
+    assert choose_location("Talent Acquisition Partner, Early Careers", "Austin, TX") is None
+    assert choose_location("Recruitment Intern", "Austin, TX") == ("Austin, TX", "US")
+
+
+@pytest.mark.parametrize(
+    ("title", "student"),
+    [("Summer Student - Parks", True), ("Working Student", True),
+     ("Student Experience Intern", True), ("Marketing manager (student)", True),
+     ("Student Success Manager", False), ("Senior Student Support Specialist", False),
+     ("Director of Student Leadership", False), ("Students Services Advisor", False)],
+)
+def test_student_title_skips_jobs_that_serve_students(title: str, student: bool) -> None:
+    assert bool(STUDENT_TITLE.search(title)) is student
+    assert (role_of(title) != "job") is student
 
 
 def test_us_jobs_are_kept_only_for_students_by_default() -> None:

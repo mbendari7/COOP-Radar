@@ -249,7 +249,11 @@ with adapter types `greenhouse`, `lever`, `ashby`, `smartrecruiters` and `workda
 home city). Workday (`ingest/workday.py`) is what most big employers outside tech use: banks, insurers, energy, health,
 pharma, aerospace, food, retail, accounting and universities. Its careers page loads jobs from a public JSON endpoint
 (`/wday/cxs/<tenant>/<site>/jobs`, allowed by robots.txt); every Canadian job is kept on every site, and for other
-places sites with up to 300 jobs are checked job by job while bigger ones keep student and campus roles (`scope`). Small and niche employers come from two more places. `seed/discover_boards.py`
+places sites with up to 300 jobs are checked job by job while bigger ones keep student and campus roles (`scope`). Workday never lists more than 2,000 jobs for one search, so when
+a site's own Canada filter counts more Canadian jobs than the list showed (Walmart has about 4,500 of its 19,000), the
+adapter lists Canada on its own, and each province on its own when Canada is over 2,000. The country Workday, Lever and
+SmartRecruiters give always wins over place names, so Ontario, California or a Gap store called "05139 ON Coral Ridge"
+stays in the US. Store codes like "(CAN) ON FERGUS 01130 WM SUPERCENTER" read as Fergus, ON. Small and niche employers come from two more places. `seed/discover_boards.py`
 (run by the owner now and then, not by `start.py`) reads Common Crawl's free URL index for every Greenhouse, Lever,
 Ashby and Workday careers page it saw, asks each board's own API once, and writes the ones with jobs in Canada or US
 student roles to `seed/discovered_boards.json`, which `job_boards.py` seeds next to the hand picked list. And two
@@ -392,7 +396,7 @@ same origin (see `docs/DEPLOY.md`).
 
 ## 8. Testing: how it works and why
 
-**Backend** (`backend/tests/`, 457 tests):
+**Backend** (`backend/tests/`, 476 tests):
 - `conftest.py` rebuilds the schema once per session (`drop_all`/`create_all`, after enabling `vector`). Each
   test then runs inside an outer transaction with
   `join_transaction_mode="create_savepoint"`, so a service's `commit()` only releases a savepoint and everything

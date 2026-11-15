@@ -275,6 +275,24 @@ async def test_rerun_refreshes_the_employer_name(db_session: AsyncSession):
 
 
 @pytest.mark.asyncio
+async def test_employer_names_lose_stray_spaces(db_session: AsyncSession):
+    """"Atari " and "Atari" are one employer, in the filters and for spotting duplicates."""
+    source = await _create_source(db_session)
+    raw = RawPosting(
+        title=" Records Intern ", company="Atari ", city="Toronto", province="ON", country="CA",
+        term="Summer 2027", description="d", source_ref="sp-1",
+    )
+    with patch("app.ingest.runner.adapter_for") as mock_af:
+        mock_af.return_value.fetch = AsyncMock(return_value=[raw])
+        await _execute_run(db_session, source.id)
+
+    posting = (
+        await db_session.execute(select(Posting).where(Posting.source_ref == "sp-1"))
+    ).scalar_one()
+    assert (posting.company, posting.title) == ("Atari", "Records Intern")
+
+
+@pytest.mark.asyncio
 async def test_term_and_length_are_read_and_refreshed(db_session: AsyncSession):
     """
     Board jobs come with no term. The runner reads the term and length from the text, and on

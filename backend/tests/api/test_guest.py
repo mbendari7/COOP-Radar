@@ -109,6 +109,10 @@ async def test_students_only_keeps_intern_coop_and_new_grad_roles(
         _posting("New Grad Backend Engineer"),
         _posting("Senior Staff Engineer"),
         _posting("Internal Tools Lead"),  # "Internal" must not match "intern"
+        # Jobs that serve students are not jobs for students
+        _posting("Student Success Manager"),
+        _posting("Senior Student Support Specialist"),
+        _posting("Retail supervisor (student)"),
     ])
     await db_session.flush()
 
@@ -120,10 +124,15 @@ async def test_students_only_keeps_intern_coop_and_new_grad_roles(
         "Data Co-op (Winter 2027)",
         "Coop Student, QA",
         "New Grad Backend Engineer",
+        "Retail supervisor (student)",
     }
+    roles = {item["title"]: item["role"] for item in res.json()["items"]}
+    assert roles["Retail supervisor (student)"] == "internship"
 
     everything = await client.get("/api/postings", params={"page_size": 50})
-    assert everything.json()["total"] == 6
+    assert everything.json()["total"] == 9
+    by_title = {item["title"]: item["role"] for item in everything.json()["items"]}
+    assert by_title["Student Success Manager"] == "job"
     assert "source_id" in everything.json()["items"][0]
 
 
