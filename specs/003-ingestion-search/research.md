@@ -5,7 +5,7 @@
 
 ---
 
-## Decision 1: Background Job Queue — RQ vs Celery
+## Decision 1: Background Job Queue: RQ vs Celery
 
 **Decision**: Use **RQ (Redis Queue)** with **rq-scheduler** for scheduled and on-demand ingestion.
 
@@ -18,13 +18,13 @@
 
 ---
 
-## Decision 2: Vector Index Type — HNSW vs IVFFlat
+## Decision 2: Vector Index Type: HNSW vs IVFFlat
 
 **Decision**: Use **HNSW** (Hierarchical Navigable Small World) index in pgvector.
 
 **Rationale**: HNSW provides better query-time recall at the 10,000-posting scale without requiring a training step. IVFFlat requires a `CLUSTER` phase with a minimum number of rows before it delivers good recall, making it awkward for incremental ingestion. HNSW builds incrementally and stays accurate as new embeddings are inserted. At 10,000 vectors of dimension 1536, the HNSW index fits comfortably in PostgreSQL shared memory.
 
-**Parameters**: `m = 16`, `ef_construction = 64` (pgvector defaults — adequate at this scale, Constitution IX).
+**Parameters**: `m = 16`, `ef_construction = 64` (pgvector defaults, adequate at this scale, Constitution IX).
 
 **Alternatives considered**:
 - **IVFFlat with `lists = 100`**: Works well but requires `ANALYZE` / periodic re-clustering as data grows. More operational burden.
@@ -32,20 +32,20 @@
 
 ---
 
-## Decision 3: Duplicate Detection — Levenshtein Similarity
+## Decision 3: Duplicate Detection: Levenshtein Similarity
 
 **Decision**: Use **PostgreSQL `levenshtein()` from `fuzzystrmatch`** for title similarity. Threshold: similarity > 0.85 (`1 - levenshtein(title_a, title_b) / GREATEST(len_a, len_b)`).
 
-**Rationale**: `fuzzystrmatch` ships with PostgreSQL and requires no extra dependencies (Constitution IX). The 0.85 threshold catches minor wording differences ("Software Developer Co-op" vs "Software Developer Coop") while avoiding false positives across genuinely different roles. Duplicate check runs on ingest only — not on every search — so O(n) cost per batch is acceptable.
+**Rationale**: `fuzzystrmatch` ships with PostgreSQL and requires no extra dependencies (Constitution IX). The 0.85 threshold catches minor wording differences ("Software Developer Co-op" vs "Software Developer Coop") while avoiding false positives across genuinely different roles. Duplicate check runs on ingest only, not on every search, so O(n) cost per batch is acceptable.
 
 **Alternatives considered**:
 - **trigram similarity (`pg_trgm`)**: Good alternative; `fuzzystrmatch` was preferred to avoid enabling another extension. Both are valid; can be swapped if `fuzzystrmatch` proves slow on large batches.
-- **Exact title match only**: Too strict — misses "Co-op" vs "Coop" variations common in job postings.
-- **ML-based deduplication**: Overkill for 200–10,000 postings.
+- **Exact title match only**: Too strict, misses "Co-op" vs "Coop" variations common in job postings.
+- **ML-based deduplication**: Overkill for 200 to 10,000 postings.
 
 ---
 
-## Decision 4: Embedding Model — text-embedding-3-small
+## Decision 4: Embedding Model: text-embedding-3-small
 
 **Decision**: Use **OpenAI `text-embedding-3-small`** (1536 dimensions) as the default embedding model; configurable via `EMBED_MODEL` env var.
 
@@ -58,7 +58,7 @@
 
 ---
 
-## Decision 5: HTTP Mocking in Tests — respx
+## Decision 5: HTTP Mocking in Tests: respx
 
 **Decision**: Use **respx** to record and replay httpx responses in tests.
 
@@ -75,7 +75,7 @@
 
 **Decision**: Two-stage extraction: **regex/keyword matching** against the DB taxonomy first; **Anthropic Claude API** (claude-haiku-4-5 for cost) fallback when confidence < 0.6.
 
-**Rationale**: The taxonomy covers ~150 known skills. Regex matching is deterministic, fast, and free. The LLM fallback handles edge cases (novel skill names, non-standard phrasing) with a tightly scoped prompt that returns only JSON. Claude Haiku is used for extraction (not the assistant model) to keep cost low (Constitution III — performance budgets include cost). A confidence score of 0.6 triggers the fallback; scores are derived from the fraction of extracted fields that matched the taxonomy unambiguously.
+**Rationale**: The taxonomy covers ~150 known skills. Regex matching is deterministic, fast, and free. The LLM fallback handles edge cases (novel skill names, non-standard phrasing) with a tightly scoped prompt that returns only JSON. Claude Haiku is used for extraction (not the assistant model) to keep cost low (Constitution III, performance budgets include cost). A confidence score of 0.6 triggers the fallback; scores are derived from the fraction of extracted fields that matched the taxonomy unambiguously.
 
 **Alternatives considered**:
 - **Pure regex only**: Misses non-standard skill names in job descriptions.
@@ -100,7 +100,7 @@ ORDER BY ts_rank(search_vector, query) DESC
 
 ---
 
-## Decision 8: Admin Flag — Boolean Column
+## Decision 8: Admin Flag: Boolean Column
 
 **Decision**: Add `is_admin BOOLEAN NOT NULL DEFAULT FALSE` to the `users` table in migration 0004. No separate admin role table.
 

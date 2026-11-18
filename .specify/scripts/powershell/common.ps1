@@ -1,6 +1,8 @@
 #!/usr/bin/env pwsh
-# Common PowerShell functions analogous to common.sh
 
+# Shared helpers for the PowerShell Spec Kit scripts
+# Finds the repo root, works out the current specs/NNN-name folder and finds templates.
+# Same job as python/common.py.
 
 # Find repository root by searching upward for .specify directory
 # This is the primary marker for spec-kit projects

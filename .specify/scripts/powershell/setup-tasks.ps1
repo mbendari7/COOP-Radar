@@ -1,5 +1,7 @@
 #!/usr/bin/env pwsh
 
+# Check plan.md exists and hand back the tasks template (PowerShell version of setup_tasks.py)
+
 [CmdletBinding()]
 param(
     [switch]$Json,

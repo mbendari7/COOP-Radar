@@ -129,5 +129,5 @@ class Posting(Base):
 - Cities: Toronto, Mississauga, Waterloo, Kitchener, Guelph, Hamilton, Ottawa, Vancouver + a handful with `work_mode=remote`
 - Terms: Winter 2027 (≈20), Summer 2027 (≈25), Fall 2027 (≈15)
 - Durations: mix of 4, 8, 12, 16 months
-- Skills: ~20–30 distinct skills from the fixed taxonomy (Python, Java, React, TypeScript, SQL, C++, Go, AWS, Docker, etc.)
+- Skills: ~20 to 30 distinct skills from the fixed taxonomy (Python, Java, React, TypeScript, SQL, C++, Go, AWS, Docker, etc.)
 - Deadlines: mix of future (active) and past (expired) dates

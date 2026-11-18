@@ -4,7 +4,14 @@
 
 **Created**: 2026-10-09
 
-**Status**: Draft
+**Status**: Built (2026-10-10). Merged to `main` in PR #1
+
+> **What changed after this was built.** The jobs list grew a lot in later features. Feature 007 added work term,
+> length, level, country, job type, program, grad year, company and date posted filters with counts, a list
+> beside a details panel, page sizes up to 100 and sorts by term start, length and newly added. Feature 006 added
+> the cached snapshot so the first page shows at once. The rules in this spec (filters, sort and paging on the
+> server, state in the address, remote jobs always passing the city filter, all selected skills required) all
+> still hold.
 
 **Input**: User description: "Students need one place to browse co-op postings instead of checking many sites."
 
@@ -39,7 +46,7 @@ A student types a keyword (e.g., "software") and applies filters for city, term,
 duration range, and one or more required skills. The list updates to show only matching postings.
 All active filters and the search query are visible and can be cleared individually or all at once.
 
-**Why this priority**: Search and filter are the core productivity gain — without them the student
+**Why this priority**: Search and filter are the core productivity gain, without them the student
 must scan 60+ rows manually. This story directly drives the 30-second success criterion.
 
 **Independent Test**: Enter "Python" in the search box. Observe only postings mentioning Python
@@ -52,7 +59,7 @@ filters" and observe the full list returns.
 2. **Given** filters for city "Waterloo" and term "Summer 2027" are applied, **When** results load, **Then** only Waterloo Summer 2027 postings appear, and each active filter is shown as a removable chip or badge.
 3. **Given** skills filter "React" and "TypeScript" are both selected, **When** results load, **Then** only postings that list both React AND TypeScript as required skills appear.
 4. **Given** multiple filters are active, **When** the student clicks "Clear all", **Then** all filters and the search query are removed and the full list reloads.
-5. **Given** no postings match the current filters, **When** results load, **Then** an empty state reads "No postings match — clear filters" with a visible "Clear all" action.
+5. **Given** no postings match the current filters, **When** results load, **Then** an empty state reads "No postings match, clear filters" with a visible "Clear all" action.
 
 ---
 
@@ -121,7 +128,7 @@ paste it in an incognito window. Verify the identical list state loads.
 ### Edge Cases
 
 - What happens when all 60 postings expire? The list shows the empty state and the "Show expired" toggle is still functional.
-- What happens if the student enters a keyword with no matches while filters are also active? The same "No postings match — clear filters" empty state appears.
+- What happens if the student enters a keyword with no matches while filters are also active? The same "No postings match, clear filters" empty state appears.
 - What happens when the student selects a page beyond the last page (e.g., via URL manipulation)? The last available page of results is shown.
 - What happens if the "Original posting" URL is missing for a posting? The link is hidden rather than showing a broken link.
 - What happens when the student resizes the browser to mobile width? The table collapses to a card layout; filters move to a collapsible panel.
@@ -135,13 +142,13 @@ paste it in an incognito window. Verify the identical list state loads.
 - **FR-002**: System MUST hide postings whose deadline has passed by default, and MUST provide a "Show expired" toggle that reveals them.
 - **FR-003**: System MUST support keyword search across title, company, skills, and description fields; matching MUST be case-insensitive and support prefix matching; title matches MUST rank above description matches.
 - **FR-004**: System MUST support filtering by city, province, term, work mode, duration, and one or more required skills; filters MUST be combinable; city and province MUST be independent (non-hierarchical) dropdowns; the duration filter MUST offer fixed checkboxes for 4, 8, 12, and 16 months; selecting multiple skills MUST require ALL selected skills to be present (AND logic).
-- **FR-004a**: Remote postings MUST always appear in city-filtered results (because they are not tied to a city); users who want to exclude remote postings MUST be able to do so by selecting "Onsite" or "Hybrid" in the work mode filter — there is no separate "Exclude remote" toggle.
+- **FR-004a**: Remote postings MUST always appear in city-filtered results (because they are not tied to a city); users who want to exclude remote postings MUST be able to do so by selecting "Onsite" or "Hybrid" in the work mode filter, there is no separate "Exclude remote" toggle.
 - **FR-005**: System MUST allow filters to be cleared individually and all at once with a single "Clear all" action.
 - **FR-006**: System MUST support sorting by posted date (default: newest first), application deadline, company name, and title, in ascending or descending order.
 - **FR-007**: System MUST support pagination with page sizes of 10, 25, and 50 results; the default page size MUST be 25.
 - **FR-008**: All search terms, active filters, sort field, sort direction, page number, and page size MUST be reflected in the URL query string so views are shareable and survive page refresh.
 - **FR-009**: System MUST display a posting detail view with full description, complete required skills list, and a link to the original posting source (opened in a new tab).
-- **FR-010**: System MUST display a loading state while data is being fetched, an empty state reading "No postings match — clear filters" when no results exist, and an error state with a "Try again" action when the fetch fails.
+- **FR-010**: System MUST display a loading state while data is being fetched, an empty state reading "No postings match, clear filters" when no results exist, and an error state with a "Try again" action when the fetch fails.
 - **FR-011**: The UI MUST be usable on mobile screens (minimum 375 px width); the table MUST collapse to a card layout below the medium breakpoint.
 - **FR-012**: System MUST be seeded with approximately 60 realistic sample co-op postings covering Toronto, Mississauga, Waterloo, Kitchener, Guelph, Hamilton, Ottawa, and Vancouver for Winter 2027, Summer 2027, and Fall 2027 terms.
 
@@ -154,7 +161,7 @@ paste it in an incognito window. Verify the identical list state loads.
 
 ### Measurable Outcomes
 
-- **SC-001**: A student can narrow 60 sample postings down to 3–5 relevant results in under 30 seconds using search and filters.
+- **SC-001**: A student can narrow 60 sample postings down to 3 to 5 relevant results in under 30 seconds using search and filters.
 - **SC-002**: The postings list loads and displays results within 2 seconds on a standard laptop internet connection.
 - **SC-003**: All active filters and the search query are visible to the user at all times; removing all filters with one click restores the full unfiltered list.
 - **SC-004**: Copying and sharing a URL with an active filter/sort/page state reproduces the identical view for any other user who opens that URL.
@@ -177,7 +184,7 @@ paste it in an incognito window. Verify the identical list state loads.
 ### Session 2026-10-09
 
 - Q: How should keyword search matching work? → A: Case-insensitive, prefix matching; title/company/skills matches rank above description matches.
-- Q: When multiple skills are selected in the filter, what logic applies? → A: AND logic — a posting must list ALL selected skills.
+- Q: When multiple skills are selected in the filter, what logic applies? → A: AND logic, a posting must list ALL selected skills.
 - Q: What is the default sort order? → A: Newest posted first (applied when no sort param present in URL).
 - Q: How should remote postings behave when a city filter is active? → A: Remote postings always appear regardless of city filter; exclusion is via work mode filter (not a separate toggle).
 - Q: What are the exact values for the duration filter? → A: Fixed checkboxes: 4, 8, 12, 16 months; multiple selections are OR'd.

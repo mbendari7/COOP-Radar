@@ -37,7 +37,8 @@ Docs: `README.md` (front door: overview, screenshots, map of every doc, run, fre
   sample postings (`SEED_*` flags) · `backend/tests/` pytest
 - `frontend/src/`: `api/` (`client.ts` + query hooks) · `pages/` · `components/` · `frontend/tests/` vitest ·
   `frontend/e2e/` Playwright (`*.e2e.ts`, run against a started site)
-- `specs/NNN-*/` Spec Kit feature specs · `.specify/` Spec Kit config, templates, constitution
+- `specs/NNN-*/` Spec Kit feature specs (001 to 008) · `.specify/` Spec Kit config, templates, constitution
+  (`.specify/README.md` explains the loop)
 - `.claude/skills/`: `speckit-*` workflow skills + project skills (api-conventions, frontend-tables,
   agent-tools, db-migration, log-agentic-work)
 - `guides/`: using-coopradar (visitors), owner-handbook (running the site), how-it-works (builder / interviews)

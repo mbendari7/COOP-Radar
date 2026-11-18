@@ -19,7 +19,7 @@ for full request/response schemas.
 
 ---
 
-## Scenario A — Happy Path Upload (US1)
+## Scenario A: Happy Path Upload (US1)
 
 ```bash
 # 1. Register + log in (or use existing test user)
@@ -39,11 +39,11 @@ curl -X POST http://localhost:8000/api/resume \
 ```
 
 **Expected**: `200 OK` with `resume` metadata and `matches` array containing up to 20 items,
-each with `score` (0–100), `reason` (one sentence), and posting fields. Response arrives in < 30 s.
+each with `score` (0 to 100), `reason` (one sentence), and posting fields. Response arrives in < 30 s.
 
 ---
 
-## Scenario B — Invalid File Type (US1, FR-001)
+## Scenario B: Invalid File Type (US1, FR-001)
 
 ```bash
 curl -X POST http://localhost:8000/api/resume \
@@ -55,7 +55,7 @@ curl -X POST http://localhost:8000/api/resume \
 
 ---
 
-## Scenario C — Oversized File (US1, FR-001)
+## Scenario C: Oversized File (US1, FR-001)
 
 ```bash
 # Create a 6 MB dummy file
@@ -69,7 +69,7 @@ curl -X POST http://localhost:8000/api/resume \
 
 ---
 
-## Scenario D — View Stored Resume Metadata (US3)
+## Scenario D: View Stored Resume Metadata (US3)
 
 ```bash
 curl http://localhost:8000/api/resume \
@@ -80,7 +80,7 @@ curl http://localhost:8000/api/resume \
 
 ---
 
-## Scenario E — Re-upload Replaces Previous (US1, FR-006)
+## Scenario E: Re-upload Replaces Previous (US1, FR-006)
 
 ```bash
 # Upload a second resume; check that matches are refreshed
@@ -96,7 +96,7 @@ curl http://localhost:8000/api/resume/matches \
 
 ---
 
-## Scenario F — Return Visit Loads Stored Results (US1, SC6)
+## Scenario F: Return Visit Loads Stored Results (US1, SC6)
 
 ```bash
 time curl http://localhost:8000/api/resume/matches \
@@ -107,7 +107,7 @@ time curl http://localhost:8000/api/resume/matches \
 
 ---
 
-## Scenario G — Ask Follow-up Question with Citation (US2)
+## Scenario G: Ask Follow-up Question with Citation (US2)
 
 ```bash
 # Get a posting_id from the matches list
@@ -126,7 +126,7 @@ curl -X POST "http://localhost:8000/api/resume/matches/$POSTING_ID/ask" \
 
 ---
 
-## Scenario H — AI Says It Doesn't Know (US2, FR-009)
+## Scenario H: AI Says It Doesn't Know (US2, FR-009)
 
 ```bash
 curl -X POST "http://localhost:8000/api/resume/matches/$POSTING_ID/ask" \
@@ -140,7 +140,7 @@ curl -X POST "http://localhost:8000/api/resume/matches/$POSTING_ID/ask" \
 
 ---
 
-## Scenario I — Delete Resume (US3)
+## Scenario I: Delete Resume (US3)
 
 ```bash
 curl -X DELETE http://localhost:8000/api/resume \
@@ -159,7 +159,7 @@ curl http://localhost:8000/api/resume/matches \
 
 ---
 
-## Scenario J — Cross-user Isolation (FR-014)
+## Scenario J: Cross-user Isolation (FR-014)
 
 ```bash
 # Register a second user and verify they cannot see the first user's resume
@@ -170,7 +170,7 @@ TOKEN2=$(curl -s -X POST http://localhost:8000/api/auth/register \
 curl http://localhost:8000/api/resume -H "Authorization: Bearer $TOKEN2"
 ```
 
-**Expected**: `404 Not Found` — the second user has no resume.
+**Expected**: `404 Not Found`, the second user has no resume.
 
 ---
 

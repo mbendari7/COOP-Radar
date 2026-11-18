@@ -4,14 +4,14 @@
 
 **Prerequisites**: plan.md, spec.md, data-model.md, contracts/api.md, research.md, quickstart.md
 
-**Tests**: Included — spec explicitly requires pytest (backend) and Vitest + Testing Library (frontend).
+**Tests**: Included, spec explicitly requires pytest (backend) and Vitest + Testing Library (frontend).
 
 **Organization**: Tasks grouped by user story to enable independent implementation and testing.
 
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies on incomplete tasks)
-- **[Story]**: Which user story this task belongs to (US1–US5)
+- **[Story]**: Which user story this task belongs to (US1 to US5)
 - Exact file paths included in all descriptions
 
 ---
@@ -35,7 +35,7 @@
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Core backend infrastructure — DB connection, ORM model, migration, seed data — that ALL user stories depend on.
+**Purpose**: Core backend infrastructure. DB connection, ORM model, migration, seed data, that ALL user stories depend on.
 
 **CRITICAL**: No user story work begins until this phase is complete.
 
@@ -56,20 +56,20 @@
 
 **Independent Test**: Open `http://localhost:5173`. A table of postings loads within 2 seconds. Pagination controls change rows. "Show expired" toggle reveals past-deadline postings.
 
-### Backend — US1
+### Backend: US1
 
 - [X] T015 [P] [US1] Create `backend/app/schemas/posting.py`: `PostingListItem` (id, title, company, city, province, work_mode, term, duration_months, deadline, posted_at, is_active bool); `PostingsPage` = `Page[PostingListItem]` with items, total, page, page_size; `PostingListParams` (page: int = 1, page_size: Literal[10,25,50] = 25, show_expired: bool = False)
-- [X] T016 [US1] Create `backend/app/services/postings.py`: `list_postings(params, db)` — SELECT postings with optional `deadline >= CURRENT_DATE` filter when `show_expired=False`; ORDER BY posted_at DESC; LIMIT/OFFSET; separate COUNT query; return `PostingsPage`
+- [X] T016 [US1] Create `backend/app/services/postings.py`: `list_postings(params, db)`. SELECT postings with optional `deadline >= CURRENT_DATE` filter when `show_expired=False`; ORDER BY posted_at DESC; LIMIT/OFFSET; separate COUNT query; return `PostingsPage`
 - [X] T017 [US1] Create `backend/app/api/postings.py`: thin FastAPI `APIRouter`; `GET /postings` reads `PostingListParams` via `Depends`, calls `list_postings`, returns `PostingsPage`
 - [X] T018 [US1] Create `backend/app/main.py`: `create_app()` factory; CORS middleware (origins from settings); mount router at `/api`; lifespan event to test DB connection
 - [X] T019 [US1] Create `backend/tests/conftest.py`: async test DB fixture using a separate test database; `async_session` fixture; `client` fixture using `httpx.AsyncClient` against the app
 - [X] T020 [US1] Create `backend/tests/api/test_postings.py` (US1 cases): GET /api/postings returns 200 with `Page` shape; `total` equals seeded count; `page_size=10` returns 10 items; `show_expired=false` hides past-deadline rows; `show_expired=true` includes them; page beyond last page returns last valid page
 
-### Frontend — US1
+### Frontend: US1
 
 - [X] T021 [P] [US1] Create `frontend/src/main.tsx`: mount React app with `QueryClientProvider` (TanStack Query) and `BrowserRouter` (React Router)
-- [X] T022 [P] [US1] Create `frontend/src/App.tsx`: define routes — `/` → `PostingsListPage`, `/postings/:id` → `PostingDetailPage`
-- [X] T023 [US1] Create `frontend/src/api/postings.ts`: `usePostings(params)` hook — TanStack Query `useQuery`; fetches `GET /api/postings`; manual mode; typed with generated types (use inline types until T049 generates types.gen.ts)
+- [X] T022 [P] [US1] Create `frontend/src/App.tsx`: define routes, `/` → `PostingsListPage`, `/postings/:id` → `PostingDetailPage`
+- [X] T023 [US1] Create `frontend/src/api/postings.ts`: `usePostings(params)` hook. TanStack Query `useQuery`; fetches `GET /api/postings`; manual mode; typed with generated types (use inline types until T049 generates types.gen.ts)
 - [X] T024 [US1] Create `frontend/src/pages/PostingsListPage.tsx`: owns `useSearchParams`; manages page/page_size/show_expired state from URL; renders `PostingsTable`; renders pagination controls (prev/next, page size selector); renders "Show expired" toggle
 - [X] T025 [US1] Create `frontend/src/components/PostingsTable.tsx`: TanStack Table in `manualSorting`, `manualFiltering`, `manualPagination` mode; columns: title, company, city/province, work_mode, term, duration_months, deadline, posted_at; skeleton rows while loading (8 rows x shimmer); empty state "No postings match"; error state with "Try again" button; clicking a row navigates to `/postings/:id`
 - [X] T026 [US1] Create `frontend/src/components/PostingCard.tsx`: card layout for mobile (`<md`); shows same fields as table row; keyboard accessible
@@ -84,14 +84,14 @@
 
 **Independent Test**: Type "Python" in search; only Python postings appear. Add "Remote" work mode; results narrow. Click "Clear all"; full list returns.
 
-### Backend — US2
+### Backend: US2
 
-- [X] T027 [P] [US2] Extend `backend/app/schemas/posting.py`: add to `PostingListParams` — `q: str | None`, `city: str | None`, `province: str | None`, `term: str | None`, `work_mode: WorkMode | None`, `duration_months: list[int] | None`, `skills: list[str] | None`; add `FilterMeta` schema (cities, provinces, terms, skills as sorted lists of strings)
+- [X] T027 [P] [US2] Extend `backend/app/schemas/posting.py`: add to `PostingListParams`, `q: str | None`, `city: str | None`, `province: str | None`, `term: str | None`, `work_mode: WorkMode | None`, `duration_months: list[int] | None`, `skills: list[str] | None`; add `FilterMeta` schema (cities, provinces, terms, skills as sorted lists of strings)
 - [X] T028 [US2] Extend `backend/app/services/postings.py`: add keyword search with `search_vector @@ websearch_to_tsquery('english', q)` when `q` is provided; add city/province/term/work_mode filters as equality predicates; add duration_months as `IN (...)` when list provided; add skills as `skills @> ARRAY[...] :: TEXT[]` (AND logic per FR-004); add `get_filter_meta(db)` that returns distinct sorted values for FilterMeta
 - [X] T029 [US2] Extend `backend/app/api/postings.py`: add `GET /postings/meta/filters` route; returns `FilterMeta`
 - [X] T030 [US2] Extend `backend/tests/api/test_postings.py` (US2 cases): `q=Python` returns only Python postings; `skills=React&skills=TypeScript` (AND) returns only postings with both; `city=Waterloo` with remote posting still returns remote posting (FR-004a); unknown `sort` value → 422; `duration_months=4&duration_months=8` returns postings of either duration (OR logic)
 
-### Frontend — US2
+### Frontend: US2
 
 - [X] T031 [P] [US2] Create `frontend/src/components/SearchBox.tsx`: uncontrolled text input with 300 ms debounce; calls `onSearch(value)` after debounce; clears on "Clear all"; keyboard accessible with visible focus ring
 - [X] T032 [US2] Create `frontend/src/components/FilterBar.tsx`: city dropdown, province dropdown, term dropdown (populated from FilterMeta), work_mode chip group (onsite/hybrid/remote), duration checkboxes (4/8/12/16 months), skills multi-select; shows each active filter as removable chip/badge; "Clear all" button removes everything; collapses to off-canvas panel at `<md`
@@ -109,13 +109,13 @@
 
 **Independent Test**: Click "Deadline" header; rows sort by deadline ascending. Click again; descending. Refresh; sort preserved via URL.
 
-### Backend — US3
+### Backend: US3
 
 - [X] T036 [P] [US3] Extend `backend/app/schemas/posting.py`: add `sort: Literal['posted_at','deadline','company','title'] = 'posted_at'` and `order: Literal['asc','desc'] = 'desc'` to `PostingListParams`
 - [X] T037 [US3] Extend `backend/app/services/postings.py`: add `SORT_MAP = {'posted_at': Posting.posted_at, 'deadline': Posting.deadline, 'company': Posting.company, 'title': Posting.title}`; apply `ORDER BY SORT_MAP[sort] ASC|DESC`; unknown sort value already produces 422 via `Literal` at Pydantic layer
 - [X] T038 [US3] Extend `backend/tests/api/test_postings.py` (US3 cases): `sort=deadline&order=asc` returns rows in ascending deadline order; `sort=posted_at&order=desc` is the default; `sort=invalid` → 422
 
-### Frontend — US3
+### Frontend: US3
 
 - [X] T039 [US3] Extend `frontend/src/components/PostingsTable.tsx`: sortable column headers on posted_at, deadline, company, title; clicking header sets `sort` and `order` URL params; shows sort direction indicator (arrow); second click toggles `order` between asc/desc
 - [X] T040 [US3] Create `frontend/tests/PostingsTable.test.tsx`: renders column headers; clicking "Deadline" header sets `sort=deadline` URL param; second click changes `order` to desc; refresh preserves sort from URL
@@ -130,14 +130,14 @@
 
 **Independent Test**: Click any row; detail page shows title, company, full description, skills, and source link in new tab. Back button returns to filtered/sorted list.
 
-### Backend — US4
+### Backend: US4
 
 - [X] T041 [P] [US4] Add `PostingDetail` schema to `backend/app/schemas/posting.py`: all `PostingListItem` fields plus `description: str`, `skills: list[str]`, `source_url: str | None`
 - [X] T042 [US4] Add `get_posting(id: UUID, db)` to `backend/app/services/postings.py`: SELECT by id; raise `HTTPException(404, detail="Posting not found", code="POSTING_NOT_FOUND")` if missing
 - [X] T043 [US4] Add `GET /postings/{id}` to `backend/app/api/postings.py`: route MUST be declared before `GET /postings/meta/filters` to avoid path conflict; returns `PostingDetail`
 - [X] T044 [US4] Extend `backend/tests/api/test_postings.py` (US4 cases): GET /api/postings/{id} returns 200 with full PostingDetail including description and skills; GET with unknown UUID returns 404
 
-### Frontend — US4
+### Frontend: US4
 
 - [X] T045 [P] [US4] Add `usePosting(id)` hook to `frontend/src/api/postings.ts`: TanStack Query `useQuery`; fetches `GET /api/postings/:id`
 - [X] T046 [US4] Create `frontend/src/pages/PostingDetailPage.tsx`: displays title, company, city/province, work_mode, term, duration_months, deadline, posted_at, full description, skills as tag list, conditional "View original posting" link (opens new tab, hidden if source_url is null); skeleton while loading; error state with back link; keyboard accessible
@@ -153,7 +153,7 @@
 **Independent Test**: Apply keyword + two filters + sort + page 2. Copy URL. Paste in incognito. Identical state loads.
 
 - [X] T047 [US5] Audit `frontend/src/pages/PostingsListPage.tsx`: verify ALL state (q, city, province, term, work_mode, duration_months, skills, sort, order, page, page_size, show_expired) is read from and written to `useSearchParams`; no state lives only in React state; ensure `usePostings` is called only after URL params are parsed on first render (no flash of unfiltered data)
-- [X] T048 [US5] Extend `frontend/tests/PostingsTable.test.tsx`: write URL round-trip test — render PostingsListPage with a pre-set URL containing all params; assert `usePostings` is called with the correct params derived from URL; assert that navigating to the page with the copied URL produces the same query
+- [X] T048 [US5] Extend `frontend/tests/PostingsTable.test.tsx`: write URL round-trip test, render PostingsListPage with a pre-set URL containing all params; assert `usePostings` is called with the correct params derived from URL; assert that navigating to the page with the copied URL produces the same query
 
 **Checkpoint**: Copy URL with active state; paste in new tab; identical results load.
 
@@ -176,20 +176,20 @@
 
 ### Phase Dependencies
 
-- **Phase 1 (Setup)**: No dependencies — start immediately; T002–T008 all parallelizable
-- **Phase 2 (Foundational)**: Depends on Phase 1 — BLOCKS all user stories; T009–T014 must run in order (config → db → model → alembic → migration → seed)
-- **Phase 3–7 (User Stories)**: All depend on Phase 2 completion; US1 must precede US2/US3 (extends same service/schema); US4 depends on US1 backend
+- **Phase 1 (Setup)**: No dependencies, start immediately; T002 to T008 all parallelizable
+- **Phase 2 (Foundational)**: Depends on Phase 1. BLOCKS all user stories; T009 to T014 must run in order (config → db → model → alembic → migration → seed)
+- **Phase 3 to 7 (User Stories)**: All depend on Phase 2 completion; US1 must precede US2/US3 (extends same service/schema); US4 depends on US1 backend
 - **Phase 8 (Polish)**: Depends on all user stories complete
 
 ### User Story Dependencies
 
 | Story | Depends On | Can Parallelize Backend/Frontend? |
 |-------|------------|-----------------------------------|
-| US1 | Phase 2 | Yes — T015–T018 (BE) parallel with T021–T022 (FE) after T019 done |
-| US2 | US1 backend endpoints live | Yes — T027–T030 (BE) parallel with T031–T034 (FE) |
-| US3 | US1 backend (extends schemas/service) | Yes — T036–T037 (BE) parallel with T039 (FE) |
-| US4 | US1 backend (extends router) | Yes — T041–T043 (BE) parallel with T045–T046 (FE) |
-| US5 | US1–US4 frontend complete | No parallelism needed — audit only |
+| US1 | Phase 2 | Yes. T015 to T018 (BE) parallel with T021 to T022 (FE) after T019 done |
+| US2 | US1 backend endpoints live | Yes. T027 to T030 (BE) parallel with T031 to T034 (FE) |
+| US3 | US1 backend (extends schemas/service) | Yes. T036 to T037 (BE) parallel with T039 (FE) |
+| US4 | US1 backend (extends router) | Yes. T041 to T043 (BE) parallel with T045 to T046 (FE) |
+| US5 | US1 to US4 frontend complete | No parallelism needed, audit only |
 
 ### Within Each User Story
 
@@ -202,18 +202,18 @@
 ## Parallel Opportunities by Phase
 
 ```bash
-# Phase 1 — all parallel after T001:
+# Phase 1: all parallel after T001:
 T002, T003, T004, T005, T006, T007, T008
 
-# Phase 3 — backend and frontend in parallel after T019 (conftest):
+# Phase 3: backend and frontend in parallel after T019 (conftest):
 Backend: T015, T016, T017, T018 (then T019, T020)
 Frontend: T021, T022 (then T023, T024, T025, T026)
 
-# Phase 4 — backend and frontend in parallel after T027:
+# Phase 4: backend and frontend in parallel after T027:
 Backend: T028, T029, T030
 Frontend: T031, T032, T033, T034, T035
 
-# Phase 5 — parallel:
+# Phase 5: parallel:
 Backend: T036, T037, T038
 Frontend: T039, T040
 ```
@@ -246,14 +246,14 @@ Frontend: T039, T040
 
 | Phase | Tasks | MVP? |
 |-------|-------|------|
-| Phase 1: Setup | T001–T008 (8) | Required |
-| Phase 2: Foundational | T009–T014 (6) | Required |
-| Phase 3: US1 Browse | T015–T026 (12) | MVP |
-| Phase 4: US2 Search/Filter | T027–T035 (9) | |
-| Phase 5: US3 Sort | T036–T040 (5) | |
-| Phase 6: US4 Detail | T041–T046 (6) | |
-| Phase 7: US5 URL State | T047–T048 (2) | |
-| Phase 8: Polish | T049–T054 (6) | |
+| Phase 1: Setup | T001 to T008 (8) | Required |
+| Phase 2: Foundational | T009 to T014 (6) | Required |
+| Phase 3: US1 Browse | T015 to T026 (12) | MVP |
+| Phase 4: US2 Search/Filter | T027 to T035 (9) | |
+| Phase 5: US3 Sort | T036 to T040 (5) | |
+| Phase 6: US4 Detail | T041 to T046 (6) | |
+| Phase 7: US5 URL State | T047 to T048 (2) | |
+| Phase 8: Polish | T049 to T054 (6) | |
 | **Total** | **54** | |
 
 > 2026-10-11: T049 types generated from OpenAPI (`frontend/src/api/types.gen.ts`, drift-checked in CI); T051/T052 verified in Edge via Playwright (375 px no overflow, cards + filter drawer; axe WCAG AA clean, focus rings everywhere); T054 backend 235 passed incl. perf, frontend 29 passed.

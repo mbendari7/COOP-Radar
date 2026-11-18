@@ -1,50 +1,50 @@
 # [PROJECT_NAME] Constitution
-<!-- Example: Spec Constitution, TaskFlow Constitution, etc. -->
+<!-- CoopRadar's filled in version is .specify/memory/constitution.md. Start there instead of here. -->
 
 ## Core Principles
 
 ### [PRINCIPLE_1_NAME]
-<!-- Example: I. Library-First -->
+<!-- CoopRadar: I. Correctness First -->
 [PRINCIPLE_1_DESCRIPTION]
-<!-- Example: Every feature starts as a standalone library; Libraries must be self-contained, independently testable, documented; Clear purpose required - no organizational-only libraries -->
+<!-- CoopRadar: every endpoint has a schema and tests, every bug fix has a regression test, tests never touch the network -->
 
 ### [PRINCIPLE_2_NAME]
-<!-- Example: II. CLI Interface -->
+<!-- CoopRadar: II. Data Stays in the Database -->
 [PRINCIPLE_2_DESCRIPTION]
-<!-- Example: Every library exposes functionality via CLI; Text in/out protocol: stdin/args → stdout, errors → stderr; Support JSON + human-readable formats -->
+<!-- CoopRadar: filter, sort and page in SQL, whitelisted columns, no user input in SQL text, do not load columns the page does not show -->
 
 ### [PRINCIPLE_3_NAME]
-<!-- Example: III. Test-First (NON-NEGOTIABLE) -->
+<!-- CoopRadar: III. Fast on Free Hosting -->
 [PRINCIPLE_3_DESCRIPTION]
-<!-- Example: TDD mandatory: Tests written → User approved → Tests fail → Then implement; Red-Green-Refactor cycle strictly enforced -->
+<!-- CoopRadar: 300 ms p95 on 10,000 postings, an index for every new sort or filter, the first page shows jobs while the server wakes up -->
 
 ### [PRINCIPLE_4_NAME]
-<!-- Example: IV. Integration Testing -->
+<!-- CoopRadar: IV. Matching Works Without AI and V. Honest AI -->
 [PRINCIPLE_4_DESCRIPTION]
-<!-- Example: Focus areas requiring integration tests: New library contract tests, Contract changes, Inter-service communication, Shared schemas -->
+<!-- CoopRadar: free SQL matching is the base, AI only adds; the AI cites, says when it does not know, and resume and posting text is tagged data -->
 
 ### [PRINCIPLE_5_NAME]
-<!-- Example: V. Observability, VI. Versioning & Breaking Changes, VII. Simplicity -->
+<!-- CoopRadar: VI. Visitors Own Their Keys and Their Data, VII. Respectful Job Collection, VIII. Accessible and Easy to Read, IX. Small Honest Changes, X. Keep It Simple -->
 [PRINCIPLE_5_DESCRIPTION]
-<!-- Example: Text I/O ensures debuggability; Structured logging required; Or: MAJOR.MINOR.BUILD format; Or: Start simple, YAGNI principles -->
+<!-- CoopRadar: keys never stored, resumes deletable, public sources only with robots.txt and terms respected, 375 px and keyboard friendly, conventional commits with no AI attribution, one process and one database -->
 
 ## [SECTION_2_NAME]
-<!-- Example: Additional Constraints, Security Requirements, Performance Standards, etc. -->
+<!-- CoopRadar: Quality Gates -->
 
 [SECTION_2_CONTENT]
-<!-- Example: Technology stack requirements, compliance standards, deployment policies, etc. -->
+<!-- CoopRadar: ruff, mypy strict, pytest, perf budget, migrations round trip, alembic check, eslint, tsc, vitest, build, hosted smoke test, Playwright -->
 
 ## [SECTION_3_NAME]
-<!-- Example: Development Workflow, Review Process, Quality Gates, etc. -->
+<!-- CoopRadar: Development Workflow -->
 
 [SECTION_3_CONTENT]
-<!-- Example: Code review requirements, testing gates, deployment approval process, etc. -->
+<!-- CoopRadar: branch, the Spec Kit loop from specify to converge, the project skills, checks, pull request -->
 
 ## Governance
-<!-- Example: Constitution supersedes all other practices; Amendments require documentation, approval, migration plan -->
+<!-- CoopRadar: the constitution wins over other practices, CLAUDE.md must agree with it, changes go through a PR with a version bump -->
 
 [GOVERNANCE_RULES]
-<!-- Example: All PRs/reviews must verify compliance; Complexity must be justified; Use [GUIDANCE_FILE] for runtime development guidance -->
+<!-- CoopRadar: MAJOR for a removed or changed principle, MINOR for a new one, PATCH for wording; every review checks new work against it -->
 
 **Version**: [CONSTITUTION_VERSION] | **Ratified**: [RATIFICATION_DATE] | **Last Amended**: [LAST_AMENDED_DATE]
-<!-- Example: Version: 2.1.1 | Ratified: 2025-06-13 | Last Amended: 2025-07-16 -->
+<!-- CoopRadar: Version 2.0.0 | Ratified 2026-10-09 | Last Amended 2026-11-17 -->

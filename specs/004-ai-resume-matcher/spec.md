@@ -3,7 +3,14 @@
 **Feature ID**: 004
 **Short name**: ai-resume-matcher
 **Date**: 2026-10-10
-**Status**: Draft
+**Status**: Core built (2026-10-10). Upload, matching and cited Q&A are on `main`. The tool using agent, the MCP
+server, `agent_runs` logging and the YAML eval runner were never built
+
+> **What changed after this was built.** Feature 005 made AI bring your own key (Claude, ChatGPT or Gemini) and
+> made matching work with no key at all through SQL skill overlap, with AI only re-ranking. It also added the AI
+> review, tailoring and cover letter modes and made upload work without an account. Feature 007 added program,
+> grad year, term and length to the score, "why it fits" notes, up to 60 matches, and the free Make your resume
+> fit check.
 
 ---
 
@@ -23,13 +30,13 @@ Students currently browse hundreds of postings manually, applying keyword filter
 
 1. Reduce the time a student spends finding relevant postings from 30+ minutes to under 5 minutes.
 2. Surface postings the student would not have found through keyword search alone.
-3. Give honest, cite-grounded explanations of match quality — never hallucinated claims.
+3. Give honest, cite-grounded explanations of match quality, never hallucinated claims.
 
 ---
 
 ## User Stories
 
-### US1 — Upload Resume and Get Ranked Matches (Priority: P1) 🎯 MVP
+### US1: Upload Resume and Get Ranked Matches (Priority: P1) 🎯 MVP
 
 **As a** registered student,
 **I want to** upload my resume (PDF or Word document),
@@ -38,14 +45,14 @@ Students currently browse hundreds of postings manually, applying keyword filter
 **Acceptance criteria:**
 - Student can upload a PDF or `.docx` resume from the My Profile page.
 - Within 30 seconds of upload, the page shows a ranked list of up to 20 matching postings.
-- Each result displays a match score (0–100 %), a one-sentence match reason, and the posting's key details (title, company, city, term, deadline).
+- Each result displays a match score (0 to 100 %), a one-sentence match reason, and the posting's key details (title, company, city, term, deadline).
 - Postings are ranked by match score descending.
 - Re-uploading a new resume replaces the previous one and triggers a fresh match run.
 - Upload rejects files that are not PDF or DOCX, or that exceed 5 MB.
 
 ---
 
-### US2 — Ask Follow-up Questions about a Match (Priority: P2)
+### US2: Ask Follow-up Questions about a Match (Priority: P2)
 
 **As a** registered student,
 **I want to** ask the AI questions about a specific matched posting,
@@ -55,14 +62,14 @@ Students currently browse hundreds of postings manually, applying keyword filter
 - On the match results page, each posting card has a "Ask about this role" button.
 - Clicking it opens a conversation panel (inline or modal) pre-loaded with the posting's details and the student's resume summary.
 - The student can type free-text questions (e.g. "Do I have enough Python experience for this?", "What am I missing?").
-- The AI answers using only information from the posting text and the resume — it cites the specific resume section or posting sentence it draws from.
+- The AI answers using only information from the posting text and the resume, it cites the specific resume section or posting sentence it draws from.
 - The AI says "I don't have enough information to answer that" rather than guessing.
 - Conversation history is preserved within the session; navigating away clears it (no persistent chat history required for MVP).
 - Response to each question streams to the UI (text appears word by word, not all at once).
 
 ---
 
-### US3 — View and Delete Stored Resume (Priority: P3)
+### US3: View and Delete Stored Resume (Priority: P3)
 
 **As a** registered student,
 **I want to** view which resume is currently stored and delete it,
@@ -83,7 +90,7 @@ Students currently browse hundreds of postings manually, applying keyword filter
 | FR-001 | Accept PDF and DOCX resume files up to 5 MB; reject other formats with a clear error.           | US1   |
 | FR-002 | Extract text from the uploaded resume without storing the raw file longer than needed to parse. | US1   |
 | FR-003 | Produce a ranked list of up to 20 matching postings within 30 seconds of upload.                | US1   |
-| FR-004 | Each match result includes: posting ID, match score (0–100), one-sentence match reason.         | US1   |
+| FR-004 | Each match result includes: posting ID, match score (0 to 100), one-sentence match reason.         | US1   |
 | FR-005 | Match score and reasons are grounded in extractable skills from both resume and posting.         | US1   |
 | FR-006 | Re-uploading replaces the previous resume and clears prior match results.                        | US1   |
 | FR-007 | The conversation panel for a posting is pre-loaded with context (posting + resume summary).      | US2   |
@@ -93,7 +100,7 @@ Students currently browse hundreds of postings manually, applying keyword filter
 | FR-011 | My Profile page shows file name, size, and upload date for the stored resume.                    | US3   |
 | FR-012 | A confirmed delete action permanently removes resume text and match results from storage.        | US3   |
 | FR-013 | After deletion, match results page shows an upload prompt rather than an empty list.             | US3   |
-| FR-014 | All resume data is scoped to the authenticated user; no cross-user access.                       | US1–3 |
+| FR-014 | All resume data is scoped to the authenticated user; no cross-user access.                       | US1 to 3 |
 
 ---
 
@@ -110,7 +117,7 @@ Students currently browse hundreds of postings manually, applying keyword filter
 
 ## User Scenarios & Testing
 
-### Scenario A — Happy path upload
+### Scenario A: Happy path upload
 
 1. Student logs in and navigates to My Profile.
 2. Student uploads a valid PDF resume (< 5 MB).
@@ -119,14 +126,14 @@ Students currently browse hundreds of postings manually, applying keyword filter
 
 **Expected**: Student sees ranked results with legible match reasons.
 
-### Scenario B — Oversized or invalid file
+### Scenario B: Oversized or invalid file
 
 1. Student uploads a `.png` image or a 10 MB PDF.
 2. The upload form immediately rejects the file with a descriptive error.
 
 **Expected**: Clear error message; no upload attempted.
 
-### Scenario C — Ask a follow-up question
+### Scenario C: Ask a follow-up question
 
 1. Student clicks "Ask about this role" on a match card.
 2. Student types "What Python skills from my resume match this job?"
@@ -134,14 +141,14 @@ Students currently browse hundreds of postings manually, applying keyword filter
 
 **Expected**: Response includes verbatim or paraphrased quotes from both resume and posting.
 
-### Scenario D — AI says it doesn't know
+### Scenario D: AI says it doesn't know
 
 1. Student asks "Will this company hire someone with a 2.5 GPA?"
 2. The posting doesn't mention GPA requirements.
 
 **Expected**: AI responds "The posting doesn't mention GPA requirements. I can't answer that."
 
-### Scenario E — Delete resume
+### Scenario E: Delete resume
 
 1. Student navigates to My Profile; sees stored resume metadata.
 2. Student clicks "Delete resume" and confirms in the modal.

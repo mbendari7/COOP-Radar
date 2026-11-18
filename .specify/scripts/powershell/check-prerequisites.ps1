@@ -1,20 +1,20 @@
 #!/usr/bin/env pwsh
 
-# Consolidated prerequisite checking script (PowerShell)
+# Check that a feature has the docs the next Spec Kit step needs (PowerShell version)
 #
-# This script provides unified prerequisite checking for Spec-Driven Development workflow.
-# It replaces the functionality previously spread across multiple scripts.
+# Same job as python/check_prerequisites.py. CoopRadar runs the Python one (init-options.json says "py"),
+# this one is here for anyone who sets Spec Kit to PowerShell.
 #
 # Usage: ./check-prerequisites.ps1 [OPTIONS]
 #
 # OPTIONS:
-#   -Json               Output in JSON format
-#   -RequireSpec        Require spec.md to exist (for analysis phase)
-#   -RequireTasks       Require tasks.md to exist (for implementation phase)
-#   -IncludeTasks       Include tasks.md in AVAILABLE_DOCS list
-#   -PathsOnly          Only output path variables (no validation)
-#   -Template NAME      Include composed template content in JSON output
-#   -Help, -h           Show help message
+#   -Json               Print JSON
+#   -RequireSpec        Stop if spec.md is missing
+#   -RequireTasks       Stop if tasks.md is missing (used before implement)
+#   -IncludeTasks       Add tasks.md to the AVAILABLE_DOCS list
+#   -PathsOnly          Only print the paths, skip the checks
+#   -Template NAME      Add the content of a template to the JSON
+#   -Help, -h           Show help
 
 [CmdletBinding()]
 param(

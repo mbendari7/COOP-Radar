@@ -105,7 +105,7 @@ class SavedPosting(Base):
 
 ## Redis Session Schema
 
-Not a relational table — stored in Redis as a hash.
+Not a relational table, stored in Redis as a hash.
 
 | Key pattern | Type | Fields | TTL |
 |------------|------|--------|-----|

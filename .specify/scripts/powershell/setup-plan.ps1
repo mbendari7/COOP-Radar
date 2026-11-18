@@ -1,5 +1,6 @@
 #!/usr/bin/env pwsh
-# Setup implementation plan for a feature
+
+# Copy the plan template into the current feature as plan.md (PowerShell version of setup_plan.py)
 
 [CmdletBinding()]
 param(

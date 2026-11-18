@@ -9,154 +9,141 @@ description: "Task list template for feature implementation"
 
 **Prerequisites**: plan.md (required), spec.md (required for user stories), research.md, data-model.md, contracts/
 
-**Tests**: The examples below include test tasks. Tests are OPTIONAL - only include them if explicitly requested in the feature specification.
+**Tests**: In CoopRadar tests are not optional. The constitution says every new endpoint gets a happy path and a
+bad request test, and every bug fix gets a regression test. Write the test task before the code task it covers.
 
-**Organization**: Tasks are grouped by user story to enable independent implementation and testing of each story.
+**Organization**: Tasks are grouped by user story so each story can be built and tested on its own.
 
 ## Format: `[ID] [P?] [Story] Description`
 
-- **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Which user story this task belongs to (e.g., US1, US2, US3)
-- Include exact file paths in descriptions
+- **[P]**: Can run at the same time as other [P] tasks (different files, nothing it waits on)
+- **[Story]**: Which user story the task is for (US1, US2, US3)
+- Every task names the real file it changes
 
 ## Path Conventions
 
-- **Single project**: `src/`, `tests/` at repository root
-- **Web app**: `backend/src/`, `frontend/src/`
-- **Mobile**: `api/src/`, `ios/src/` or `android/src/`
-- Paths shown below assume single project - adjust based on plan.md structure
+- Backend code: `backend/app/api/`, `backend/app/services/`, `backend/app/schemas/`, `backend/app/models/`,
+  `backend/app/ingest/`, `backend/app/agent/`
+- Migrations: `backend/alembic/versions/00NN_short_name.py` (use the `/db-migration` skill)
+- Seed data: `backend/seed/`
+- Backend tests: `backend/tests/api/`, `backend/tests/ingest/`, `backend/tests/resume/`, `backend/tests/eval/`,
+  `backend/tests/perf/`, recorded replies in `backend/tests/fixtures/`
+- Frontend code: `frontend/src/api/`, `frontend/src/pages/`, `frontend/src/components/`
+- Frontend tests: `frontend/tests/` (Vitest), `frontend/e2e/*.e2e.ts` (Playwright)
+- Docs that carry numbers: `README.md`, `guides/*/README.md`, `docs/PROJECT_GUIDE.md`, `docs/DEPLOY.md`
 
 <!--
-  ============================================================================
-  IMPORTANT: The tasks below are SAMPLE TASKS for illustration purposes only.
+  The tasks below are examples of the shape only. /speckit-tasks MUST replace them with real tasks from:
+  - the user stories and priorities in spec.md
+  - the stack and structure in plan.md
+  - the tables in data-model.md
+  - the endpoints in contracts/api.md
 
-  The /speckit-tasks command MUST replace these with actual tasks based on:
-  - User stories from spec.md (with their priorities P1, P2, P3...)
-  - Feature requirements from plan.md
-  - Entities from data-model.md
-  - Endpoints from contracts/
-
-  Tasks MUST be organized by user story so each story can be:
-  - Implemented independently
-  - Tested independently
-  - Delivered as an MVP increment
-
-  DO NOT keep these sample tasks in the generated tasks.md file.
-  ============================================================================
+  Keep them grouped by user story so each story can be built, tested and shipped on its own.
+  Do not leave these example tasks in the real tasks.md.
 -->
 
 ## Phase 1: Setup (Shared Infrastructure)
 
-**Purpose**: Project initialization and basic structure
+**Purpose**: Anything every story needs before work starts
 
-- [ ] T001 Create project structure per implementation plan
-- [ ] T002 Initialize [language] project with [framework] dependencies
-- [ ] T003 [P] Configure linting and formatting tools
+- [ ] T001 Add [library] to `backend/pyproject.toml` with the reason from research.md
+- [ ] T002 [P] Add recorded replies for [source] under `backend/tests/fixtures/ingest/`
+- [ ] T003 [P] Add any new env vars to `backend/app/config.py` and `.env.example`
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: Core infrastructure that MUST be complete before ANY user story can be implemented
+**Purpose**: The parts every story depends on
 
-**⚠️ CRITICAL**: No user story work can begin until this phase is complete
+**⚠️ CRITICAL**: No user story work starts until this phase is done
 
-Examples of foundational tasks (adjust based on your project):
+- [ ] T004 Add the [column or table] to `backend/app/models/[model].py` with its index in `__table_args__`
+- [ ] T005 Write migration `backend/alembic/versions/00NN_[name].py` with the same index, then upgrade, downgrade,
+  upgrade and `alembic check`
+- [ ] T006 [P] Add request and reply schemas in `backend/app/schemas/[area].py`
+- [ ] T007 [P] Add the TypeScript types and hook in `frontend/src/api/[area].ts`
 
-- [ ] T004 Setup database schema and migrations framework
-- [ ] T005 [P] Implement authentication/authorization framework
-- [ ] T006 [P] Setup API routing and middleware structure
-- [ ] T007 Create base models/entities that all stories depend on
-- [ ] T008 Configure error handling and logging infrastructure
-- [ ] T009 Setup environment configuration management
-
-**Checkpoint**: Foundation ready - user story implementation can now begin in parallel
+**Checkpoint**: `alembic check` is clean and the app starts with `python start.py`
 
 ---
 
 ## Phase 3: User Story 1 - [Title] (Priority: P1) 🎯 MVP
 
-**Goal**: [Brief description of what this story delivers]
+**Goal**: [What this story gives the student]
 
-**Independent Test**: [How to verify this story works on its own]
+**Independent Test**: [How to check it on its own]
 
-### Tests for User Story 1 (OPTIONAL - only if tests requested) ⚠️
+### Tests for User Story 1 ⚠️
 
-> **NOTE: Write these tests FIRST, ensure they FAIL before implementation**
+> **Write these first and watch them fail before the code exists**
 
-- [ ] T010 [P] [US1] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T011 [P] [US1] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T008 [P] [US1] Endpoint test for [endpoint] in `backend/tests/api/test_[area].py` (happy path and a bad request)
+- [ ] T009 [P] [US1] Component test for [component] in `frontend/tests/[Component].test.tsx`
 
 ### Implementation for User Story 1
 
-- [ ] T012 [P] [US1] Create [Entity1] model in src/models/[entity1].py
-- [ ] T013 [P] [US1] Create [Entity2] model in src/models/[entity2].py
-- [ ] T014 [US1] Implement [Service] in src/services/[service].py (depends on T012, T013)
-- [ ] T015 [US1] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T016 [US1] Add validation and error handling
-- [ ] T017 [US1] Add logging for user story 1 operations
+- [ ] T010 [US1] Add [function] to `backend/app/services/[area].py` (filters and sorting in SQL, whitelisted)
+- [ ] T011 [US1] Add the route in `backend/app/api/[area].py` that calls the service and nothing else
+- [ ] T012 [US1] Build [component] in `frontend/src/components/[Component].tsx` with loading, empty and error states
+- [ ] T013 [US1] Wire it into `frontend/src/pages/[Page].tsx` with the state kept in the URL
 
-**Checkpoint**: At this point, User Story 1 should be fully functional and testable independently
+**Checkpoint**: Story 1 works on its own and its tests pass
 
 ---
 
 ## Phase 4: User Story 2 - [Title] (Priority: P2)
 
-**Goal**: [Brief description of what this story delivers]
+**Goal**: [What this story gives the student]
 
-**Independent Test**: [How to verify this story works on its own]
+**Independent Test**: [How to check it on its own]
 
-### Tests for User Story 2 (OPTIONAL - only if tests requested) ⚠️
+### Tests for User Story 2 ⚠️
 
-- [ ] T018 [P] [US2] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T019 [P] [US2] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T014 [P] [US2] Test for [behaviour] in `backend/tests/[folder]/test_[name].py`
 
 ### Implementation for User Story 2
 
-- [ ] T020 [P] [US2] Create [Entity] model in src/models/[entity].py
-- [ ] T021 [US2] Implement [Service] in src/services/[service].py
-- [ ] T022 [US2] Implement [endpoint/feature] in src/[location]/[file].py
-- [ ] T023 [US2] Integrate with User Story 1 components (if needed)
+- [ ] T015 [US2] [Change] in `backend/app/[folder]/[file].py`
+- [ ] T016 [US2] [Change] in `frontend/src/[folder]/[file].tsx`
 
-**Checkpoint**: At this point, User Stories 1 AND 2 should both work independently
+**Checkpoint**: Stories 1 and 2 both work on their own
 
 ---
 
 ## Phase 5: User Story 3 - [Title] (Priority: P3)
 
-**Goal**: [Brief description of what this story delivers]
+**Goal**: [What this story gives the student]
 
-**Independent Test**: [How to verify this story works on its own]
+**Independent Test**: [How to check it on its own]
 
-### Tests for User Story 3 (OPTIONAL - only if tests requested) ⚠️
+### Tests for User Story 3 ⚠️
 
-- [ ] T024 [P] [US3] Contract test for [endpoint] in tests/contract/test_[name].py
-- [ ] T025 [P] [US3] Integration test for [user journey] in tests/integration/test_[name].py
+- [ ] T017 [P] [US3] Test for [behaviour] in `backend/tests/[folder]/test_[name].py`
 
 ### Implementation for User Story 3
 
-- [ ] T026 [P] [US3] Create [Entity] model in src/models/[entity].py
-- [ ] T027 [US3] Implement [Service] in src/services/[service].py
-- [ ] T028 [US3] Implement [endpoint/feature] in src/[location]/[file].py
+- [ ] T018 [US3] [Change] in `backend/app/[folder]/[file].py`
 
-**Checkpoint**: All user stories should now be independently functional
+**Checkpoint**: Every story works on its own
 
 ---
 
-[Add more user story phases as needed, following the same pattern]
+[Add more story phases the same way]
 
 ---
 
 ## Phase N: Polish & Cross-Cutting Concerns
 
-**Purpose**: Improvements that affect multiple user stories
+**Purpose**: Things that touch every story
 
-- [ ] TXXX [P] Documentation updates in docs/
-- [ ] TXXX Code cleanup and refactoring
-- [ ] TXXX Performance optimization across all stories
-- [ ] TXXX [P] Additional unit tests (if requested) in tests/unit/
-- [ ] TXXX Security hardening
-- [ ] TXXX Run quickstart.md validation
+- [ ] TXXX Run the perf budget `pytest -q -m perf -s` and add an index if p95 is over 300 ms
+- [ ] TXXX [P] Add or update a Playwright test in `frontend/e2e/` and run `npm run test:e2e` against a local site
+- [ ] TXXX [P] Check the new UI at 375 px and with only the keyboard
+- [ ] TXXX Update the numbers in `README.md`, the guides, `docs/PROJECT_GUIDE.md` and `docs/DEPLOY.md`
+- [ ] TXXX Run every check in `CLAUDE.md` and the steps in quickstart.md
+- [ ] TXXX Write the `docs/agentic-workflow.md` entry with `/log-agentic-work`
 
 ---
 
@@ -164,48 +151,44 @@ Examples of foundational tasks (adjust based on your project):
 
 ### Phase Dependencies
 
-- **Setup (Phase 1)**: No dependencies - can start immediately
-- **Foundational (Phase 2)**: Depends on Setup completion - BLOCKS all user stories
-- **User Stories (Phase 3+)**: All depend on Foundational phase completion
-  - User stories can then proceed in parallel (if staffed)
-  - Or sequentially in priority order (P1 → P2 → P3)
-- **Polish (Final Phase)**: Depends on all desired user stories being complete
+- **Setup (Phase 1)**: Nothing to wait on
+- **Foundational (Phase 2)**: Waits on Setup and blocks every story
+- **User Stories (Phase 3 and up)**: Wait on Foundational
+  - They can go at the same time if more than one person is working
+  - Or one after the other in priority order (P1, then P2, then P3)
+- **Polish (last phase)**: Waits on the stories you want in this release
 
 ### User Story Dependencies
 
-- **User Story 1 (P1)**: Can start after Foundational (Phase 2) - No dependencies on other stories
-- **User Story 2 (P2)**: Can start after Foundational (Phase 2) - May integrate with US1 but should be independently testable
-- **User Story 3 (P3)**: Can start after Foundational (Phase 2) - May integrate with US1/US2 but should be independently testable
+- **User Story 1 (P1)**: Starts after Foundational. Does not need the other stories
+- **User Story 2 (P2)**: Starts after Foundational. Can use Story 1 but still tests on its own
+- **User Story 3 (P3)**: Starts after Foundational. Can use Stories 1 and 2 but still tests on its own
 
 ### Within Each User Story
 
-- Tests (if included) MUST be written and FAIL before implementation
-- Models before services
-- Services before endpoints
-- Core implementation before integration
-- Story complete before moving to next priority
+- Tests first, and they fail before the code exists
+- Models and migration, then services, then routes, then hooks, then UI
+- Finish the story before moving to the next priority
 
 ### Parallel Opportunities
 
-- All Setup tasks marked [P] can run in parallel
-- All Foundational tasks marked [P] can run in parallel (within Phase 2)
-- Once Foundational phase completes, all user stories can start in parallel (if team capacity allows)
-- All tests for a user story marked [P] can run in parallel
-- Models within a story marked [P] can run in parallel
-- Different user stories can be worked on in parallel by different team members
+- Setup and Foundational tasks marked [P] can run together
+- Once Foundational is done, stories can run together
+- Tests in one story marked [P] can be written together
+- Backend and frontend tasks in one story can usually run together once the schema is agreed
 
 ---
 
 ## Parallel Example: User Story 1
 
 ```bash
-# Launch all tests for User Story 1 together (if tests requested):
-Task: "Contract test for [endpoint] in tests/contract/test_[name].py"
-Task: "Integration test for [user journey] in tests/integration/test_[name].py"
+# Write the tests for Story 1 together:
+Task: "Endpoint test for [endpoint] in backend/tests/api/test_[area].py"
+Task: "Component test for [component] in frontend/tests/[Component].test.tsx"
 
-# Launch all models for User Story 1 together:
-Task: "Create [Entity1] model in src/models/[entity1].py"
-Task: "Create [Entity2] model in src/models/[entity2].py"
+# Then the backend service and the frontend hook together:
+Task: "Add [function] to backend/app/services/[area].py"
+Task: "Add the hook in frontend/src/api/[area].ts"
 ```
 
 ---
@@ -214,39 +197,35 @@ Task: "Create [Entity2] model in src/models/[entity2].py"
 
 ### MVP First (User Story 1 Only)
 
-1. Complete Phase 1: Setup
-2. Complete Phase 2: Foundational (CRITICAL - blocks all stories)
-3. Complete Phase 3: User Story 1
-4. **STOP and VALIDATE**: Test User Story 1 independently
-5. Deploy/demo if ready
+1. Finish Setup
+2. Finish Foundational (this blocks every story)
+3. Finish Story 1
+4. **Stop and check**: test Story 1 on its own with `python start.py`
+5. Push it if it is ready
 
 ### Incremental Delivery
 
-1. Complete Setup + Foundational → Foundation ready
-2. Add User Story 1 → Test independently → Deploy/Demo (MVP!)
-3. Add User Story 2 → Test independently → Deploy/Demo
-4. Add User Story 3 → Test independently → Deploy/Demo
-5. Each story adds value without breaking previous stories
+1. Setup and Foundational, so the base is ready
+2. Story 1, test it, push it (the MVP)
+3. Story 2, test it, push it
+4. Story 3, test it, push it
+5. Each story adds something without breaking the ones before
 
-### Parallel Team Strategy
+### Checks before every push
 
-With multiple developers:
-
-1. Team completes Setup + Foundational together
-2. Once Foundational is done:
-   - Developer A: User Story 1
-   - Developer B: User Story 2
-   - Developer C: User Story 3
-3. Stories complete and integrate independently
+```bash
+cd backend && ruff check . && mypy app && pytest -q -m 'not perf' && alembic check
+cd frontend && npm run lint && npm run typecheck && npm test && npm run build
+```
 
 ---
 
 ## Notes
 
-- [P] tasks = different files, no dependencies
-- [Story] label maps task to specific user story for traceability
-- Each user story should be independently completable and testable
-- Verify tests fail before implementing
-- Commit after each task or logical group
-- Stop at any checkpoint to validate story independently
-- Avoid: vague tasks, same file conflicts, cross-story dependencies that break independence
+- [P] tasks touch different files and do not wait on each other
+- The [Story] label ties each task to a story so you can trace it back
+- Each story should be finished and tested on its own
+- Watch the tests fail before writing the code
+- Commit after each task or small group with a conventional message and no AI attribution
+- Stop at any checkpoint to test the story on its own
+- Avoid vague tasks, two tasks editing the same file at once, and stories that only work together

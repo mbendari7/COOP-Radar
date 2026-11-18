@@ -1,5 +1,8 @@
 #!/usr/bin/env pwsh
-# Create a new feature
+
+# Start a new feature folder, spec and branch (PowerShell version of create_new_feature.py)
+# Picks the next number, makes specs/NNN-short-name/ with spec.md and points .specify/feature.json at it.
+
 [CmdletBinding()]
 param(
     [switch]$Json,

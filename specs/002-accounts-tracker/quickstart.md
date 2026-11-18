@@ -23,7 +23,7 @@ docker compose exec api alembic upgrade head   # applies 0002 migration
 
 ## End-to-end validation
 
-### 1 — Register a new account
+### 1: Register a new account
 
 ```bash
 curl -s -c cookies.txt -X POST http://localhost:8000/api/auth/register \
@@ -34,29 +34,29 @@ curl -s -c cookies.txt -X POST http://localhost:8000/api/auth/register \
 # cookies.txt now contains the session cookie
 ```
 
-### 2 — Verify the cookie is HttpOnly
+### 2: Verify the cookie is HttpOnly
 
-Check the response headers — `Set-Cookie` must include `HttpOnly` and `SameSite=Lax`:
+Check the response headers, `Set-Cookie` must include `HttpOnly` and `SameSite=Lax`:
 
 ```
 Set-Cookie: session=<token>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=604800
 ```
 
-### 3 — Hit a protected endpoint without the cookie (expect 401)
+### 3: Hit a protected endpoint without the cookie (expect 401)
 
 ```bash
 curl -s http://localhost:8000/api/saved | jq .
 # Expected: {"detail":"Not authenticated","code":"NOT_AUTHENTICATED"}
 ```
 
-### 4 — Hit the same endpoint with the cookie (expect 200)
+### 4: Hit the same endpoint with the cookie (expect 200)
 
 ```bash
 curl -s -b cookies.txt http://localhost:8000/api/saved | jq .
 # Expected: {"items":[],"total":0,"page":1,"page_size":25,"status_counts":{...}}
 ```
 
-### 5 — Save a posting
+### 5: Save a posting
 
 ```bash
 # Get a posting ID first
@@ -68,14 +68,14 @@ curl -s -b cookies.txt -c cookies.txt -X POST http://localhost:8000/api/saved \
 # Expected: {"id":"...","saved_at":"...","status":null}
 ```
 
-### 6 — View saved postings
+### 6: View saved postings
 
 ```bash
 curl -s -b cookies.txt http://localhost:8000/api/saved | jq '.items | length'
 # Expected: 1
 ```
 
-### 7 — Set application status
+### 7: Set application status
 
 ```bash
 SAVED_ID=$(curl -s -b cookies.txt http://localhost:8000/api/saved | jq -r '.items[0].id')
@@ -87,7 +87,7 @@ curl -s -b cookies.txt -c cookies.txt -X PATCH \
 # Expected: {"id":"...","status":"applied","saved_at":"..."}
 ```
 
-### 8 — Log out
+### 8: Log out
 
 ```bash
 curl -s -b cookies.txt -c cookies.txt -X POST http://localhost:8000/api/auth/logout
@@ -98,7 +98,7 @@ curl -s -b cookies.txt http://localhost:8000/api/saved | jq .
 # Expected: 401
 ```
 
-### 9 — Frontend smoke tests
+### 9: Frontend smoke tests
 
 - Open http://localhost:5173
 - A "Sign in / Register" button should be visible in the header

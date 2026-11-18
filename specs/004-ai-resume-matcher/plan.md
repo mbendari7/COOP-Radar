@@ -8,7 +8,7 @@
 
 Students upload a PDF or DOCX resume; the server extracts its text, embeds it with OpenAI
 text-embedding-3-small, ranks all co-op postings by cosine similarity, re-ranks the top 20 using
-Claude Haiku to produce a 0–100 match score and a one-sentence reason, and stores the results in
+Claude Haiku to produce a 0 to 100 match score and a one-sentence reason, and stores the results in
 `match_results`. A separate streaming Q&A endpoint lets students ask free-text questions about any
 matched posting; Claude claude-sonnet-4-6 answers citing only resume or posting text, streaming
 word-by-word via SSE. Students can view stored resume metadata and permanently delete it.
@@ -19,14 +19,14 @@ word-by-word via SSE. Students can view stored resume metadata and permanently d
 
 **Primary Dependencies**:
 - FastAPI, SQLAlchemy 2.0 async, Pydantic v2, Alembic (existing)
-- `pypdf>=4.0` — PDF text extraction (pure-Python, widely-used)
-- `python-docx>=1.1` — DOCX text extraction (widely-used)
-- `anthropic>=0.29` — Claude Haiku re-ranking + claude-sonnet-4-6 streaming Q&A (existing)
-- `openai>=1.30` — text-embedding-3-small embeddings (existing)
-- `pgvector>=0.3` — cosine similarity query (existing)
+- `pypdf>=4.0`. PDF text extraction (pure-Python, widely-used)
+- `python-docx>=1.1`. DOCX text extraction (widely-used)
+- `anthropic>=0.29`. Claude Haiku re-ranking + claude-sonnet-4-6 streaming Q&A (existing)
+- `openai>=1.30`, text-embedding-3-small embeddings (existing)
+- `pgvector>=0.3`, cosine similarity query (existing)
 - TanStack Query v5, React Router v6, Tailwind CSS v3 (existing)
 
-**Storage**: PostgreSQL 16 + pgvector; two new tables — `resumes`, `match_results`
+**Storage**: PostgreSQL 16 + pgvector; two new tables, `resumes`, `match_results`
 
 **Testing**: pytest + respx (backend), vitest (frontend); eval suite at `backend/tests/eval/`
 
@@ -59,7 +59,7 @@ word-by-word via SSE. Students can view stored resume metadata and permanently d
 | VIII. Small Changes | PASS | Feature branch + conventional commits |
 | IX. Simplicity | PASS | pypdf + python-docx are the canonical libraries; no novel abstractions; match pipeline is a single service function |
 
-All gates pass — no Complexity Tracking table required.
+All gates pass, no Complexity Tracking table required.
 
 ## Project Structure
 
@@ -121,7 +121,7 @@ frontend/
 
 ---
 
-## Amendment — 2026-10-10 (post-implementation review)
+## Amendment: 2026-10-10 (post-implementation review)
 
 Changes made after this plan was implemented. The decisions above are kept as the original record.
 

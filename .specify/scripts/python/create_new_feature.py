@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Create a new feature directory and spec file."""
+"""Start a new feature folder and spec.
+
+/speckit-specify runs this. It picks the next number (CoopRadar is on 008, so the next is 009), turns the
+description into a short name, makes specs/NNN-short-name/ with spec.md copied from the spec template, makes
+the git branch with the same name and points .specify/feature.json at the new folder.
+"""
 
 from __future__ import annotations
 

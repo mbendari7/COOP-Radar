@@ -12,9 +12,9 @@
 multi-page PDFs; available on PyPI; zero native binary install overhead in Docker.
 
 **Alternatives considered**:
-- `pdfminer.six` — more accurate for complex PDFs, but slower and more complex API; overkill for resumes
-- `pymupdf` — fastest, best quality, but requires MuPDF C library; increases Docker image size significantly
-- `pdfplumber` — wrapper over pdfminer; easier API but heavier
+- `pdfminer.six`, more accurate for complex PDFs, but slower and more complex API; overkill for resumes
+- `pymupdf`, fastest, best quality, but requires MuPDF C library; increases Docker image size significantly
+- `pdfplumber`, wrapper over pdfminer; easier API but heavier
 
 **Validation**: Extract text from a typical 2-page resume PDF in < 2 s. Fall back gracefully with
 an error message if pypdf raises `PdfReadError` (encrypted or corrupted file).
@@ -29,24 +29,24 @@ an error message if pypdf raises `PdfReadError` (encrypted or corrupted file).
 available on PyPI; no system dependencies.
 
 **Alternatives considered**:
-- `mammoth` — excellent HTML output but over-engineered for plain-text extraction
-- Manual XML parsing — fragile, no maintained library support
+- `mammoth`, excellent HTML output but over-engineered for plain-text extraction
+- Manual XML parsing, fragile, no maintained library support
 
 ---
 
 ## Match Pipeline Architecture
 
-**Decision**: Synchronous POST — extract → embed → cosine rank → Haiku re-rank → store → return results
+**Decision**: Synchronous POST, extract → embed → cosine rank → Haiku re-rank → store → return results
 
 **Rationale**: The 30 s SLA is generous. Embedding one resume takes ~1 s; cosine similarity
 query over 10 k posting embeddings takes < 200 ms; batching 20 posting descriptions + resume
-summary to Claude Haiku takes ~5–10 s. Total ≤ 15 s typical, well within the 30 s budget.
+summary to Claude Haiku takes ~5 to 10 s. Total ≤ 15 s typical, well within the 30 s budget.
 Keeping it synchronous avoids adding polling complexity on the frontend and a second RQ job type.
 
 **Alternatives considered**:
-- RQ background job with polling — adds frontend polling loop and job-status endpoint; unnecessary
+- RQ background job with polling, adds frontend polling loop and job-status endpoint; unnecessary
   given the timing budget
-- Stream match progress via SSE — complex; match results are not useful until all 20 are scored
+- Stream match progress via SSE, complex; match results are not useful until all 20 are scored
 
 ---
 
@@ -64,9 +64,9 @@ is the cheapest model capable of structured JSON output and is already a project
 Parse and validate with Pydantic.
 
 **Alternatives considered**:
-- Only embedding cosine — misses semantic nuance, no human-readable reason
-- Only LLM scoring all postings — too slow and expensive for 10 k postings
-- GPT-4o for re-ranking — higher cost, no advantage for structured scoring
+- Only embedding cosine, misses semantic nuance, no human-readable reason
+- Only LLM scoring all postings, too slow and expensive for 10 k postings
+- GPT-4o for re-ranking, higher cost, no advantage for structured scoring
 
 ---
 
@@ -93,8 +93,8 @@ data: [DONE]\n\n
 - Model: `claude-sonnet-4-6` (best reasoning + citation quality for this use case)
 
 **Alternatives considered**:
-- EventSource (GET) — browser-native but requires GET; long questions hit URL length limits
-- WebSockets — overkill for one-shot Q&A; SSE is simpler and stateless
+- EventSource (GET), browser-native but requires GET; long questions hit URL length limits
+- WebSockets, overkill for one-shot Q&A; SSE is simpler and stateless
 
 ---
 

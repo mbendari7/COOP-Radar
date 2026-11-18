@@ -4,21 +4,27 @@
 
 **Created**: 2026-10-10
 
-**Status**: Draft
+**Status**: Built (2026-10-10). Merged to `main` in PR #1
 
-**Input**: User description: "Real Postings Ingestion & Semantic Search — Feature 003"
+> **What changed after this was built.** Feature 006 replaced the RQ worker and Redis with background jobs inside
+> the server and a scheduler that runs 3 sources at a time. Feature 008 added about 1,700 real sources (employer
+> career boards on Greenhouse, Lever, Ashby, SmartRecruiters, Workday and others, Workable, The Muse, Himalayas,
+> Simplify's lists and Government of Canada Job Bank), rolling windows and estimated deadlines. Smart search with
+> embeddings still works but only when the owner sets an OpenAI key.
+
+**Input**: User description: "Real Postings Ingestion & Semantic Search. Feature 003"
 
 ---
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 — Scheduled Ingestion from Public Sources (Priority: P1)
+### User Story 1: Scheduled Ingestion from Public Sources (Priority: P1)
 
 The system automatically imports co-op postings every 6 hours from a configurable list of company job boards that publish public APIs or RSS feeds. Each run fetches new postings, updates changed ones, closes ones that have disappeared, and records the run result in an audit log. An admin can also trigger a run manually from the Sources page.
 
 **Why this priority**: Without real postings the app has no value for a genuine job hunt. Every other feature depends on having up-to-date data.
 
-**Independent Test**: Configure one source adapter pointing to a recorded fixture response. Trigger a run. Confirm new postings appear in the postings list. Trigger the same run again — confirm no duplicates are created and the run log shows "0 added". Remove a posting from the fixture and re-run — confirm that posting is marked closed.
+**Independent Test**: Configure one source adapter pointing to a recorded fixture response. Trigger a run. Confirm new postings appear in the postings list. Trigger the same run again, confirm no duplicates are created and the run log shows "0 added". Remove a posting from the fixture and re-run, confirm that posting is marked closed.
 
 **Acceptance Scenarios**:
 
@@ -30,7 +36,7 @@ The system automatically imports co-op postings every 6 hours from a configurabl
 
 ---
 
-### User Story 2 — CSV Upload and Manual Entry (Priority: P2)
+### User Story 2: CSV Upload and Manual Entry (Priority: P2)
 
 A student can upload a CSV file exported from their school's co-op portal to bulk-import postings. They can also add a single posting manually through a form. Both paths use the same duplicate-detection logic as the scheduled ingestion.
 
@@ -48,9 +54,9 @@ A student can upload a CSV file exported from their school's co-op portal to bul
 
 ---
 
-### User Story 3 — Semantic ("Smart") Search (Priority: P3)
+### User Story 3: Semantic ("Smart") Search (Priority: P3)
 
-A student can switch from keyword search to semantic search with a toggle. Semantic search finds postings by meaning — for example, "embedded firmware" also finds postings that mention "microcontroller C developer" — because both the query and all posting descriptions are represented as meaning-vectors. The detail page shows a "Similar postings" sidebar with the top 5 results.
+A student can switch from keyword search to semantic search with a toggle. Semantic search finds postings by meaning, for example, "embedded firmware" also finds postings that mention "microcontroller C developer", because both the query and all posting descriptions are represented as meaning-vectors. The detail page shows a "Similar postings" sidebar with the top 5 results.
 
 **Why this priority**: Keyword search misses semantically equivalent terms common in job descriptions. Semantic search is the key differentiator of this feature for users.
 
@@ -66,13 +72,13 @@ A student can switch from keyword search to semantic search with a toggle. Seman
 
 ---
 
-### User Story 4 — Admin Sources Page (Priority: P4)
+### User Story 4: Admin Sources Page (Priority: P4)
 
 An admin user can view all configured ingestion sources, see each source's last run time, the counts of postings added/updated/closed, any errors, and trigger a manual run. Admins can add new sources and flag individual fields on a posting as needing review.
 
 **Why this priority**: Operational visibility is required to maintain data quality; low-confidence field flags protect students from bad data without blocking imports.
 
-**Independent Test**: Log in as admin. Navigate to /admin/sources. Confirm all configured sources appear with last-run status. Click "Run now" — confirm the run log updates. Open a posting with a low-confidence field — confirm the yellow warning icon is visible to the admin but not to students on the public detail page.
+**Independent Test**: Log in as admin. Navigate to /admin/sources. Confirm all configured sources appear with last-run status. Click "Run now", confirm the run log updates. Open a posting with a low-confidence field, confirm the yellow warning icon is visible to the admin but not to students on the public detail page.
 
 **Acceptance Scenarios**:
 

@@ -9,7 +9,7 @@
 ## Format: `[ID] [P?] [Story] Description`
 
 - **[P]**: Can run in parallel (different files, no dependencies)
-- **[Story]**: Which user story this task belongs to (US1–US4)
+- **[Story]**: Which user story this task belongs to (US1 to US4)
 
 ---
 
@@ -18,29 +18,29 @@
 **Purpose**: Add new dependencies and wire up the shared pieces that every user story needs.
 
 - [X] T001 Add `argon2-cffi>=23` to `[project.dependencies]` in `backend/pyproject.toml`
-- [X] T002 [P] Create `backend/app/deps.py` — `get_current_user(request, db, redis)` FastAPI dependency: reads `session` cookie → `GET session:<token>` from Redis → SELECT user → reset EXPIRE 7d → return `User`; raises `HTTP 401` with `{"detail":"Not authenticated","code":"NOT_AUTHENTICATED"}` if cookie absent or Redis key missing
-- [X] T003 [P] Create `backend/app/redis.py` — async Redis client: `create_redis_pool()` factory returning `redis.asyncio.Redis`; `get_redis()` FastAPI dependency yielding the pool; pool stored on `app.state.redis`; opened in lifespan startup, closed in shutdown
+- [X] T002 [P] Create `backend/app/deps.py`, `get_current_user(request, db, redis)` FastAPI dependency: reads `session` cookie → `GET session:<token>` from Redis → SELECT user → reset EXPIRE 7d → return `User`; raises `HTTP 401` with `{"detail":"Not authenticated","code":"NOT_AUTHENTICATED"}` if cookie absent or Redis key missing
+- [X] T003 [P] Create `backend/app/redis.py`, async Redis client: `create_redis_pool()` factory returning `redis.asyncio.Redis`; `get_redis()` FastAPI dependency yielding the pool; pool stored on `app.state.redis`; opened in lifespan startup, closed in shutdown
 
 ---
 
 ## Phase 2: Foundational (Blocking Prerequisites)
 
-**Purpose**: ORM models, Alembic migration, and Pydantic schemas — must be complete before any endpoint can be written.
+**Purpose**: ORM models, Alembic migration, and Pydantic schemas, must be complete before any endpoint can be written.
 
 ⚠️ CRITICAL: No user story work can begin until this phase is complete.
 
-- [X] T004 Create `backend/app/models/user.py` — `User` SQLAlchemy mapped class: `id UUID PK default uuid4`, `email TEXT NOT NULL UNIQUE`, `hashed_password TEXT NOT NULL`, `created_at TIMESTAMPTZ server_default NOW()`; `saved_postings` relationship back_populates; import into `backend/app/db.py` so `Base.metadata` sees it
-- [X] T005 [P] Create `backend/app/models/saved_posting.py` — `ApplicationStatus(str, Enum)` with values `applied/interviewing/offer/rejected`; `SavedPosting` mapped class: `id UUID PK`, `user_id UUID FK→users.id ON DELETE CASCADE NOT NULL`, `posting_id UUID FK→postings.id ON DELETE CASCADE NOT NULL`, `status Enum(ApplicationStatus) nullable`, `saved_at TIMESTAMPTZ server_default NOW()`; `user` + `posting` relationships; UNIQUE constraint `(user_id, posting_id)`
-- [X] T006 Create `backend/alembic/versions/0002_add_auth.py` — Alembic migration: upgrade creates `application_status_enum` ENUM type, `users` table (`id`, `email`, `hashed_password`, `created_at`), `saved_postings` table (`id`, `user_id`, `posting_id`, `status`, `saved_at`), UNIQUE `ux_saved_postings_user_posting(user_id, posting_id)`, indexes `idx_users_email` (unique), `idx_saved_postings_user_id`, `idx_saved_postings_posting_id`, `idx_saved_postings_status`, `idx_saved_postings_saved_at DESC`; downgrade drops tables then type; use `op.execute()` for the ENUM and GENERATED expressions
-- [X] T007 [P] Create `backend/app/schemas/auth.py` — Pydantic schemas: `RegisterIn(email: EmailStr, password: str = Field(min_length=10))`, `LoginIn(email: EmailStr, password: str)`, `UserOut(id: UUID, email: str, created_at: datetime, model_config from_attributes=True)`, `ChangePasswordIn(current_password: str, new_password: str = Field(min_length=10))`, `DeleteAccountIn(password: str)`
-- [X] T008 [P] Create `backend/app/schemas/saved_posting.py` — Pydantic schemas: `SaveIn(posting_id: UUID)`, `StatusUpdateIn(status: ApplicationStatus | None)`, `SavedPostingOut(id: UUID, saved_at: datetime, status: ApplicationStatus | None, posting: PostingListItem, model_config from_attributes=True)`, `SavedPostingsPage(items: list[SavedPostingOut], total: int, page: int, page_size: int, status_counts: dict[str, int])`; import `PostingListItem` from `app.schemas.posting`
-- [X] T009 Update `backend/app/schemas/posting.py` — add `is_saved: bool | None = None` field to `PostingListItem`; this field is omitted (None) for unauthenticated responses and explicitly True/False for authenticated ones
+- [X] T004 Create `backend/app/models/user.py`, `User` SQLAlchemy mapped class: `id UUID PK default uuid4`, `email TEXT NOT NULL UNIQUE`, `hashed_password TEXT NOT NULL`, `created_at TIMESTAMPTZ server_default NOW()`; `saved_postings` relationship back_populates; import into `backend/app/db.py` so `Base.metadata` sees it
+- [X] T005 [P] Create `backend/app/models/saved_posting.py`, `ApplicationStatus(str, Enum)` with values `applied/interviewing/offer/rejected`; `SavedPosting` mapped class: `id UUID PK`, `user_id UUID FK→users.id ON DELETE CASCADE NOT NULL`, `posting_id UUID FK→postings.id ON DELETE CASCADE NOT NULL`, `status Enum(ApplicationStatus) nullable`, `saved_at TIMESTAMPTZ server_default NOW()`; `user` + `posting` relationships; UNIQUE constraint `(user_id, posting_id)`
+- [X] T006 Create `backend/alembic/versions/0002_add_auth.py`. Alembic migration: upgrade creates `application_status_enum` ENUM type, `users` table (`id`, `email`, `hashed_password`, `created_at`), `saved_postings` table (`id`, `user_id`, `posting_id`, `status`, `saved_at`), UNIQUE `ux_saved_postings_user_posting(user_id, posting_id)`, indexes `idx_users_email` (unique), `idx_saved_postings_user_id`, `idx_saved_postings_posting_id`, `idx_saved_postings_status`, `idx_saved_postings_saved_at DESC`; downgrade drops tables then type; use `op.execute()` for the ENUM and GENERATED expressions
+- [X] T007 [P] Create `backend/app/schemas/auth.py`. Pydantic schemas: `RegisterIn(email: EmailStr, password: str = Field(min_length=10))`, `LoginIn(email: EmailStr, password: str)`, `UserOut(id: UUID, email: str, created_at: datetime, model_config from_attributes=True)`, `ChangePasswordIn(current_password: str, new_password: str = Field(min_length=10))`, `DeleteAccountIn(password: str)`
+- [X] T008 [P] Create `backend/app/schemas/saved_posting.py`. Pydantic schemas: `SaveIn(posting_id: UUID)`, `StatusUpdateIn(status: ApplicationStatus | None)`, `SavedPostingOut(id: UUID, saved_at: datetime, status: ApplicationStatus | None, posting: PostingListItem, model_config from_attributes=True)`, `SavedPostingsPage(items: list[SavedPostingOut], total: int, page: int, page_size: int, status_counts: dict[str, int])`; import `PostingListItem` from `app.schemas.posting`
+- [X] T009 Update `backend/app/schemas/posting.py`, add `is_saved: bool | None = None` field to `PostingListItem`; this field is omitted (None) for unauthenticated responses and explicitly True/False for authenticated ones
 
-**Checkpoint**: Models, migration, and schemas ready — user story implementation can now begin.
+**Checkpoint**: Models, migration, and schemas ready, user story implementation can now begin.
 
 ---
 
-## Phase 3: User Story 1 — Register & Log In (Priority: P1) 🎯 MVP
+## Phase 3: User Story 1: Register & Log In (Priority: P1) 🎯 MVP
 
 **Goal**: Students can create accounts and authenticate via HTTP-only cookie sessions stored in Redis.
 
@@ -61,7 +61,7 @@
 
 ---
 
-## Phase 4: User Story 2 — Save & Unsave Postings (Priority: P2)
+## Phase 4: User Story 2: Save & Unsave Postings (Priority: P2)
 
 **Goal**: Logged-in students can bookmark postings; bookmarks appear on a `/saved` page.
 
@@ -84,7 +84,7 @@
 
 ---
 
-## Phase 5: User Story 3 — Track Application Status (Priority: P3)
+## Phase 5: User Story 3: Track Application Status (Priority: P3)
 
 **Goal**: Students can assign and update `applied / interviewing / offer / rejected` status on saved postings; Saved page shows counts and can be filtered by status.
 
@@ -99,7 +99,7 @@
 
 ---
 
-## Phase 6: User Story 4 — Account Management (Priority: P4)
+## Phase 6: User Story 4: Account Management (Priority: P4)
 
 **Goal**: Students can change their password and permanently delete their account (all data removed immediately).
 
@@ -118,11 +118,11 @@
 
 ## Phase 7: Polish & Cross-Cutting Concerns
 
-- [X] T034 [P] Update `frontend/src/api/postings.ts` — add `is_saved?: boolean | null` to `PostingListItem`
-- [X] T035 [P] Update `backend/tests/api/test_postings.py` — add `is_saved` test for unauthenticated requests
+- [X] T034 [P] Update `frontend/src/api/postings.ts`, add `is_saved?: boolean | null` to `PostingListItem`
+- [X] T035 [P] Update `backend/tests/api/test_postings.py`, add `is_saved` test for unauthenticated requests
 - [X] T036 [P] Run `docker compose exec api alembic upgrade head` and confirm migration clean; run `docker compose exec api pytest -q -m "not perf"` green; run `docker compose exec web npm test` green
-- [X] T037 Manual quickstart.md validation — execute all 9 curl steps from `specs/002-accounts-tracker/quickstart.md`
-- [X] T038 [P] Frontend smoke tests — register, bookmark, /saved, status badge, logout
+- [X] T037 Manual quickstart.md validation, execute all 9 curl steps from `specs/002-accounts-tracker/quickstart.md`
+- [X] T038 [P] Frontend smoke tests, register, bookmark, /saved, status badge, logout
 
 ---
 
@@ -130,28 +130,28 @@
 
 ### Phase Dependencies
 
-- **Phase 1 (Setup)**: No dependencies — start immediately
-- **Phase 2 (Foundational)**: Depends on Phase 1 — BLOCKS all user stories
-- **Phase 3 (US1 — Auth)**: Depends on Phase 2 — also blocks US2/US3/US4 (login required)
-- **Phase 4 (US2 — Save/Unsave)**: Depends on Phase 3 (needs `get_current_user`) — blocks US3
-- **Phase 5 (US3 — Status)**: Depends on Phase 4 (StatusBadge lives on SavedPostingsPage)
-- **Phase 6 (US4 — Account Mgmt)**: Depends on Phase 3 only — can proceed in parallel with US2/US3
+- **Phase 1 (Setup)**: No dependencies, start immediately
+- **Phase 2 (Foundational)**: Depends on Phase 1. BLOCKS all user stories
+- **Phase 3 (US1. Auth)**: Depends on Phase 2, also blocks US2/US3/US4 (login required)
+- **Phase 4 (US2. Save/Unsave)**: Depends on Phase 3 (needs `get_current_user`), blocks US3
+- **Phase 5 (US3. Status)**: Depends on Phase 4 (StatusBadge lives on SavedPostingsPage)
+- **Phase 6 (US4. Account Mgmt)**: Depends on Phase 3 only, can proceed in parallel with US2/US3
 - **Phase 7 (Polish)**: Depends on all user story phases complete
 
 ### User Story Dependencies
 
-- **US1 (P1)**: After Foundational phase — no story dependencies
+- **US1 (P1)**: After Foundational phase, no story dependencies
 - **US2 (P2)**: After US1 (needs auth cookie + get_current_user)
 - **US3 (P3)**: After US2 (status lives on saved postings)
 - **US4 (P4)**: After US1 (needs authenticated user), independent of US2/US3
 
 ### Parallel Opportunities
 
-- T002 + T003 (deps.py + redis.py) — different files, run together
-- T004 + T005 (User + SavedPosting models) — different files, run together
-- T007 + T008 + T009 (schema files) — different files, run together after T004/T005
-- T015 + T016 + T017 (frontend auth hooks, modal, header) — different files, run together
-- T022 + T023 + T024 + T025 + T026 + T027 (frontend save pieces) — different files, run together
+- T002 + T003 (deps.py + redis.py), different files, run together
+- T004 + T005 (User + SavedPosting models), different files, run together
+- T007 + T008 + T009 (schema files), different files, run together after T004/T005
+- T015 + T016 + T017 (frontend auth hooks, modal, header), different files, run together
+- T022 + T023 + T024 + T025 + T026 + T027 (frontend save pieces), different files, run together
 
 ---
 
@@ -159,10 +159,10 @@
 
 ### MVP First (User Story 1 Only)
 
-1. Complete Phase 1: Setup (T001–T003)
-2. Complete Phase 2: Foundational (T004–T009)
-3. Complete Phase 3: US1 auth (T010–T017)
-4. **STOP and VALIDATE**: run quickstart steps 1–8; confirm register/login/logout/401
+1. Complete Phase 1: Setup (T001 to T003)
+2. Complete Phase 2: Foundational (T004 to T009)
+3. Complete Phase 3: US1 auth (T010 to T017)
+4. **STOP and VALIDATE**: run quickstart steps 1 to 8; confirm register/login/logout/401
 5. Deploy/demo if ready
 
 ### Incremental Delivery
@@ -178,13 +178,13 @@
 
 ## Notes
 
-- [P] tasks touch different files — safe to parallelize within a phase
+- [P] tasks touch different files, safe to parallelize within a phase
 - US4 (account management) can overlap with US2/US3 since it only needs US1
-- `is_saved` on `GET /api/postings` requires `get_optional_user` dep — do not break unauthenticated access (FR-015)
-- Cookie must be set with `response.set_cookie(...)` not via headers directly — FastAPI's `Response` parameter pattern
+- `is_saved` on `GET /api/postings` requires `get_optional_user` dep, do not break unauthenticated access (FR-015)
+- Cookie must be set with `response.set_cookie(...)` not via headers directly. FastAPI's `Response` parameter pattern
 - Redis `EXPIRE` reset on every authenticated request implements the rolling 7-day session (FR-004)
 - argon2-cffi `PasswordHasher()` with defaults (time_cost=2, memory_cost=65536, parallelism=1) is adequate per research.md
 - If Redis is down, `get_current_user` raises HTTP 503 (not 500) to signal a retriable infrastructure error
-- T036–T038 require the Docker stack running — manual validation steps
+- T036 to T038 require the Docker stack running, manual validation steps
 
-> 2026-10-11: T036 migrations 0001–0007 up/down/up + `alembic check` clean, tests green; T037 quickstart steps 1–8 executed against the running app (all expected responses); T038 register → bookmark → tracker → status persists → logout passed in Edge.
+> 2026-10-11: T036 migrations 0001 to 0007 up/down/up + `alembic check` clean, tests green; T037 quickstart steps 1 to 8 executed against the running app (all expected responses); T038 register → bookmark → tracker → status persists → logout passed in Edge.

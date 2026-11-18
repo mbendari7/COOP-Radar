@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Check tasks prerequisites and resolve the tasks template."""
+"""Get the current feature ready for its task list.
+
+/speckit-tasks runs this. It checks plan.md exists, lists which design docs are there (research.md,
+data-model.md, contracts/, quickstart.md) and hands back the tasks template so the skill can fill it in.
+"""
 
 from __future__ import annotations
 

@@ -1,5 +1,13 @@
 #!/usr/bin/env python3
-"""Consolidated prerequisite checking script."""
+"""Check that a feature has the docs the next Spec Kit step needs.
+
+The clarify, checklist, analyze, implement and converge skills run this first. It finds the current feature
+(from the git branch or .specify/feature.json), checks that spec.md, plan.md or tasks.md exist when the step
+needs them, and prints their paths as JSON so the skill knows where to read and write.
+
+Try it by hand from the repo root to see which CoopRadar feature is active:
+    python .specify/scripts/python/check_prerequisites.py --json --paths-only
+"""
 
 from __future__ import annotations
 

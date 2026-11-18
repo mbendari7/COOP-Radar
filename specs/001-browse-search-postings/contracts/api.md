@@ -14,13 +14,13 @@ Returns a paginated, filtered, sorted list of co-op postings.
 
 | Parameter | Type | Default | Validation | Description |
 |-----------|------|---------|------------|-------------|
-| `q` | string | — | max 200 chars | Keyword search across title, company, skills, description |
-| `city` | string | — | | Filter by city (exact match, case-insensitive) |
-| `province` | string | — | 2-char code | Filter by province (e.g. `ON`, `BC`) |
-| `term` | string | — | | Filter by term label (e.g. `Summer 2027`) |
-| `work_mode` | string | — | `onsite\|hybrid\|remote` | Filter by work mode |
-| `duration` | int[] | — | values in {4,8,12,16} | One or more duration values; OR'd |
-| `skills` | string[] | — | | One or more skill names; AND'd (posting must have ALL) |
+| `q` | string | none | max 200 chars | Keyword search across title, company, skills, description |
+| `city` | string | none | | Filter by city (exact match, case-insensitive) |
+| `province` | string | none | 2-char code | Filter by province (e.g. `ON`, `BC`) |
+| `term` | string | none | | Filter by term label (e.g. `Summer 2027`) |
+| `work_mode` | string | none | `onsite\|hybrid\|remote` | Filter by work mode |
+| `duration` | int[] | none | values in {4,8,12,16} | One or more duration values; OR'd |
+| `skills` | string[] | none | | One or more skill names; AND'd (posting must have ALL) |
 | `show_expired` | boolean | `false` | | If false, hides postings with `deadline < today` |
 | `sort` | string | `posted_at` | `posted_at\|deadline\|company\|title` | Sort column |
 | `order` | string | `desc` | `asc\|desc` | Sort direction |

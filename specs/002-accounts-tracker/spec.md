@@ -4,7 +4,12 @@
 
 **Created**: 2026-10-10
 
-**Status**: Draft
+**Status**: Built (2026-10-10). Merged to `main` in PR #1
+
+> **What changed after this was built.** Feature 005 made accounts optional. A visitor who drops in a resume gets
+> a temporary account that is deleted after 7 days unless they keep it with an email and password, and there is a
+> Try the demo account with a filled tracker. Sign in moved from a popup to its own page in feature 007. The
+> tracker itself (7 statuses, history, board, deadlines this week, CSV export) is as this spec describes.
 
 **Input**: User description: "Students need accounts so they can save postings and track where they've applied, with statuses like applied, interviewing, offer, and rejected."
 
@@ -12,7 +17,7 @@
 
 ## User Scenarios & Testing *(mandatory)*
 
-### User Story 1 — Register & Log In (Priority: P1)
+### User Story 1: Register & Log In (Priority: P1)
 
 A student creates an account with their email address and a password. On subsequent
 visits they log in and their session is remembered until they explicitly log out or
@@ -37,7 +42,7 @@ POST to logout; cookie is cleared and the session is invalidated server-side.
 
 ---
 
-### User Story 2 — Save & Unsave Postings (Priority: P2)
+### User Story 2: Save & Unsave Postings (Priority: P2)
 
 A logged-in student can bookmark any posting from the list or detail page with a single
 click. Saved postings are accessible from a "Saved" tab/page. Clicking the same
@@ -56,11 +61,11 @@ and the icon returns to its unfilled state.
 2. **Given** the student has saved a posting, **When** they navigate to their Saved Postings page, **Then** all saved postings are listed with the same columns as the main list, ordered by most recently saved.
 3. **Given** the student has saved a posting, **When** they click the bookmark icon again (unsave), **Then** the posting is removed from the saved list immediately and the icon returns to its default state.
 4. **Given** the student is not logged in, **When** they click the bookmark icon, **Then** they are prompted to log in; after logging in they are returned to their previous page.
-5. **Given** the student has no saved postings, **When** they navigate to /saved, **Then** an empty state reads "You haven't saved any postings yet — browse postings to get started."
+5. **Given** the student has no saved postings, **When** they navigate to /saved, **Then** an empty state reads "You haven't saved any postings yet, browse postings to get started."
 
 ---
 
-### User Story 3 — Track Application Status (Priority: P3)
+### User Story 3: Track Application Status (Priority: P3)
 
 A student can assign a status to any saved posting: **Applied**, **Interviewing**,
 **Offer**, or **Rejected**. They can update the status as their application progresses.
@@ -84,18 +89,18 @@ badge updates. Filter saved postings by "Interviewing"; only that posting appear
 
 ---
 
-### User Story 4 — Account Management (Priority: P4)
+### User Story 4: Account Management (Priority: P4)
 
 A logged-in student can change their password and permanently delete their account.
-Deleting an account removes all personal data — saved postings, statuses — immediately
+Deleting an account removes all personal data, saved postings, statuses, immediately
 and irreversibly.
 
 **Why this priority**: Required by the privacy principle (Constitution V): users must
 be able to delete their data at any time. Password change is standard account hygiene.
 
 **Independent Test**: Log in. Navigate to account settings. Change password; log out;
-log back in with the new password — succeeds. Delete account; attempt to log in with
-the old credentials — fails with "Invalid email or password".
+log back in with the new password, succeeds. Delete account; attempt to log in with
+the old credentials, fails with "Invalid email or password".
 
 **Acceptance Scenarios**:
 
@@ -110,7 +115,7 @@ the old credentials — fails with "Invalid email or password".
 
 - What happens if a student saves a posting that expires before they check it? The posting stays in their saved list but shows an "Expired" badge alongside its status.
 - What happens if two browser tabs are open and the student logs out in one? The next request in the other tab returns 401 and the UI redirects to the login page.
-- What happens if the student tries to save the same posting twice? Silently returns the existing saved record — no duplicate, no error shown.
+- What happens if the student tries to save the same posting twice? Silently returns the existing saved record, no duplicate, no error shown.
 - What happens if Redis is temporarily unavailable? Sessions cannot be validated; all authenticated requests return 503 with a retry message. The postings list (unauthenticated) continues to work.
 - What happens when a student registers with an email that has mixed case (e.g. "User@Example.com")? Emails are normalised to lowercase before storage and comparison.
 

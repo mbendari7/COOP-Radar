@@ -73,7 +73,7 @@ Sets cookie: `session=<token>; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=6
 ```
 
 Note: The same error is returned whether the email doesn't exist or the password
-is wrong — preventing account enumeration (FR-014).
+is wrong, preventing account enumeration (FR-014).
 
 ---
 
@@ -173,7 +173,7 @@ Optionally filter by `status`.
 
 | Parameter | Type | Default | Description |
 |-----------|------|---------|-------------|
-| `status` | string | — | Filter: `applied` / `interviewing` / `offer` / `rejected` |
+| `status` | string | none | Filter: `applied` / `interviewing` / `offer` / `rejected` |
 | `page` | integer | 1 | 1-based page number |
 | `page_size` | integer | 25 | 10 / 25 / 50 |
 
@@ -222,7 +222,7 @@ Optionally filter by `status`.
 
 **[auth required]**
 
-Save a posting. Idempotent — returns the existing record if already saved.
+Save a posting. Idempotent, returns the existing record if already saved.
 
 ### Request body
 
@@ -284,7 +284,7 @@ Invalid status value.
 
 ---
 
-## GET /api/postings — saved indicator
+## GET /api/postings: saved indicator
 
 The existing postings list endpoint returns an optional `is_saved` boolean for
 authenticated users. Unauthenticated requests omit the field entirely.

@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Resolve composed template content from the project template stack."""
+"""Find which copy of a template to use and print it.
+
+Spec Kit looks for overrides and presets first and falls back to .specify/templates/. CoopRadar has no
+overrides, so this returns the filled in templates in that folder. /speckit-constitution uses it to get the
+constitution template.
+"""
 
 from __future__ import annotations
 

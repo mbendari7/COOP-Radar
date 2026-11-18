@@ -13,7 +13,7 @@ tailoring and cover letters.
 
 **Live site:** [COOPRadar](https://coop-radar-qdrc.vercel.app/) ·
 **Students:** [Using CoopRadar](guides/using-coopradar/README.md) ·
-**Builders and interviews:** [How it works](guides/how-it-works/README.md) ·
+**Builders:** [How it works](guides/how-it-works/README.md) ·
 **Running the site:** [Owner's handbook](guides/owner-handbook/README.md)
 
 ```bash
@@ -58,10 +58,11 @@ This README is the front door. Everything else is one click away.
 |---|---|---|
 | A student or anyone who just wants to use it | [Using CoopRadar](guides/using-coopradar/README.md) | Find jobs, match your resume, the tracker, a free AI key, tips, fixes. No code |
 | The owner keeping the site running | [Owner's handbook](guides/owner-handbook/README.md) | Weekly checks, free plan limits, adding employers, updating, before you commit, fixing a broken site |
-| Learning the build or preparing for an interview | [How it works](guides/how-it-works/README.md) | The stack piece by piece, the flow step by step, how to explain it, interview answers |
+| Learning how it is built | [How it works](guides/how-it-works/README.md) | The stack piece by piece and the flow step by step |
 | Changing or debugging the code | [Project guide](docs/PROJECT_GUIDE.md) | Every module, the database, feature deep dives, recipes, testing |
 | Hosting somewhere other than Render | [Deploy](docs/DEPLOY.md) | Render + Neon in detail, Vercel in front, other hosts, your own server |
 | Looking at the design | [DESIGN.md](DESIGN.md) · [PRODUCT.md](PRODUCT.md) | The postal look and why · who it is for |
+| Planning a new feature | [Spec Kit guide](.specify/README.md) · [Feature specs](specs/) · [Prompts](docs/speckit-prompts.md) | The spec first loop, the project rules, a spec for every feature, the open tasks |
 | Curious how AI helped build it | [Agentic workflow log](docs/agentic-workflow.md) · [Progress](docs/progress.md) | What the AI did each session, what was checked |
 
 All guides are also listed in [guides/README.md](guides/README.md).
@@ -319,7 +320,7 @@ COOP-Radar/
 ├── guides/
 │   ├── using-coopradar/         For students and visitors
 │   ├── owner-handbook/          For the owner: keep the site running and change it safely
-│   └── how-it-works/            For builders and interviews: stack, flow, how to explain it
+│   └── how-it-works/            For builders: the stack and the flow
 ├── docs/
 │   ├── PROJECT_GUIDE.md         Every module, recipes, testing, troubleshooting
 │   ├── DEPLOY.md                Hosting in detail and other hosts
@@ -328,7 +329,8 @@ COOP-Radar/
 │   └── images/                  README screenshots
 ├── .github/workflows/           ci.yml (every check + Playwright) · refresh-jobs.yml (keeps the site awake)
 ├── .claude/skills/              Spec Kit skills + project skills (api-conventions, frontend-tables, ...)
-├── .specify/ · specs/           Spec Kit config, constitution and the feature specs 001 to 004
+├── .specify/                    Spec Kit: README (how to use it), constitution, templates, helper scripts
+├── specs/                       One folder per feature, 001 to 008: spec, plan, research, data model, API, tasks
 ├── backend/
 │   ├── app/
 │   │   ├── main.py · config.py · db.py · deps.py · store.py · jobs.py · ai.py · llm.py
@@ -384,10 +386,39 @@ real site exactly like Render does, smoke tests it, and runs Playwright against 
 
 ## Built with Spec Kit and Claude Code
 
-Features were specified and built with the [Spec Kit](https://github.com/github/spec-kit) loop in Claude Code
-(`specs/001` to `004`), governed by `.specify/memory/constitution.md`: filter in SQL, every endpoint has schemas
-and tests, p95 under 300 ms on 10,000 jobs, AI cites sources or says it doesn't know, secrets only in environment
-variables. Project skills in `.claude/skills/` hold the conventions, and every session is logged in
+CoopRadar is built spec first with [Spec Kit](https://github.com/github/spec-kit) in Claude Code. Each feature
+gets a spec (what and why), a plan (how), and a task list before any code is written. Every plan is checked against
+the project rules in [`.specify/memory/constitution.md`](.specify/memory/constitution.md) (version 2.0.0, 10
+rules). In short: filter and sort in SQL, matching works with no AI key, AI cites its sources or says it doesn't
+know, visitor keys are never stored, jobs only come from public sources, p95 under 300 ms on 10,000 jobs, and
+every endpoint has a schema and tests.
+
+| Feature | Spec | Status |
+|---|---|---|
+| 001 Browse and search jobs | [specs/001-browse-search-postings](specs/001-browse-search-postings/) | Built |
+| 002 Accounts and application tracker | [specs/002-accounts-tracker](specs/002-accounts-tracker/) | Built |
+| 003 Real jobs and smart search | [specs/003-ingestion-search](specs/003-ingestion-search/) | Built |
+| 004 AI resume matcher | [specs/004-ai-resume-matcher](specs/004-ai-resume-matcher/) | Core built. Tool using assistant, MCP server and evals still open |
+| 005 Bring your own AI key and a resume first site | [specs/005-byok-resume-first](specs/005-byok-resume-first/) | Built |
+| 006 One command run and free hosting | [specs/006-one-command-free-hosting](specs/006-one-command-free-hosting/) | Built |
+| 007 Co-op matching and a job board layout | [specs/007-coop-matching-job-board](specs/007-coop-matching-job-board/) | Built |
+| 008 Jobs from every field, from public sources | [specs/008-more-job-sources](specs/008-more-job-sources/) | Built |
+
+001 to 004 went through the full loop. 005 to 008 were built straight from chat and their specs were written
+afterwards from the code, so every part of the site has a spec. Work that was planned but not built is left as
+open tasks in those specs.
+
+The loop for a new feature, run from the repo root in Claude Code:
+
+```
+/speckit-specify  →  /speckit-clarify  →  /speckit-plan  →  /speckit-checklist  →  /speckit-tasks
+→  /speckit-analyze  →  /speckit-implement  →  /speckit-converge (until "Converged")  →  /log-agentic-work
+```
+
+[`.specify/README.md`](.specify/README.md) explains each step, what to check after it, and what the helper
+scripts do. The templates in `.specify/templates/` already have the CoopRadar stack, paths and checks filled in.
+[docs/speckit-prompts.md](docs/speckit-prompts.md) has the prompts for 001 to 008 to copy for the next one.
+Project skills in `.claude/skills/` hold the coding conventions, and every session is logged in
 [docs/agentic-workflow.md](docs/agentic-workflow.md).
 
 ---
@@ -401,7 +432,9 @@ variables. Project skills in `.claude/skills/` hold the conventions, and every s
 - [x] Instant first load, Job Bank jobs for every program, new jobs and RSS feeds, lighter database use
 - [ ] Email alerts for new matches
 - [ ] School job boards with public feeds
-- [ ] Learning from which jobs students save; a tool using assistant and evals (spec 004)
+- [ ] Learning from which jobs students save; a tool using assistant, MCP server and evals (open tasks in spec 004)
+- [ ] An Admin form to add sources and review guessed fields; error tracking and a usage dashboard
+- [ ] Unsave from the jobs list; show the match score broken into its parts (open tasks in spec 007)
 
 ## License
 

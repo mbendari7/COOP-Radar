@@ -1,6 +1,6 @@
 # CoopRadar — Progress Log
 
-## Current status (2026-10-31)
+## Current status (2026-11-17)
 
 | Feature | Status |
 |---|---|
@@ -8,6 +8,14 @@
 | 002 Accounts & Application Tracker | Done |
 | 003 Real Postings Ingestion & Semantic Search | Done |
 | 004 AI Resume Matcher | Core done (upload, match, cited Q&A); tool-use agent, MCP server, YAML evals not built |
+| 005 Bring your own AI key and a resume first site | Done (spec written after the code) |
+| 006 One command run and free hosting | Done (spec written after the code); `SITE_URL` still to set |
+| 007 Co-op matching and a job board layout | Done (spec written after the code) |
+| 008 Jobs from every field, from public sources | Done (spec written after the code) |
+
+2026-11-17: every feature now has a spec in `specs/`. The constitution was rewritten (2.0.0, 10 principles) to
+match how the project works, the Spec Kit templates were filled in for CoopRadar, and `.specify/README.md` explains
+the folder. Open tasks in specs 004 to 008 are the next work.
 
 Everything is on `main` (PR #1 merged 2026-10-10; the superseded per-feature branches and PRs #2–#4 were closed).
 New work: branch from `main`, open a PR, merge when CI is green.

@@ -21,11 +21,11 @@ retained at any time; re-uploading replaces the existing row and cascades to del
 | `uploaded_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | |
 
 **Indexes**:
-- `idx_resumes_user_id` on `(user_id)` — supports `WHERE user_id = $1` lookup
+- `idx_resumes_user_id` on `(user_id)`, supports `WHERE user_id = $1` lookup
 
 **Validation rules**:
 - `file_size` ≤ 5,242,880 (5 MB) enforced in the upload endpoint before text extraction
-- `filename` must end in `.pdf` or `.docx` (case-insensitive) — enforced in the upload endpoint
+- `filename` must end in `.pdf` or `.docx` (case-insensitive), enforced in the upload endpoint
 - `extracted_text` must be non-empty after extraction; return 422 if extraction yields blank text
 
 ---
@@ -40,16 +40,16 @@ replaced atomically when a new match run completes.
 | `id` | UUID | PK, DEFAULT gen_random_uuid() | |
 | `resume_id` | UUID | NOT NULL, FK → resumes(id) ON DELETE CASCADE | Cascade delete with resume |
 | `posting_id` | UUID | NOT NULL, FK → postings(id) ON DELETE CASCADE | Cascade delete if posting removed |
-| `score` | SMALLINT | NOT NULL, CHECK 0 ≤ score ≤ 100 | Match quality 0–100 |
+| `score` | SMALLINT | NOT NULL, CHECK 0 ≤ score ≤ 100 | Match quality 0 to 100 |
 | `reason` | TEXT | NOT NULL | One-sentence reason from Claude Haiku |
 | `ranked_at` | TIMESTAMPTZ | NOT NULL, DEFAULT now() | When this match run completed |
 
 **Indexes**:
-- `idx_match_results_resume_score` on `(resume_id, score DESC)` — fetching top-ranked results
-- `UNIQUE (resume_id, posting_id)` — prevents duplicate entries per match run
+- `idx_match_results_resume_score` on `(resume_id, score DESC)`, fetching top-ranked results
+- `UNIQUE (resume_id, posting_id)`, prevents duplicate entries per match run
 
 **Validation rules**:
-- `score` 0–100 inclusive enforced by CHECK constraint and Pydantic schema
+- `score` 0 to 100 inclusive enforced by CHECK constraint and Pydantic schema
 - `reason` must be a non-empty string (max 500 chars enforced in schema, not DB)
 
 ---

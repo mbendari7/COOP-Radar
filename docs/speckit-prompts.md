@@ -1,13 +1,15 @@
-# CoopRadar — Spec Kit Prompt Pack
+# CoopRadar: Spec Kit Prompt Pack
 
 Paste each block into Claude Code, run from the repo root. One block at a time. **Read what it generates before running the next one.**
 
 Where things live: Spec Kit config, templates, and the constitution are in `.specify/`; feature specs in `specs/NNN-*/`;
-the `/speckit-*` and project skills in `.claude/skills/`. Features 001–004 below have already been run — use them as
-the model for Feature 005+.
+the `/speckit-*` and project skills in `.claude/skills/`. Features 001 to 004 below were run through the full loop.
+Features 005 to 008 were built straight from chat and their specs written afterwards, so their blocks below are the
+prompts you would use to run them properly. Use any of them as the model for Feature 009 and up. `.specify/README.md`
+explains the folder and the loop.
 
 - Run the **Constitution once**.
-- Then run each **Feature** (001 → 004) through the full loop below. Finish and merge one feature before you start the next.
+- Then run each **Feature** (001 to 008) through the full loop below. Finish and merge one feature before you start the next.
 
 ```
 /speckit-specify → /speckit-clarify → /speckit-plan → /speckit-checklist → /speckit-tasks
@@ -20,6 +22,10 @@ Rule of thumb: **specify = WHAT and WHY (no tech)**. **plan = HOW (stack, librar
 ---
 
 ## 0. Constitution (run once)
+
+This is the prompt that made version 1.0.0 on 2026-10-09. On 2026-11-17 the constitution was rewritten to 2.0.0
+(10 principles) to match how the project works now: no Docker, matching without AI, bring your own key, free
+hosting. Read `.specify/memory/constitution.md` for the current rules.
 
 ```
 /speckit-constitution
@@ -39,7 +45,7 @@ Principles:
 
 ---
 
-## Feature 001 — Browse & search postings (MVP)
+## Feature 001: Browse & search postings (MVP)
 
 ```
 /speckit-specify
@@ -53,13 +59,13 @@ Users can:
 - Page through results and choose page size (10, 25, 50).
 - Open a posting to see the full description, required skills, and a link to the original posting.
 - Share or bookmark a view: the current search, filters, sort, and page are kept in the page address.
-- See clear loading, empty ("no postings match — clear filters"), and error states.
+- See clear loading, empty ("no postings match, clear filters"), and error states.
 
 Postings whose deadline has passed are hidden by default, with a toggle to show them.
 
 Out of scope for this feature: user accounts, saving postings, importing real postings, AI features. Use about 60 realistic sample postings across Toronto, Mississauga, Waterloo, Kitchener, Guelph, Hamilton, Ottawa and Vancouver, for Winter, Summer and Fall 2027 terms.
 
-Success: a student can narrow 60 postings to the 3–5 that fit them in under 30 seconds.
+Success: a student can narrow 60 postings to the 3 to 5 that fit them in under 30 seconds.
 ```
 
 **Likely `/speckit-clarify` questions and good answers**
@@ -87,7 +93,7 @@ Then run `/speckit-tasks`, `/speckit-analyze`, `/speckit-implement`, and `/speck
 
 ---
 
-## Feature 002 — Accounts & application tracker
+## Feature 002: Accounts & application tracker
 
 ```
 /speckit-specify
@@ -128,7 +134,7 @@ Then the usual loop.
 
 ---
 
-## Feature 003 — Real postings ingestion & semantic search
+## Feature 003: Real postings ingestion & semantic search
 
 ```
 /speckit-specify
@@ -170,7 +176,7 @@ Then the usual loop.
 
 ---
 
-## Feature 004 — AI resume matcher & assistant
+## Feature 004: AI resume matcher & assistant
 
 ```
 /speckit-specify
@@ -178,7 +184,7 @@ Students struggle to tell which postings they're actually qualified for and how 
 
 Users can:
 - Upload a resume (PDF or DOCX) and see the skills, education, and experience CoopRadar extracted, and correct them.
-- See a fit score (0–100) on each posting with a short explanation: matched skills, missing skills, and why.
+- See a fit score (0 to 100) on each posting with a short explanation: matched skills, missing skills, and why.
 - Sort and filter postings by fit score.
 - Chat with an assistant that can search postings, compare postings, explain gaps, and draft tailored resume bullet points or a short cover-letter opening for a chosen posting. Every claim cites the posting(s) it is based on.
 - Ask the assistant to save a posting or change a tracker status; it always asks for confirmation first.
@@ -211,5 +217,127 @@ Then the usual loop. After this feature, also try `/claude-api build-eval` to st
 
 ---
 
-## Optional Feature 005 — Deploy & observability
-Specify: a public demo URL with seeded read-only data, a health page, error tracking, a basic usage dashboard (searches/day, ingestion health, agent pass rate and cost), and one-command deploys from the main branch.
+## Feature 005: Bring your own AI key and a resume first site
+
+Spec written after the code: `specs/005-byok-resume-first/`.
+
+```
+/speckit-specify
+Hosting AI for everyone costs the owner money, and students should not need an account just to see which jobs fit them.
+
+Visitors can:
+- Drop a PDF or DOCX resume without signing up (a temporary account is made and deleted after 7 days unless they keep it).
+- See skills found, the most asked for skills they are missing, and ranked matches with a reason, with no AI key at all.
+- Add their own Claude, ChatGPT or Gemini key, check it, and pick a model the key can use. The key stays in their browser.
+- With a key: get an AI review of the resume, re-rank matches, tailor the resume to one job, draft a cover letter, and ask cited questions about one job.
+- Try a demo account with a filled tracker, and turn any temporary account into a real one.
+
+The owner can optionally offer a few AI actions a day on their own key. Student roles rank above senior ones.
+
+Success: a signed out visitor sees ranked matches within 10 seconds of dropping a resume, with no key.
+```
+
+```
+/speckit-plan
+Same stack. One app/ai.py module over the official anthropic, openai and google-genai SDKs, with complete(), stream(), list_models() and clear error codes. Keys on X-AI-Provider, X-AI-Key and X-AI-Model headers, never stored or logged. Stage 1 matching is SQL skill overlap, stage 2 is the visitor's model. Guest and demo accounts flagged is_demo. Cached AI review in resumes.insights. Follow the agent-tools skill.
+```
+
+```
+/speckit-checklist
+Focus on: keys never stored or echoed, every provider error case, the no key path, prompt injection in resume and posting text, and temporary account cleanup.
+```
+
+---
+
+## Feature 006: One command run and free hosting
+
+Spec written after the code: `specs/006-one-command-free-hosting/`.
+
+```
+/speckit-specify
+Running CoopRadar needs Docker, Redis and a separate worker, which most students and reviewers do not have.
+
+- Anyone with Python and Node runs it with one command. It sets itself up, keeps its own database outside synced folders, and restarts in seconds.
+- The owner hosts it for free and it keeps importing jobs on its own every 6 hours.
+- The free server sleeps when idle, so the first page of jobs must show right away anyway, with a note if the rest is still on its way.
+- Old closed jobs are cleaned up so the free database does not fill.
+
+Success: clone to jobs on screen with one command, and jobs visible in about a second while the server wakes up.
+```
+
+```
+/speckit-plan
+start.py at the repo root (stdlib only) with --dev and --hosted. pgserver for a local Postgres 16 + pgvector in ~/.coopradar. Sessions and counters in a kv_store table behind a Store protocol, Redis only if REDIS_URL is set. Background jobs as asyncio tasks in app/jobs.py, 3 at a time, with a scheduler in the lifespan. Render native Python runtime, Neon database, optional Vercel with /api proxied. A GET /api/postings/snapshot reply cached at the edge and in the browser. Seed fingerprint so restarts skip the seed. Remove every Dockerfile and compose file.
+```
+
+```
+/speckit-checklist
+Focus on: what may and may not be cached at the edge, restart and crash recovery, free plan limits, and the server sleeping halfway through an import.
+```
+
+---
+
+## Feature 007: Co-op matching and a job board layout
+
+Spec written after the code: `specs/007-coop-matching-job-board/`.
+
+```
+/speckit-specify
+Matching only looks at skills, but a co-op student cares about their program, their graduation year and which work term a job is for.
+
+- Read program, degree and graduation year from the resume and let the student fix them.
+- Read the programs, graduation years, work term and length each job asks for.
+- Ask what the student is looking for (job types, keywords, place, work mode, level, term, length, countries) and rank by all of it. Never hide a job just for program or grad year, rank it lower with a note.
+- Each match says why it fits in plain words.
+- The jobs page works like a real job board: one search row, a filter sidebar with counts (term, length, level, place, work mode, job type, program, grad year, date, company, skills), a list beside a details panel, everything in the address, no popups.
+- A free "make your resume fit this job" check, and "new since your last visit" with an RSS feed for any search.
+
+Success: for a resume that names a program, at least 8 of the top 10 matches suit it.
+```
+
+```
+/speckit-plan
+Rules, not AI: services/education.py for programs and grad years, ingest/terms.py for term and length, services/categories.py for job types as title patterns. Generated season and term_start columns. A weighted student fit score in SQL with fit_notes(). JobPreferences saved on the resume. include_unstated for jobs that do not say their term. Design with the Impeccable skill into DESIGN.md. Follow the api-conventions and frontend-tables skills.
+```
+
+```
+/speckit-checklist
+Focus on: grad year versus work term confusion, lenient matching, every filter combination in the URL, the 375 px layout, and the perf budget with every filter on.
+```
+
+---
+
+## Feature 008: Jobs from every field, from public sources
+
+Spec written after the code: `specs/008-more-job-sources/`.
+
+```
+/speckit-specify
+Bring in real jobs from as many employers as possible, in every field that has co-ops, not only tech: nursing, trades, early childhood education, business, hospitality.
+
+- Read each employer's own careers board for the hiring systems most employers use.
+- Read the Government of Canada Job Bank student, apprentice and program feeds.
+- Read the public student internship and new grad lists, keeping each role's term.
+- Make sure every job lands in the right city and country.
+- Use only public APIs and feeds that allow it. Never LinkedIn, Indeed, Glassdoor or Google Jobs.
+
+Success: about 1,700 sources and about 30,000 open jobs, and no import stopped by one broken source.
+```
+
+```
+/speckit-plan
+One adapter per system in backend/app/ingest/ on the existing BaseAdapter and runner: Greenhouse, Lever, Ashby, SmartRecruiters, Workday, Recruitee, BambooHR, Rippling, Oracle, Workable, Simplify, GitHub lists, The Muse, Himalayas, Job Bank, optional Adzuna. Each adapter type added to the CHECK constraint in a migration. Recorded replies with respx in tests. seed/job_boards.py plus seed/discovered_boards.json from seed/discover_boards.py. rolling_window for feeds that only show a few days. Link every source's robots.txt and terms in research.md.
+```
+
+```
+/speckit-checklist
+Focus on: terms and robots.txt for every source, re running twice, country and location rules, rate limits, and one bad source not stopping the rest.
+```
+
+---
+
+## Feature 009 and up
+
+Ideas waiting for a spec: the rest of 004 (tool using assistant with a confirm step, MCP server, `agent_runs`,
+YAML evals), an Admin form to add sources and review low confidence fields, error tracking and a usage dashboard,
+unsave from the jobs list, and showing the fit score broken into its parts.

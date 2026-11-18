@@ -1,5 +1,7 @@
 #!/usr/bin/env pwsh
 
+# Find which copy of a template to use and print it (PowerShell version of resolve_template.py)
+
 param(
     [Parameter(Position=0)]
     [string]$TemplateName,

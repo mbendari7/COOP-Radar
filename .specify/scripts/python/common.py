@@ -1,4 +1,9 @@
-"""Shared helpers for Spec Kit Python scripts."""
+"""Shared helpers for the Spec Kit scripts.
+
+Finds the repo root (the folder with .specify in it), works out which specs/NNN-name folder is the current
+feature, reads and writes .specify/feature.json, and finds the right copy of a template. Every other script
+in this folder imports from here.
+"""
 
 from __future__ import annotations
 

@@ -22,7 +22,7 @@ implementation is complete.
 docker compose up --build -d
 ```
 
-Expected: four containers running — `db` (postgres:16), `redis`, `api` (FastAPI on :8000), `web` (Vite on :5173).
+Expected: four containers running, `db` (postgres:16), `redis`, `api` (FastAPI on :8000), `web` (Vite on :5173).
 
 ---
 

@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
-"""Setup implementation plan for a feature."""
+"""Get the current feature ready for planning.
+
+/speckit-plan runs this. It finds the current feature and copies the plan template (with the CoopRadar stack
+and Constitution Check already in it) to plan.md, then prints the paths as JSON.
+"""
 
 from __future__ import annotations
 

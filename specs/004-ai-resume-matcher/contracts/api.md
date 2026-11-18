@@ -43,11 +43,11 @@ Upload a resume file, extract text, run match pipeline, store results.
 ```
 
 **Error responses**:
-- `400 Bad Request` — `{"detail": "Unsupported file type. Upload a PDF or DOCX.", "code": "INVALID_FILE_TYPE"}`
-- `400 Bad Request` — `{"detail": "File exceeds 5 MB limit.", "code": "FILE_TOO_LARGE"}`
-- `422 Unprocessable Entity` — `{"detail": "Could not extract text from the uploaded file.", "code": "EXTRACTION_FAILED"}`
-- `401 Unauthorized` — unauthenticated request
-- `504 Gateway Timeout` — match pipeline exceeded 30 s
+- `400 Bad Request`, `{"detail": "Unsupported file type. Upload a PDF or DOCX.", "code": "INVALID_FILE_TYPE"}`
+- `400 Bad Request`, `{"detail": "File exceeds 5 MB limit.", "code": "FILE_TOO_LARGE"}`
+- `422 Unprocessable Entity`, `{"detail": "Could not extract text from the uploaded file.", "code": "EXTRACTION_FAILED"}`
+- `401 Unauthorized`, unauthenticated request
+- `504 Gateway Timeout`, match pipeline exceeded 30 s
 
 **Notes**:
 - Re-uploading replaces the existing resume row and all match_results atomically
@@ -71,7 +71,7 @@ Return stored resume metadata for the authenticated user.
 ```
 
 **Error responses**:
-- `404 Not Found` — `{"detail": "No resume on file.", "code": "RESUME_NOT_FOUND"}`
+- `404 Not Found`, `{"detail": "No resume on file.", "code": "RESUME_NOT_FOUND"}`
 - `401 Unauthorized`
 
 ---
@@ -83,7 +83,7 @@ Permanently delete the stored resume and all associated match results.
 **Success response**: `204 No Content`
 
 **Error responses**:
-- `404 Not Found` — `{"detail": "No resume on file.", "code": "RESUME_NOT_FOUND"}`
+- `404 Not Found`, `{"detail": "No resume on file.", "code": "RESUME_NOT_FOUND"}`
 - `401 Unauthorized`
 
 ---
@@ -129,7 +129,7 @@ Return the stored ranked match results for the authenticated user's current resu
 Stream a Q&A response about the matched posting. Response is streamed as Server-Sent Events.
 
 **Path parameters**:
-- `posting_id` — UUID of the posting (must be in the user's match results)
+- `posting_id`. UUID of the posting (must be in the user's match results)
 
 **Request body**: `application/json`
 ```json
@@ -152,9 +152,9 @@ data: [DONE]\n\n
 Final message is always `data: [DONE]\n\n`.
 
 **Error responses** (returned before streaming starts):
-- `404 Not Found` — `{"detail": "Posting not in your match results.", "code": "MATCH_NOT_FOUND"}`
-- `404 Not Found` — `{"detail": "No resume on file.", "code": "RESUME_NOT_FOUND"}`
-- `400 Bad Request` — `{"detail": "Question must not be empty.", "code": "EMPTY_QUESTION"}`
+- `404 Not Found`, `{"detail": "Posting not in your match results.", "code": "MATCH_NOT_FOUND"}`
+- `404 Not Found`, `{"detail": "No resume on file.", "code": "RESUME_NOT_FOUND"}`
+- `400 Bad Request`, `{"detail": "Question must not be empty.", "code": "EMPTY_QUESTION"}`
 - `401 Unauthorized`
 
 **Notes**:

@@ -500,3 +500,29 @@ Not run: the test suites themselves, and the live site was not checked for its c
 pgserver. Live adapter run against Walmart, Gap and TD recorded in the summary to the owner.
 
 **What I reviewed / changed**: _(fill in after reviewing the diff)_
+
+## 2026-11-17. Spec Kit files filled in for CoopRadar, specs for features 005 to 008
+
+**What the AI assistant did**:
+- Asked: fill in the Spec Kit templates, scripts and `.specify` files with how to use and build CoopRadar, based on
+  all the work so far, in plain human wording with no fancy dashes.
+- Rewrote the constitution as 2.0.0 with 10 principles that match the code now (no Docker, matching works without
+  AI, bring your own key, free hosting, Neon data transfer, public sources only, plain words, docs numbers kept in
+  step). Added `.specify/README.md` explaining the folder, the loop, the scripts and where every feature stands.
+- Filled the spec, plan, tasks, checklist and constitution templates with the CoopRadar stack, real paths, checks,
+  edge cases and a 10 row Constitution Check, keeping the headings the `speckit-*` skills read.
+- Rewrote the opening comments of the 12 Python and PowerShell helper scripts in plain words. No code changed.
+- Wrote full specs (spec, plan, research, data model, contracts, quickstart, tasks, requirements checklist) for work
+  that had been built straight from chat: 005 bring your own key and resume first, 006 one command and free hosting,
+  007 co-op matching and job board, 008 more job sources. Facts checked against the schemas, routes, migrations
+  and this log. Unbuilt items left as open tasks, and the missing 004 scope added to its tasks.
+- Marked specs 001 to 004 as built with a note on what changed later, swapped the em and en dashes in them and in
+  `docs/speckit-prompts.md` for plain punctuation, and added the 005 to 008 prompts there. Updated progress,
+  PROJECT_GUIDE, README and CLAUDE.md to point at the new specs.
+
+**Results (actual runs)**: `check_prerequisites.py --json --paths-only`, `create_new_feature.py --dry-run`,
+`resolve_template.py plan-template` and the PowerShell `check-prerequisites.ps1` all ran after the comment changes.
+`resolve_template.py` needs `PYTHONIOENCODING=utf-8` on the Windows console, which was true before this change too.
+Docs and comments only, the test suites were not run.
+
+**What I reviewed / changed**: _(fill in after reviewing the diff)_

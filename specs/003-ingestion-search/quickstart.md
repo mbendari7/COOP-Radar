@@ -13,7 +13,7 @@
 
 ---
 
-## Scenario 1 — Scheduled Ingestion (US1)
+## Scenario 1: Scheduled Ingestion (US1)
 
 ### Setup
 
@@ -45,7 +45,7 @@ curl http://localhost:8000/api/admin/sources/<source-id>/runs \
 
 ---
 
-## Scenario 2 — CSV Upload (US2)
+## Scenario 2: CSV Upload (US2)
 
 ### Setup
 
@@ -70,7 +70,7 @@ curl -X POST http://localhost:8000/api/postings/upload \
 # Expected response:
 # { "added": 4, "skipped_duplicates": 0, "errors": [{"row":3,"column":"deadline","message":"..."}] }
 
-# Upload same file again — duplicates detected
+# Upload same file again: duplicates detected
 curl -X POST http://localhost:8000/api/postings/upload \
   -H "Cookie: session=<user-session>" \
   -F "file=@sample_postings.csv"
@@ -79,7 +79,7 @@ curl -X POST http://localhost:8000/api/postings/upload \
 
 ---
 
-## Scenario 3 — Semantic Search (US3)
+## Scenario 3: Semantic Search (US3)
 
 ### Setup
 
@@ -94,7 +94,7 @@ docker compose exec worker python -m app.ingest.embed_worker --all
 # Keyword search (baseline)
 curl "http://localhost:8000/api/postings?q=firmware&search_mode=keyword" | jq '.total'
 
-# Semantic search — should find "microcontroller C developer" posts
+# Semantic search: should find "microcontroller C developer" posts
 curl "http://localhost:8000/api/postings?q=embedded+firmware&search_mode=semantic" | jq '.items[].title'
 
 # Similar postings
@@ -106,7 +106,7 @@ curl "http://localhost:8000/api/postings/<posting-id>/similar" | jq '.items | le
 
 ---
 
-## Scenario 4 — Admin Sources Page (US4)
+## Scenario 4: Admin Sources Page (US4)
 
 ### Steps
 
@@ -127,7 +127,7 @@ curl http://localhost:8000/api/admin/sources -H "Cookie: session=<admin-session>
 
 ---
 
-## Scenario 5 — Manual Posting Entry
+## Scenario 5: Manual Posting Entry
 
 ```bash
 curl -X POST http://localhost:8000/api/postings \
